@@ -1,5 +1,39 @@
 # CHANGELOG
 
+## [2026-06-27] - Fase 3: Persistencia e fila de sincronizacao
+
+### Alterado
+- O frontend passou a manter uma fila local persistida para visitas nao sincronizadas.
+- A tela de sincronizacao ganhou acao de reenviar a fila local pendente.
+- O fluxo de sync passou a registrar estados intermediarios da fila local.
+- O backend recebeu endpoint dedicado para retry de sincronizacao.
+- O backend recebeu endpoint para consulta da fila operacional de sync.
+
+### Adicionado
+- `src/services/syncQueue.ts`
+- `netlify/functions/_shared/sync.ts`
+- `netlify/functions/retry-sync.ts`
+- `netlify/functions/sync-queue.ts`
+
+### Corrigido
+- A visita nao fica mais dependente apenas do envio imediato para considerar o registro salvo localmente.
+- O reenvio manual deixou de reutilizar o caminho de sync normal sem diferenciar retry.
+- O estado da fila local agora e atualizado de forma coerente em sucesso e erro.
+
+### Seguranca
+- O reenvio passou a acontecer no backend, sem expor webhook ou credencial no navegador.
+- A fila local evita perda de visita em caso de falha de rede ou erro temporario.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso.
+- `npm.cmd run dev` validado com smoke check local em `200`.
+- `npx.cmd --yes netlify dev --target-port 3000 --port 8889 --no-open` validado com smoke check em `200` na raiz e `/api/health`, e `401` em `/api/sync/queue` sem autenticacao.
+
+### Pendencias
+- Fase 4: endurecer validacoes do fluxo do promotor ponta a ponta.
+- Fase 5: painel supervisor com dados reais e sem sinteticos.
+
 ## [2026-06-27] - Fase 2: Backend minimo seguro
 
 ### Alterado

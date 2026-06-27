@@ -39,6 +39,17 @@ Data da ultima auditoria: 2026-06-27
 - [x] Smoke check do frontend puro retornou `200`.
 - [x] Smoke check do backend local retornou `200` em `/api/health` e `/api/config`.
 
+## Fase 3 - Persistencia e fila de sincronizacao
+
+- [x] Fila local persistida criada para visitas nao sincronizadas.
+- [x] Reenvio manual da fila local adicionado na tela de sincronizacao.
+- [x] Backend recebeu endpoint de retry dedicado.
+- [x] Backend recebeu endpoint para consulta da fila operacional.
+- [x] Estados da fila local atualizados para pendente, enviando, enviado e erro.
+- [x] `npm.cmd run lint` executado apos a implementacao da Fase 3.
+- [x] `npm.cmd run build` executado apos a implementacao da Fase 3.
+- [x] Smoke check do fluxo de fila e retry executado.
+
 ## Checklist da fase 0
 
 - [x] Li os arquivos diretamente envolvidos.
@@ -91,4 +102,5 @@ Data da ultima auditoria: 2026-06-27
 - O ambiente local aceitou o projeto com build aprovado.
 - O `npm.cmd install` reportou 8 vulnerabilidades no inventario de dependencias.
 - O build ainda emite warning sobre chunk grande acima de 500 kB.
-- A fila de retry manual dedicada continua como objetivo da Fase 3.
+- A fila de retry manual dedicada agora existe e segue para validacao final.
+- A fila local e o endpoint de retry foram validados em runtime com `401` sem autenticacao na fila e `200` nos endpoints basicos.

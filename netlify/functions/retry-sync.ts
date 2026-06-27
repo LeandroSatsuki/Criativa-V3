@@ -1,7 +1,7 @@
 import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { authenticate } from './_shared/auth';
-import { getVisit, upsertVisit } from './_shared/visits';
+import { getVisit } from './_shared/visits';
 import { syncVisitRecord } from './_shared/sync';
 
 export default async (request: Request, context: Context) => {
@@ -15,21 +15,25 @@ export default async (request: Request, context: Context) => {
   }
 
   const visitId = context.params.id as string | undefined;
-  const payload = await request.json().catch(() => ({}));
-  const resolvedVisitId = visitId || payload.visitId;
-
-  if (!resolvedVisitId) {
+  if (!visitId) {
     return json({ error: 'ID da visita é obrigatório' }, 400);
   }
 
-  const existing = await getVisit(resolvedVisitId);
-  const visit = existing || await upsertVisit({ ...payload, visitId: resolvedVisitId });
-  const result = await syncVisitRecord(visit);
-  const status = result.syncStatus === 'enviado' ? 200 : result.syncStatus === 'enviando' ? 202 : result.syncStatus === 'erro' ? 502 : 200;
+  const visit = await getVisit(visitId);
+  if (!visit) {
+    return json({ error: 'Visita não encontrada' }, 404);
+  }
+
+  const result = await syncVisitRecord({
+    ...visit,
+    syncStatus: 'reenviar',
+  });
+
+  const status = result.syncStatus === 'enviado' ? 200 : result.syncStatus === 'erro' ? 502 : 202;
   return json(result, status);
 };
 
 export const config: Config = {
-  path: '/api/visits/sync',
+  path: '/api/sync/:id/retry',
   method: ['POST'],
 };

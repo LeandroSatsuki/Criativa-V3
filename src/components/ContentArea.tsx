@@ -8,6 +8,7 @@ import { SectionId, VisitState, Industry } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { logService } from '../services/logService';
 import { analyzeProductPhoto } from '../services/geminiService';
+import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
 import SupervisorDashboard from './SupervisorDashboard';
 import CriativaIcon from './CriativaIcon';
 import { 
@@ -49,11 +50,19 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [logs, setLogs] = React.useState<any[]>([]);
   const [isTesting, setIsTesting] = useState(false);
+  const [queueCount, setQueueCount] = useState(() => getQueuedVisitCount());
 
   React.useEffect(() => {
     return logService.subscribe((newLogs) => {
       setLogs([...newLogs]);
     });
+  }, []);
+
+  React.useEffect(() => {
+    const refreshQueue = () => setQueueCount(getQueuedVisitCount());
+    refreshQueue();
+    window.addEventListener('storage', refreshQueue);
+    return () => window.removeEventListener('storage', refreshQueue);
   }, []);
 
   const logEndRef = React.useRef<HTMLDivElement>(null);
@@ -124,6 +133,59 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     }
   };
 
+  const syncQueuedVisit = async (payload: any, queueVisitId?: string, useRetryEndpoint = false) => {
+    const queued = upsertQueuedVisit(payload, queueVisitId || payload.visitId, useRetryEndpoint ? 'syncing' : 'pending');
+    const resolvedVisitId = queued.visitId;
+    let activeVisitId = resolvedVisitId;
+    updateVisit('visitId', resolvedVisitId);
+
+    try {
+      updateQueuedVisit(resolvedVisitId, {
+        status: 'syncing',
+        error: null,
+        payload: { ...payload, visitId: resolvedVisitId },
+      });
+
+      const draft = await apiService.createVisit({ ...payload, visitId: resolvedVisitId });
+      const serverVisitId = draft.visitId || resolvedVisitId;
+      activeVisitId = serverVisitId;
+      updateVisit('visitId', serverVisitId);
+
+      if (serverVisitId !== resolvedVisitId) {
+        removeQueuedVisit(resolvedVisitId);
+        upsertQueuedVisit(payload, serverVisitId, 'pending');
+      }
+
+      const result = useRetryEndpoint
+        ? await apiService.retrySync(serverVisitId)
+        : await apiService.syncVisit({ ...payload, visitId: serverVisitId }, (msg) => setSyncMessage(msg));
+
+      if (result.syncStatus === 'enviado') {
+        removeQueuedVisit(serverVisitId);
+        setQueueCount(getQueuedVisitCount());
+        return result;
+      }
+
+      updateQueuedVisit(serverVisitId, {
+        status: 'error',
+        error: result.syncError || 'Falha na sincronização',
+        attempts: queued.attempts + 1,
+        payload: { ...payload, visitId: serverVisitId },
+      });
+      setQueueCount(getQueuedVisitCount());
+      throw new Error(result.syncError || 'Falha na sincronização');
+    } catch (error: any) {
+      updateQueuedVisit(activeVisitId, {
+        status: 'error',
+        error: error.message || 'Falha na sincronização',
+        attempts: queued.attempts + 1,
+        payload: { ...payload, visitId: activeVisitId },
+      });
+      setQueueCount(getQueuedVisitCount());
+      throw error;
+    }
+  };
+
   const handleSync = async () => {
     console.log(">>> BOTAO SINCRONIZAR CLICADO <<<");
     setSyncError(null);
@@ -142,16 +204,48 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     setIsSyncing(true);
     setSyncMessage('Iniciando sincronização...');
     try {
-      await apiService.syncVisit({
+      await syncQueuedVisit({
         ...visitState,
         timestamp: getBrasiliaISO()
-      }, (msg) => setSyncMessage(msg));
+      }, visitState.visitId || undefined);
       setSyncSuccess(true);
+      setQueueCount(getQueuedVisitCount());
       setTimeout(() => {
         onReset();
       }, 3000);
     } catch (error: any) {
       setSyncError(error.message || "Erro desconhecido na sincronização");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleRetryQueue = async () => {
+    const queuedVisits = listQueuedVisits();
+    if (queuedVisits.length === 0) {
+      setSyncError('Não há visitas na fila local para reenviar.');
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncError(null);
+    setSyncSuccess(false);
+    logService.clear();
+    logService.addLog(`Reenviando fila local (${queuedVisits.length})...`, 'info');
+
+    try {
+      for (const queuedVisit of queuedVisits) {
+        setSyncMessage(`Reenviando ${queuedVisit.visitId}...`);
+        await syncQueuedVisit(queuedVisit.payload, queuedVisit.visitId, true);
+      }
+
+      setSyncSuccess(true);
+      setQueueCount(getQueuedVisitCount());
+      setTimeout(() => {
+        onReset();
+      }, 3000);
+    } catch (error: any) {
+      setSyncError(error.message || 'Não foi possível reenviar a fila local.');
     } finally {
       setIsSyncing(false);
     }
@@ -775,14 +869,23 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   </div>
                 )}
                 
-                <button 
+                <button
                   onClick={handleSync}
                   className="bg-[#E65C5C] text-white px-12 py-6 rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-[#E65C5C]/20 hover:scale-105 active:scale-95 transition-all"
                 >
                   Sincronizar Agora
                 </button>
 
-                <button 
+                {queueCount > 0 && (
+                  <button
+                    onClick={handleRetryQueue}
+                    className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
+                  >
+                    Reenviar Fila Local ({queueCount})
+                  </button>
+                )}
+
+                <button
                   disabled={isTesting}
                   onClick={handleTestConnection}
                   className="text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-blue-500 transition-colors flex items-center gap-2"
@@ -799,6 +902,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     Voltar para Foto de Saída
                   </button>
                 )}
+
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  Fila local: {queueCount}
+                </p>
               </div>
             )}
           </div>

@@ -39,4 +39,5 @@ O comando usa `netlify dev` por baixo e expõe as rotas em `/api/*`.
 
 - A Fase 1 centraliza a configuração em variáveis de ambiente.
 - A Fase 2 moveu as integrações sensíveis para Netlify Functions.
+- A Fase 3 adiciona fila local persistida e retry de sincronização.
 - O frontend agora fala apenas com `/api/*`.

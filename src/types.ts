@@ -27,12 +27,15 @@ export type Industry = string;
 
 export interface VisitState {
   user: User | null;
+  visitId?: string | null;
   currentStore: string;
   currentStoreId: string;
   step: SectionId;
   checkInDone: boolean;
   checkInTime: string | null;
   checkOutTime: string | null;
+  syncStatus?: 'pendente' | 'enviando' | 'enviado' | 'erro' | 'reenviar' | null;
+  syncError?: string | null;
   selectedIndustry: Industry | null;
   tasks: Record<string, boolean>;
   photos: Record<string, string[]>;

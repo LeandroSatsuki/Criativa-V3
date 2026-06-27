@@ -27,6 +27,20 @@ type SyncResponse = {
   syncError?: string | null;
 };
 
+type SyncQueueResponse = {
+  count: number;
+  queue: Array<{
+    visitId: string;
+    syncStatus: string;
+    syncError: string | null;
+    createdAt: string;
+    updatedAt: string;
+    store: string;
+    promoter: string;
+    region: string;
+  }>;
+};
+
 export const getBrasiliaDate = () => {
   const now = new Date();
   const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
@@ -161,5 +175,15 @@ export const apiService = {
 
   getSyncStatus: async (visitId: string) => {
     return requestJson<any>(`/sync/${visitId}/status`);
+  },
+
+  retrySync: async (visitId: string) => {
+    return requestJson<SyncResponse>(`/sync/${visitId}/retry`, {
+      method: 'POST',
+    });
+  },
+
+  getSyncQueue: async () => {
+    return requestJson<SyncQueueResponse>('/sync/queue');
   },
 };
