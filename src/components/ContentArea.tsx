@@ -9,6 +9,7 @@ import { apiService, getBrasiliaISO } from '../services/apiService';
 import { logService } from '../services/logService';
 import { analyzeProductPhoto } from '../services/geminiService';
 import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
+import { generateVisitId } from '../services/visitId';
 import SupervisorDashboard from './SupervisorDashboard';
 import CriativaIcon from './CriativaIcon';
 import { 
@@ -74,6 +75,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   }, [logs]);
 
   const handleCheckIn = (store: any) => {
+    if (!visitState.visitId) {
+      updateVisit('visitId', generateVisitId());
+    }
     updateVisit('currentStore', store.name);
     updateVisit('currentStoreId', store.id);
     updateVisit('checkInTime', getBrasiliaISO());
@@ -543,6 +547,11 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     return;
                   }
 
+                  const resolvedVisitId = visitState.visitId || generateVisitId();
+                  if (!visitState.visitId) {
+                    updateVisit('visitId', resolvedVisitId);
+                  }
+
                   setIsAnalyzing(true);
                   
                   // Mark task as done and navigate IMMEDIATELY for instant feel
@@ -551,7 +560,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
                   // Run AI analysis in background without blocking the user
                   if (currentPhotos[0]) {
-                    analyzeProductPhoto(currentPhotos[0], [visitState.selectedIndustry || 'Veneza'])
+                    analyzeProductPhoto({
+                      base64Image: currentPhotos[0],
+                      industries: [visitState.selectedIndustry || 'Veneza'],
+                      visitId: resolvedVisitId,
+                      sectionId,
+                    })
                       .then(result => {
                         setAiResult(result);
                         const updatedAiResults = { ...visitState.aiResults, [sectionId]: result };

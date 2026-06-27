@@ -19,8 +19,8 @@ O app ja possui o fluxo visual principal do promotor, mas hoje a confianca opera
 O build atual passa, mas a base ainda nao esta pronta para uso real com seguranca e rastreabilidade completas.
 
 Status da fase atual:
-- Fase 5 concluida e validada.
-- Proxima fase recomendada: Fase 6, com analise de imagem em camada segura e tratamento de falhas.
+- Fase 6 concluida e validada.
+- Proxima fase recomendada: Fase 7, com implantacao e configuracao de ambiente.
 
 ## Arquivos principais e responsabilidades
 

@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## [2026-06-27] - Fase 6: IA e analise de imagem segura
+
+### Alterado
+- A analise de imagem passou a receber `visitId` estavel do fluxo do promotor.
+- A rota de IA agora persiste o resultado no backend quando a visita existe ou cria um rascunho best-effort quando necessario.
+- O frontend continua nao bloqueando o fluxo se a IA falhar.
+- O resultado da IA continua sendo refletido no estado local e agora tambem pode ficar salvo na visita do backend.
+
+### Adicionado
+- `src/services/visitId.ts`
+- Persistencia best-effort de analise em `netlify/functions/ai-analyze.ts`
+
+### Corrigido
+- Eliminado o risco de analise depender apenas de estado local sem identidade estável da visita.
+- A falha da IA continua sem bloquear o fluxo operacional.
+- O backend passou a manter o resultado da analise junto da visita quando possivel.
+
+### Seguranca
+- A chave do Gemini permanece apenas no backend.
+- O frontend continua sem acesso direto ao modelo ou segredo.
+- A rota de IA exige autenticacao e falha de forma controlada se a chave nao estiver configurada.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso.
+- Smoke check em `http://127.0.0.1:8890/api/visits` confirmou persistencia de `aiResults` com `AI_SAVED=Bom`.
+- Smoke check em `http://127.0.0.1:8890/api/ai/analyze` com chave ausente retornou `AI_ROUTE=503`.
+
+### Pendencias
+- Fase 7: preparar implantacao com variaveis e ambiente de hospedagem.
+- Validacao manual da IA com chave real do cliente em ambiente autorizado.
+
 ## [2026-06-27] - Fase 5: Painel supervisor com dados reais
 
 ### Alterado

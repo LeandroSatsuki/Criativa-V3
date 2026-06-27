@@ -70,6 +70,17 @@ Data da ultima auditoria: 2026-06-27
 - [x] `npm.cmd run build` executado apos a implementacao da Fase 5.
 - [x] Smoke check autenticado do dashboard supervisor executado.
 
+## Fase 6 - IA e analise de imagem segura
+
+- [x] `visitId` estabilizado no fluxo antes da analise.
+- [x] Rota de IA persiste resultado no backend quando possivel.
+- [x] Falha da IA continua sem bloquear a visita.
+- [x] Frontend continua sem acesso direto ao segredo da Gemini.
+- [x] `npm.cmd run lint` executado apos a implementacao da Fase 6.
+- [x] `npm.cmd run build` executado apos a implementacao da Fase 6.
+- [x] Smoke check de persistencia de `aiResults` no backend executado.
+- [x] Smoke check da rota de IA sem chave configurada executado.
+
 ## Checklist da fase 0
 
 - [x] Li os arquivos diretamente envolvidos.
@@ -127,3 +138,4 @@ Data da ultima auditoria: 2026-06-27
 - O fluxo principal do promotor ficou mais travado contra conclusao incompleta.
 - O painel supervisor deixou de depender de `chartData` fixo e numeros sinteticos.
 - O smoke check autenticado do supervisor retornou `PROMOTERS=25`, `TOTAL_VISITS=0`, `PENDING_SYNC=0`, `TIMELINE_POINTS=6`.
+- O smoke check de IA retornou `AI_SAVED=Bom` na persistencia de visita e `AI_ROUTE=503` sem chave Gemini configurada.
