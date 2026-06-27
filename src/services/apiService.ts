@@ -1,5 +1,6 @@
 import { Role, SectionId } from '../types';
 import { logService } from './logService';
+import { appConfig } from '../config/appConfig';
 
 // Helper to get current time in Brasília timezone (UTC-3)
 export const getBrasiliaDate = () => {
@@ -17,15 +18,34 @@ export const getBrasiliaISO = () => {
   }).format(now).replace(' ', 'T');
 };
 
-const spreadsheetId = '1KyyEA78ny_5iNh5N9LTbtX5ieyJ6_s5UR-1Mv45bi-Q';
 const CACHE_KEY = 'CRIATIVA_APP_CACHE';
 
+const DEFAULT_CONFIG = {
+  industries: appConfig.defaultIndustries,
+  promoters: [],
+  stores: [],
+  timestamp: null as string | null,
+};
+
+const generateId = (prefix: string) => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  }
+
+  return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+};
+
 async function fetchSheetData(sheetName: string) {
+  if (!appConfig.googleSheetsId) {
+    console.warn(`Google Sheets ID não configurado. Ignorando a aba ${sheetName}.`);
+    return null;
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+    const url = `https://docs.google.com/spreadsheets/d/${appConfig.googleSheetsId}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
     const response = await fetch(url, { signal: controller.signal });
     const text = await response.text();
     clearTimeout(timeoutId);
@@ -94,6 +114,10 @@ export const apiService = {
         (window as any)._cachedPromoters = data.promoters;
         return data;
       }
+
+      if (!appConfig.googleSheetsId) {
+        return DEFAULT_CONFIG;
+      }
     }
 
     try {
@@ -120,7 +144,7 @@ export const apiService = {
       })).filter((s: any) => s.name && s.name !== 'NOME_LOJA') || [];
 
       const config = {
-        industries: industries.length > 0 ? industries : ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'],
+        industries: industries.length > 0 ? industries : appConfig.defaultIndustries,
         promoters,
         stores,
         timestamp: getBrasiliaDate().toISOString()
@@ -136,17 +160,13 @@ export const apiService = {
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) return JSON.parse(cached);
       
-      return { industries: ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'], promoters: [], stores: [], timestamp: null };
+      return DEFAULT_CONFIG;
     }
   },
   login: async (credentials: { user: string; pass: string }) => {
     const u = (credentials.user || "").toLowerCase().trim();
     const p = (credentials.pass || "").toLowerCase().trim();
     
-    if ((u === 'admin' || u === 'administrador') && p === 'admin') {
-      return { id: '0', name: 'Supervisor Geral', role: 'SUPERVISOR' as const, user: 'admin' };
-    }
-
     const promoters = (window as any)._cachedPromoters || [];
     const found = promoters.find((promoter: any) => 
       promoter.user === u && promoter.pass === p
@@ -192,7 +212,11 @@ export const apiService = {
     }
   },
   syncVisit: async (payload: any, onProgress?: (msg: string) => void) => {
-    const webhookUrl = 'https://hook.us2.make.com/at8o2xrwiqh1wk271mwve4nena7hmnms';
+    const webhookUrl = appConfig.makeWebhookUrl;
+
+    if (!webhookUrl) {
+      throw new Error("VITE_MAKE_WEBHOOK_URL não configurada. Sincronização indisponível.");
+    }
     
     if (onProgress) onProgress('Preparando dados para envio...');
 
@@ -332,7 +356,7 @@ export const apiService = {
 
     const transformedPayload = {
       DATA_VISITA: formatBrasiliaDate(payload.timestamp || payload.checkInTime),
-      ID_VISITA: 'VISIT-' + new Date().getHours() + new Date().getMinutes() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase(),
+      ID_VISITA: generateId('VISIT'),
       NOME_PROMOTOR: cleanText(payload.user?.name, 'Promotor'),
       NOME_LOJA: cleanText(payload.currentStore, 'Loja'),
       HORA_ENTRADA_CHECK_IN: formatBrasiliaTime(payload.checkInTime),
@@ -411,7 +435,7 @@ export const apiService = {
       }
       
       logService.addLog("🎉 Sincronização concluída com sucesso!", "success");
-      return { visitId: 'SYNC-' + Math.random().toString(36).substr(2, 9).toUpperCase() };
+      return { visitId: generateId('SYNC') };
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
@@ -424,7 +448,11 @@ export const apiService = {
     }
   },
   pingMake: async () => {
-    const webhookUrl = 'https://hook.us2.make.com/at8o2xrwiqh1wk271mwve4nena7hmnms';
+    const webhookUrl = appConfig.makeWebhookUrl;
+
+    if (!webhookUrl) {
+      throw new Error("VITE_MAKE_WEBHOOK_URL não configurada. Teste de conexão indisponível.");
+    }
     // Envia um "Gabarito" completo para o Make aprender todos os campos sem precisar de fotos reais
     const templatePayload = {
       DATA_VISITA: "20/03/2026",

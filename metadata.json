@@ -1,6 +1,6 @@
 {
-  "name": "Criativa - Operação de Campo v2.0",
-  "description": "Versão Final 2.0 - App de operação de campo para promotores da Criativa, com análise de fotos por IA, modo offline e sincronização inteligente com Make.com.",
+  "name": "Criativa Field Ops",
+  "description": "Sistema operacional de campo para promotores da Criativa, com fluxo de visitas, sincronização e painel supervisor.",
   "requestFramePermissions": [
     "camera",
     "geolocation"

@@ -8,8 +8,9 @@ import Sidebar from './components/Sidebar';
 import ContentArea from './components/ContentArea';
 import CriativaIcon from './components/CriativaIcon';
 import { SectionId, STORAGE_KEY } from './types';
-import { apiService, getBrasiliaISO } from './services/apiService';
-import { Menu, LogOut, RefreshCw, AlertCircle } from 'lucide-react';
+import { apiService } from './services/apiService';
+import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
+import { appConfig } from './config/appConfig';
 
 const INITIAL_STATE = {
   user: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -41,6 +42,10 @@ const App: React.FC = () => {
 
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.title = appConfig.title;
+  }, []);
 
   const loadConfig = async (force = false) => {
     setLoading(true);

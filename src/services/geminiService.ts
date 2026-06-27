@@ -1,9 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { appConfig } from "../config/appConfig";
 
 export const analyzeProductPhoto = async (base64Image: string, industries: string[]) => {
   try {
-    const apiKey = typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined;
-    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada nas variáveis de ambiente da Vercel.");
+    const apiKey = appConfig.geminiApiKey;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY não configurada. Defina VITE_GEMINI_API_KEY no .env.local.");
+    }
 
     const ai = new GoogleGenAI({ apiKey });
     
