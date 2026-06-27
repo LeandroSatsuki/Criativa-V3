@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2026-06-27] - Fase 4: Fluxo de campo completo
+
+### Alterado
+- A etapa Antes passou a registrar analise de imagem com resultado persistido no estado local.
+- A etapa Antes/Depois passou a bloquear conclusao sem industria selecionada.
+- A etapa Estoque passou a exigir industria selecionada e quantidade valida antes de concluir.
+- A analise de imagem passou a atualizar estado de carregamento de forma real.
+
+### Adicionado
+- Validacao operacional de estoque por industria selecionada.
+- Persistencia do resultado de IA no estado da visita.
+
+### Corrigido
+- O fluxo de Depois nao permite mais salvar registro sem industria associada.
+- O estoque nao pode mais ser concluido com quantidade vazia, negativa ou nao numerica.
+- O indicador de analise por imagem agora reflete processamento real.
+
+### Seguranca
+- Sem alteracoes novas de credenciais nesta fase.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso.
+- `npm.cmd run dev` validado com smoke check local em `200`.
+
+### Pendencias
+- Fase 4 ainda pode receber validacao manual em navegador do fluxo completo do promotor.
+- Fase 5: painel supervisor com dados reais e sem sinteticos.
+
 ## [2026-06-27] - Fase 3: Persistencia e fila de sincronizacao
 
 ### Alterado

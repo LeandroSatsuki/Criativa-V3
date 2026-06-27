@@ -50,6 +50,16 @@ Data da ultima auditoria: 2026-06-27
 - [x] `npm.cmd run build` executado apos a implementacao da Fase 3.
 - [x] Smoke check do fluxo de fila e retry executado.
 
+## Fase 4 - Fluxo de campo completo
+
+- [x] Etapa Antes exige industria selecionada para concluir.
+- [x] Etapa Depois bloqueia conclusao sem industria vinculada.
+- [x] Etapa Estoque exige industria selecionada e quantidade valida.
+- [x] Analise de imagem agora atualiza estado de processamento.
+- [x] `npm.cmd run lint` executado apos a implementacao da Fase 4.
+- [x] `npm.cmd run build` executado apos a implementacao da Fase 4.
+- [x] `npm.cmd run dev` validado com smoke check local em `200`.
+
 ## Checklist da fase 0
 
 - [x] Li os arquivos diretamente envolvidos.
@@ -104,3 +114,4 @@ Data da ultima auditoria: 2026-06-27
 - O build ainda emite warning sobre chunk grande acima de 500 kB.
 - A fila de retry manual dedicada agora existe e segue para validacao final.
 - A fila local e o endpoint de retry foram validados em runtime com `401` sem autenticacao na fila e `200` nos endpoints basicos.
+- O fluxo principal do promotor ficou mais travado contra conclusao incompleta.

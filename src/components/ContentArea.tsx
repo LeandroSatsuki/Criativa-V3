@@ -83,6 +83,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const photos = visitState.photos || {};
   const tasks = visitState.tasks || {};
   const stockQuantities = visitState.stockQuantities || {};
+  const selectedIndustry = visitState.selectedIndustry || '';
+  const selectedStockQuantity = selectedIndustry ? String(stockQuantities[selectedIndustry] ?? '').trim() : '';
+  const isSelectedStockQuantityValid = /^\d+$/.test(selectedStockQuantity);
 
   const handlePhotoCapture = async (section: string, file: File) => {
     const reader = new FileReader();
@@ -534,7 +537,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 disabled={isAnalyzing}
                 onClick={async () => {
                   if (currentPhotos.length === 0) return alert("Tire pelo menos uma foto.");
-                  if (isAntes && !visitState.selectedIndustry) return alert("Selecione uma indústria primeiro.");
+                  if (!visitState.selectedIndustry) {
+                    alert("Selecione uma indústria primeiro.");
+                    if (isAntes) navigateTo(SectionId.Antes);
+                    return;
+                  }
+
+                  setIsAnalyzing(true);
                   
                   // Mark task as done and navigate IMMEDIATELY for instant feel
                   updateVisit('tasks', { ...tasks, [sectionId]: true });
@@ -544,10 +553,16 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   if (currentPhotos[0]) {
                     analyzeProductPhoto(currentPhotos[0], [visitState.selectedIndustry || 'Veneza'])
                       .then(result => {
+                        setAiResult(result);
                         const updatedAiResults = { ...visitState.aiResults, [sectionId]: result };
                         updateVisit('aiResults', updatedAiResults);
                       })
-                      .catch(err => console.error("AI Background Error:", err));
+                      .catch(err => console.error("AI Background Error:", err))
+                      .finally(() => {
+                        setIsAnalyzing(false);
+                      });
+                  } else {
+                    setIsAnalyzing(false);
                   }
                 }}
                 className="w-full bg-[#0F172A] text-white py-6 rounded-3xl font-black uppercase text-[12px] tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-slate-900/20"
@@ -665,6 +680,17 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
             <button 
               onClick={() => {
+                if (!visitState.selectedIndustry) {
+                  alert("Selecione uma indústria na etapa ANTES antes de salvar o estoque.");
+                  navigateTo(SectionId.Antes);
+                  return;
+                }
+
+                if (!isSelectedStockQuantityValid) {
+                  alert(`Informe uma quantidade válida para ${selectedIndustry} antes de salvar o estoque.`);
+                  return;
+                }
+
                 updateVisit('tasks', (prev: any) => ({ ...prev, [SectionId.Estoque]: true }));
                 navigateTo(SectionId.Dashboard);
               }}
