@@ -12,15 +12,31 @@ Sistema operacional de campo para promotores da Criativa.
 3. Inicie o app:
    `npm run dev`
 
+## Rodar com backend local
+
+Para testar frontend + funções serverless no mesmo ambiente:
+
+1. Configure as variáveis de backend.
+2. Inicie com:
+   `npm run dev:full`
+
+O comando usa `netlify dev` por baixo e expõe as rotas em `/api/*`.
+
 ## Variáveis de ambiente
 
 - `VITE_APP_TITLE`
-- `VITE_GOOGLE_SHEETS_ID`
-- `VITE_MAKE_WEBHOOK_URL`
-- `VITE_GEMINI_API_KEY`
+- `VITE_API_BASE_URL`
 - `VITE_DEFAULT_INDUSTRIES`
+
+### Backend
+
+- `APP_SESSION_SECRET`
+- `BACKEND_GOOGLE_SHEETS_ID`
+- `BACKEND_MAKE_WEBHOOK_URL`
+- `BACKEND_GEMINI_API_KEY`
 
 ## Observações
 
 - A Fase 1 centraliza a configuração em variáveis de ambiente.
-- A Fase 2 vai mover integrações sensíveis para um backend seguro, reduzindo a exposição no cliente.
+- A Fase 2 moveu as integrações sensíveis para Netlify Functions.
+- O frontend agora fala apenas com `/api/*`.

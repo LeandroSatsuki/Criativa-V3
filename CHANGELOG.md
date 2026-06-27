@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## [2026-06-27] - Fase 2: Backend minimo seguro
+
+### Alterado
+- O frontend deixou de consumir Google Sheets, Make e Gemini diretamente.
+- A configuracao sensivel passou a ser intermediada por Netlify Functions.
+- O painel supervisor agora consulta dados reais do backend.
+- O sync passou a registrar e persistir visitas em Netlify Blobs.
+
+### Adicionado
+- `netlify.toml`
+- `netlify/functions/*`
+- `src/services/httpClient.ts`
+- `src/services/session.ts`
+- `netlify/functions/_shared/*`
+
+### Corrigido
+- Removida a dependência de webhook e IA expostos no navegador.
+- Removida a validação de login baseada apenas no cliente.
+- Removido o consumo direto de Google Sheets pelo frontend.
+- Corrigido o fluxo de conexão para apontar ao backend em vez de ao Make.
+
+### Seguranca
+- Segredos agora ficam no backend e não no bundle do navegador.
+- Login passou a emitir sessão assinada com expiração.
+- A exposição da chave da Gemini foi eliminada do frontend.
+- O webhook da Make deixou de existir no código cliente.
+
+### Validacao
+- `npm.cmd install` concluído com sucesso.
+- `npm.cmd run lint` concluído com sucesso.
+- `npm.cmd run build` concluído com sucesso.
+- `npm.cmd run dev` validado com smoke check local com resposta `200`.
+- `npx netlify dev --target-port 3000 --port 8889 --no-open` validado com smoke check em `/api/health` e `/api/config`.
+
+### Pendencias
+- Fase 3: fila de reenvio confiável e estratégia de retry manual.
+- Fase 3: consolidar persistência operacional completa das visitas e estados.
+- Fase 4: endurecer ainda mais as validações do fluxo do promotor.
+
 ## [2026-06-27] - Fase 1: Configuracao, variaveis e limpeza de exposicao
 
 ### Alterado

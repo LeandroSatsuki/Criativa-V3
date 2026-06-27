@@ -113,9 +113,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     try {
       const ok = await apiService.pingMake();
       if (ok) {
-        logService.addLog("✅ Conexão com o Make.com estabelecida com sucesso!", "success");
+        logService.addLog("✅ Conexão com o backend estabelecida com sucesso!", "success");
       } else {
-        logService.addLog("❌ O Make.com recebeu o sinal mas retornou um erro.", "error");
+        logService.addLog("❌ O backend respondeu, mas retornou um erro.", "error");
       }
     } catch (e: any) {
       logService.addLog(`❌ Falha total na conexão: ${e.message}`, "error");

@@ -11,6 +11,7 @@ import { SectionId, STORAGE_KEY } from './types';
 import { apiService } from './services/apiService';
 import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
 import { appConfig } from './config/appConfig';
+import { clearSession } from './services/session';
 
 const INITIAL_STATE = {
   user: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -96,6 +97,7 @@ const App: React.FC = () => {
   };
 
   const logout = () => {
+    clearSession();
     localStorage.removeItem(STORAGE_KEY);
     setVisitState(INITIAL_STATE);
     setActiveSection(SectionId.Dashboard);
@@ -107,7 +109,7 @@ const App: React.FC = () => {
         <RefreshCw className="w-12 h-12 mb-6 animate-spin text-blue-400" />
         <h1 className="text-2xl font-black uppercase tracking-tighter mb-2">Carregando Dados...</h1>
         <p className="text-slate-400 font-bold text-sm uppercase tracking-widest max-w-xs">
-          Buscando informações da planilha do Google.
+          Buscando informações do backend seguro.
         </p>
         <p className="text-slate-500 text-[10px] uppercase tracking-widest mt-4">
           Limite de espera: 60 segundos

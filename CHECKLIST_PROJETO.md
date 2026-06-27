@@ -24,6 +24,21 @@ Data da ultima auditoria: 2026-06-27
 - [x] `README.md` atualizado com orientacoes tecnicas.
 - [x] Validacao local de build e runtime executada.
 
+## Fase 2 - Backend minimo seguro
+
+- [x] Camada backend criada com Netlify Functions.
+- [x] Autenticacao assinada centralizada no backend.
+- [x] Google Sheets acessado somente pelo backend.
+- [x] Make.com acessado somente pelo backend.
+- [x] Gemini acessado somente pelo backend.
+- [x] Storage de visitas criado com Netlify Blobs.
+- [x] Painel supervisor passou a consultar dados reais do backend.
+- [x] Frontend passou a usar `/api/*` em vez de integrar servicos sensiveis diretamente.
+- [x] `npm.cmd run lint` concluido com sucesso.
+- [x] `npm.cmd run build` concluido com sucesso.
+- [x] Smoke check do frontend puro retornou `200`.
+- [x] Smoke check do backend local retornou `200` em `/api/health` e `/api/config`.
+
 ## Checklist da fase 0
 
 - [x] Li os arquivos diretamente envolvidos.
@@ -76,4 +91,4 @@ Data da ultima auditoria: 2026-06-27
 - O ambiente local aceitou o projeto com build aprovado.
 - O `npm.cmd install` reportou 8 vulnerabilidades no inventario de dependencias.
 - O build ainda emite warning sobre chunk grande acima de 500 kB.
-- A protecao completa das integracoes sensiveis continua como objetivo da Fase 2.
+- A fila de retry manual dedicada continua como objetivo da Fase 3.
