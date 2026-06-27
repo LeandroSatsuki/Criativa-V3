@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2026-06-27] - Fase 5: Painel supervisor com dados reais
+
+### Alterado
+- O painel supervisor passou a consumir um resumo estruturado real do backend.
+- O gráfico do supervisor deixou de usar numeros fixos e agora renderiza series derivadas de visitas reais.
+- Os cards do supervisor passaram a usar contagens operacionais vindas das visitas e promotores cadastrados.
+- O detalhe do promotor passou a usar métricas reais de execucao, sem texto sintetico.
+
+### Adicionado
+- Agregador compartilhado de supervisor em `netlify/functions/_shared/supervisor.ts`.
+- Tipos tipados para resumo, timeline e detalhe do supervisor no frontend.
+
+### Corrigido
+- Removido o `chartData` fixo do painel.
+- Removidas contagens sinteticas de status no componente do supervisor.
+- Eliminado o risco de o painel mostrar valores inventados quando o backend nao tinha dados suficientes.
+
+### Seguranca
+- Sem novas credenciais ou segredos nesta fase.
+- O painel continua protegido por autenticacao de supervisor no backend.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso.
+- Smoke check autenticado em `http://127.0.0.1:8889/api/supervisor/dashboard` retornou `PROMOTERS=25`, `TOTAL_VISITS=0`, `PENDING_SYNC=0`, `TIMELINE_POINTS=6`.
+- Smoke check autenticado em `http://127.0.0.1:8889/api/supervisor/promoters/:id` retornou `DETAIL_ROUTE=0` e `DETAIL_EFF=0%`.
+
+### Pendencias
+- Fase 6: mover e consolidar a analise de imagem para uma camada segura, se ela permanecer no produto.
+- Validacao manual do dashboard em ambiente com visitas reais registradas.
+
 ## [2026-06-27] - Fase 4: Fluxo de campo completo
 
 ### Alterado

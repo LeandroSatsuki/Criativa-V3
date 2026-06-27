@@ -1,7 +1,11 @@
 import { appConfig } from '../config/appConfig';
 import { clearSession, setSession } from './session';
 import { requestJson } from './httpClient';
-import type { Role, SectionId } from '../types';
+import type {
+  Role,
+  SupervisorDashboardResponse,
+  SupervisorPromoterDetailResponse,
+} from '../types';
 
 const APP_CONFIG_CACHE = 'CRIATIVA_APP_CONFIG_CACHE';
 
@@ -152,11 +156,11 @@ export const apiService = {
   },
 
   getSupervisorDashboard: async () => {
-    return requestJson<any[]>('/supervisor/dashboard');
+    return requestJson<SupervisorDashboardResponse>('/supervisor/dashboard');
   },
 
   getPromoterExecution: async (id: string) => {
-    return requestJson<any>(`/supervisor/promoters/${id}`);
+    return requestJson<SupervisorPromoterDetailResponse>(`/supervisor/promoters/${id}`);
   },
 
   createVisit: async (payload: any) => {

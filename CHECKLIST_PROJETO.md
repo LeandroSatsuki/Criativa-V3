@@ -60,6 +60,16 @@ Data da ultima auditoria: 2026-06-27
 - [x] `npm.cmd run build` executado apos a implementacao da Fase 4.
 - [x] `npm.cmd run dev` validado com smoke check local em `200`.
 
+## Fase 5 - Painel supervisor com dados reais
+
+- [x] Backend supervisor passou a entregar resumo estruturado real.
+- [x] Gráfico do supervisor passou a usar series reais de visitas.
+- [x] Cards do supervisor passaram a usar contagens operacionais reais.
+- [x] Detalhe do promotor passou a usar métricas reais de execucao.
+- [x] `npm.cmd run lint` executado apos a implementacao da Fase 5.
+- [x] `npm.cmd run build` executado apos a implementacao da Fase 5.
+- [x] Smoke check autenticado do dashboard supervisor executado.
+
 ## Checklist da fase 0
 
 - [x] Li os arquivos diretamente envolvidos.
@@ -115,3 +125,5 @@ Data da ultima auditoria: 2026-06-27
 - A fila de retry manual dedicada agora existe e segue para validacao final.
 - A fila local e o endpoint de retry foram validados em runtime com `401` sem autenticacao na fila e `200` nos endpoints basicos.
 - O fluxo principal do promotor ficou mais travado contra conclusao incompleta.
+- O painel supervisor deixou de depender de `chartData` fixo e numeros sinteticos.
+- O smoke check autenticado do supervisor retornou `PROMOTERS=25`, `TOTAL_VISITS=0`, `PENDING_SYNC=0`, `TIMELINE_POINTS=6`.

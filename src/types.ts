@@ -45,3 +45,72 @@ export interface VisitState {
   availableStores: any[];
   industries: string[];
 }
+
+export interface SupervisorTimelinePoint {
+  time: string;
+  totalVisits: number;
+  completedVisits: number;
+  pendingSyncVisits: number;
+}
+
+export interface SupervisorPromoterOverview {
+  id: string;
+  name: string;
+  region: string;
+  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'EM ROTA';
+  online: boolean;
+  progress: number;
+  store: string;
+  lastSync: string;
+  visits: {
+    completed: number;
+    total: number;
+  };
+  pendingSyncVisits: number;
+  lastVisitId: string | null;
+}
+
+export interface SupervisorDashboardSummary {
+  totalPromoters: number;
+  onlinePromoters: number;
+  offlinePromoters: number;
+  onRoutePromoters: number;
+  inProgressPromoters: number;
+  completedPromoters: number;
+  pendingPromoters: number;
+  pendingSyncVisits: number;
+  totalVisits: number;
+  completedVisits: number;
+  averageVisitTime: string;
+  lastUpdated: string;
+}
+
+export interface SupervisorDashboardResponse {
+  summary: SupervisorDashboardSummary;
+  timeline: SupervisorTimelinePoint[];
+  promoters: SupervisorPromoterOverview[];
+  lastUpdated: string;
+}
+
+export interface SupervisorPromoterDetailRouteItem {
+  id: string;
+  visitId: string;
+  name: string;
+  time: string;
+  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE';
+  tasks: number;
+  photos: number;
+  syncStatus: 'pendente' | 'enviando' | 'enviado' | 'erro' | 'reenviar';
+}
+
+export interface SupervisorPromoterDetailResponse {
+  metrics: {
+    efficiency: string;
+    workingTime: string;
+    completedVisits: number;
+    totalVisits: number;
+    pendingSyncVisits: number;
+    averageDuration: string;
+  };
+  route: SupervisorPromoterDetailRouteItem[];
+}

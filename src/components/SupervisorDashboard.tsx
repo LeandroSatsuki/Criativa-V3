@@ -1,23 +1,66 @@
 import React, { useEffect, useState } from 'react';
 import { apiService } from '../services/apiService';
-import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp, Users, Clock, MapPin, CheckCircle2, Loader2, UserX, Route, Play, ClipboardList, SignalLow } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { TrendingUp, Users, Clock, MapPin, CheckCircle2, Loader2, Route, Play, ClipboardList, SignalLow } from 'lucide-react';
+import type { SupervisorDashboardResponse, SupervisorPromoterDetailResponse, SupervisorPromoterOverview, SupervisorTimelinePoint } from '../types';
+
+const EMPTY_TIMELINE: SupervisorTimelinePoint[] = [
+  { time: '08:00', totalVisits: 0, completedVisits: 0, pendingSyncVisits: 0 },
+  { time: '10:00', totalVisits: 0, completedVisits: 0, pendingSyncVisits: 0 },
+  { time: '12:00', totalVisits: 0, completedVisits: 0, pendingSyncVisits: 0 },
+  { time: '14:00', totalVisits: 0, completedVisits: 0, pendingSyncVisits: 0 },
+  { time: '16:00', totalVisits: 0, completedVisits: 0, pendingSyncVisits: 0 },
+  { time: '18:00', totalVisits: 0, completedVisits: 0, pendingSyncVisits: 0 },
+];
+
+const EMPTY_SUMMARY = {
+  totalPromoters: 0,
+  onlinePromoters: 0,
+  offlinePromoters: 0,
+  onRoutePromoters: 0,
+  inProgressPromoters: 0,
+  completedPromoters: 0,
+  pendingPromoters: 0,
+  pendingSyncVisits: 0,
+  totalVisits: 0,
+  completedVisits: 0,
+  averageVisitTime: '--:--',
+  lastUpdated: '',
+};
+
+const EMPTY_DASHBOARD: SupervisorDashboardResponse = {
+  summary: EMPTY_SUMMARY,
+  timeline: EMPTY_TIMELINE,
+  promoters: [],
+  lastUpdated: '',
+};
 
 const SupervisorDashboard: React.FC = () => {
-  const [data, setData] = useState<any[]>([]);
+  const [dashboard, setDashboard] = useState<SupervisorDashboardResponse>(EMPTY_DASHBOARD);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'inactive' | 'on_route' | 'in_progress' | 'pending' | 'offline'>('all');
-  const [selectedPromoter, setSelectedPromoter] = useState<any | null>(null);
-  const [promoterDetail, setPromoterDetail] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'sync_pending' | 'on_route' | 'in_progress' | 'pending' | 'offline'>('all');
+  const [selectedPromoter, setSelectedPromoter] = useState<SupervisorPromoterOverview | null>(null);
+  const [promoterDetail, setPromoterDetail] = useState<SupervisorPromoterDetailResponse | null>(null);
 
   useEffect(() => { 
-    apiService.getSupervisorDashboard().then(res => {
-      setData(res);
-      setLoading(false);
-    }); 
+    apiService.getSupervisorDashboard()
+      .then(res => {
+        setDashboard(res);
+        setError(null);
+      })
+      .catch((fetchError: any) => {
+        setDashboard(EMPTY_DASHBOARD);
+        setError(fetchError?.message || 'Não foi possível carregar o painel do supervisor.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
-  const handlePromoterClick = async (promoter: any) => {
+  const handlePromoterClick = async (promoter: SupervisorPromoterOverview) => {
+    setSelectedPromoter(null);
+    setPromoterDetail(null);
     setLoading(true);
     try {
       const detail = await apiService.getPromoterExecution(promoter.id);
@@ -30,31 +73,35 @@ const SupervisorDashboard: React.FC = () => {
     }
   };
 
-  const filteredData = data.filter(p => {
+  const filteredData = dashboard.promoters.filter(p => {
     if (filter === 'active') return p.online;
     if (filter === 'completed') return p.status === 'CONCLUÍDO';
-    if (filter === 'inactive') return p.status === 'INATIVO';
+    if (filter === 'sync_pending') return p.pendingSyncVisits > 0;
     if (filter === 'on_route') return p.status === 'EM ROTA';
     if (filter === 'in_progress') return p.status === 'EM ANDAMENTO';
     if (filter === 'pending') return p.status === 'PENDENTE';
-    if (filter === 'offline') return !p.online && p.status !== 'INATIVO';
+    if (filter === 'offline') return !p.online;
     return true;
   });
 
-  const chartData = [
-    { time: '08:00', meta: 5, realizado: 2, tendencia: 3 },
-    { time: '10:00', meta: 15, realizado: 8, tendencia: 10 },
-    { time: '12:00', meta: 25, realizado: 15, tendencia: 18 },
-    { time: '14:00', meta: 35, realizado: 22, tendencia: 28 },
-    { time: '16:00', meta: 45, realizado: 35, tendencia: 42 },
-    { time: '18:00', meta: 50, realizado: 48, tendencia: 50 },
-  ];
+  const chartData = dashboard.timeline;
 
   if (loading) return (
     <div className="h-64 flex items-center justify-center">
       <Loader2 className="animate-spin text-[#E65C5C]" size={32} />
     </div>
   );
+
+  if (error) {
+    return (
+      <div className="h-64 flex items-center justify-center text-center px-6">
+        <div className="space-y-3">
+          <p className="text-sm font-black uppercase tracking-widest text-[#0F172A]">Painel indisponível</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest max-w-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   // Detailed View for a Single Promoter
   if (selectedPromoter && promoterDetail) {
@@ -171,7 +218,7 @@ const SupervisorDashboard: React.FC = () => {
             </div>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores Ativos</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{data.filter(d => d.online).length}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.onlinePromoters}</h4>
         </button>
 
         <button 
@@ -184,20 +231,20 @@ const SupervisorDashboard: React.FC = () => {
             </div>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores Off Line</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{data.filter(d => !d.online && d.status !== 'INATIVO').length}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.offlinePromoters}</h4>
         </button>
 
         <button 
-          onClick={() => setFilter('inactive')}
-          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'inactive' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
+          onClick={() => setFilter('sync_pending')}
+          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'sync_pending' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
         >
           <div className="flex items-center gap-3 mb-2">
             <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
-              <UserX className="text-red-600" size={16} />
+              <ClipboardList className="text-red-600" size={16} />
             </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores Inativos</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pendências de Sync</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{data.filter(d => d.status === 'INATIVO').length}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.pendingSyncVisits}</h4>
         </button>
 
         <button 
@@ -210,7 +257,7 @@ const SupervisorDashboard: React.FC = () => {
             </div>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores em Rota</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{data.filter(d => d.status === 'EM ROTA').length}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.onRoutePromoters}</h4>
         </button>
 
         <button 
@@ -223,7 +270,7 @@ const SupervisorDashboard: React.FC = () => {
             </div>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas em Andamento</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{data.filter(d => d.status === 'EM ANDAMENTO').length}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.inProgressPromoters}</h4>
         </button>
 
         <button 
@@ -236,7 +283,7 @@ const SupervisorDashboard: React.FC = () => {
             </div>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Concluídas</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{data.filter(d => d.status === 'CONCLUÍDO').length}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.completedPromoters}</h4>
         </button>
 
         <button 
@@ -249,7 +296,7 @@ const SupervisorDashboard: React.FC = () => {
             </div>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Pendentes</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{data.filter(d => d.status === 'PENDENTE').length}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.pendingPromoters}</h4>
         </button>
 
         <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm">
@@ -259,7 +306,7 @@ const SupervisorDashboard: React.FC = () => {
             </div>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Média de Tempo</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">01:15h</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.averageVisitTime}</h4>
         </div>
       </div>
 
@@ -329,24 +376,24 @@ const SupervisorDashboard: React.FC = () => {
                   labelStyle={{ fontWeight: 'bold', color: '#0F172A' }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', paddingTop: '20px' }} />
-                <Line type="monotone" dataKey="meta" name="Meta" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="realizado" name="Realizado" stroke="#10B981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="tendencia" name="Tendência" stroke="#F59E0B" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="totalVisits" name="Total" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="completedVisits" name="Concluídas" stroke="#10B981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="pendingSyncVisits" name="Pendências" stroke="#F59E0B" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
           <div className="mt-6 pt-6 border-t border-slate-50 space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Meta do Dia</span>
-              <span className="text-[10px] font-black text-blue-600">50 Visitas</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Total de Visitas</span>
+              <span className="text-[10px] font-black text-blue-600">{dashboard.summary.totalVisits}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Realizado</span>
-              <span className="text-[10px] font-black text-emerald-600">48 Visitas</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Concluídas</span>
+              <span className="text-[10px] font-black text-emerald-600">{dashboard.summary.completedVisits}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Tendência</span>
-              <span className="text-[10px] font-black text-orange-500">50 Visitas</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Pendências</span>
+              <span className="text-[10px] font-black text-orange-500">{dashboard.summary.pendingSyncVisits}</span>
             </div>
           </div>
         </div>
