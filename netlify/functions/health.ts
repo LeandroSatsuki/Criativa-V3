@@ -1,6 +1,7 @@
 import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { getEnv } from './_shared/env';
+import { getProvisionalSupervisorDiagnostics } from './_shared/data';
 
 export default async (_request: Request, _context: Context) => {
   return json({
@@ -12,6 +13,7 @@ export default async (_request: Request, _context: Context) => {
       make: Boolean(getEnv('BACKEND_MAKE_WEBHOOK_URL')),
       gemini: Boolean(getEnv('BACKEND_GEMINI_API_KEY')),
       sessionSecret: Boolean(getEnv('APP_SESSION_SECRET')),
+      provisionalSupervisors: getProvisionalSupervisorDiagnostics(),
     },
   });
 };

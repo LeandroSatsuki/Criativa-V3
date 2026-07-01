@@ -39,14 +39,15 @@ export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> =
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(transformedPayload),
     });
+    const responseText = await response.text().catch(() => '');
+    const responseBody = responseText.slice(0, 1000);
 
     if (!response.ok) {
-      const errorText = await response.text();
       const errored = await saveVisit({
         ...sending,
         syncStatus: 'erro',
-        syncError: errorText || response.statusText,
-        makeResponse: { status: response.status, ok: false },
+        syncError: responseBody || response.statusText,
+        makeResponse: { status: response.status, ok: false, body: responseBody },
         updatedAt: getBrasiliaISO(),
       });
 
@@ -61,7 +62,7 @@ export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> =
       ...sending,
       syncStatus: 'enviado',
       syncError: null,
-      makeResponse: { status: response.status, ok: true },
+      makeResponse: { status: response.status, ok: true, body: responseBody },
       updatedAt: getBrasiliaISO(),
     });
 

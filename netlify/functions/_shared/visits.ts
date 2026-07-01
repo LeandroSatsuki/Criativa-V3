@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs';
+import { getJsonStore } from './storage';
 import { getBrasiliaISO, formatBrasiliaDate, formatBrasiliaTime, formatFileDate } from './time';
 
 export type VisitRecord = {
@@ -11,10 +11,11 @@ export type VisitRecord = {
   makeResponse?: {
     status: number;
     ok: boolean;
+    body?: string;
   } | null;
 };
 
-const visitStore = getStore({ name: 'criativa-visits', consistency: 'strong' });
+const visitStore = getJsonStore('criativa-visits');
 
 const keyFor = (visitId: string) => `visits/${visitId}`;
 
@@ -26,11 +27,11 @@ export const generateVisitId = () => {
 };
 
 export const getVisit = async (visitId: string) => {
-  return visitStore.get(keyFor(visitId), { type: 'json' }) as Promise<VisitRecord | null>;
+  return visitStore.get<VisitRecord>(keyFor(visitId));
 };
 
 export const saveVisit = async (record: VisitRecord) => {
-  await visitStore.setJSON(keyFor(record.visitId), record);
+  await visitStore.set(keyFor(record.visitId), record);
   return record;
 };
 
@@ -82,9 +83,9 @@ export const updateVisit = async (visitId: string, patch: any) => {
 };
 
 export const listVisits = async () => {
-  const { blobs } = await visitStore.list({ prefix: 'visits/' });
+  const keys = await visitStore.list('visits/');
   const visits = await Promise.all(
-    blobs.map(async (blob) => visitStore.get(blob.key, { type: 'json' }) as Promise<VisitRecord | null>),
+    keys.map(async (key) => visitStore.get<VisitRecord>(key)),
   );
   return visits.filter(Boolean) as VisitRecord[];
 };
@@ -108,24 +109,78 @@ export const buildTransformedPayload = (payload: any) => {
   };
 
   const storeNameClean = cleanText(payload.currentStore || 'LOJA', 'LOJA').replace(/\s+/g, '_').toUpperCase();
-  const selectedIndustry = cleanText(payload.selectedIndustry || payload.industry, 'GERAL');
   const fileDate = formatFileDate(payload.timestamp || payload.checkInTime);
-  const aiAfter = payload.aiResults?.['DEPOIS'] || {};
+  const dataVisita = formatBrasiliaDate(payload.timestamp || payload.checkInTime);
+  const idVisita = payload.visitId || generateVisitId();
+  const nomePromotor = cleanText(payload.user?.name, 'Promotor');
+  const nomeLoja = cleanText(payload.currentStore, 'Loja');
+  const horaEntrada = formatBrasiliaTime(payload.checkInTime);
+  const horaSaida = formatBrasiliaTime(payload.checkOutTime);
+  const fotoCheckin = payload.photos?.FACHADA?.[0] || '';
+  const fotoCheckout = payload.photos?.CHECKOUT?.[0] || '';
+  const executionEntries = Object.values(payload.industryExecutions || {}) as any[];
+  const selectedIndustry = cleanText(payload.selectedIndustry || payload.industry, 'GERAL');
+
+  const buildReportRow = (execution?: any) => {
+    const industry = cleanText(execution?.industry || selectedIndustry, 'GERAL');
+    const executionPhotos = execution?.photos || {};
+    const executionStock = execution?.stockQuantities || {};
+    const aiAfter = execution?.aiResults?.['DEPOIS'] || payload.aiResults?.['DEPOIS'] || {};
+    const qtdEstoque = String(executionStock[industry] || payload.stockQuantities?.[industry] || '0');
+    const teveTrocas = (execution?.hasReturns ?? payload.hasReturns) ? 'SIM' : 'NÃO';
+    const fotoAntes = executionPhotos.ANTES?.[0] || payload.photos?.ANTES?.[0] || '';
+    const fotoEstoque = executionPhotos.ESTOQUE?.[0] || payload.photos?.ESTOQUE?.[0] || '';
+    const fotoDepois = executionPhotos.DEPOIS?.[0] || payload.photos?.DEPOIS?.[0] || '';
+    const fotoTroca = executionPhotos.TROCAS?.[0] || payload.photos?.TROCAS?.[0] || '';
+    const iaOrganizacao = aiAfter.organization || '';
+    const iaStatusCompliance = aiAfter.complianceStatus || '';
+    const iaRupturas = aiAfter.ruptures || '';
+
+    return {
+      DATA_VISITA: dataVisita,
+      ID_VISITA: idVisita,
+      NOME_PROMOTOR: nomePromotor,
+      NOME_LOJA: nomeLoja,
+      'HORA_ENTRADA_CHECK-IN': horaEntrada,
+      'HORA_SAIDA_CHECK-OUT': horaSaida,
+      TEMPO_PERMANENCIA: duration,
+      QTD_ESTOQUE: qtdEstoque,
+      TEVE_TROCAS: teveTrocas,
+      INDUSTRIA: industry,
+      LINK_FOTO_CHECKIN: fotoCheckin,
+      LINK_FOTO_ANTES: fotoAntes,
+      LINK_FOTO_DEPOIS: fotoDepois,
+      LINK_FOTO_TROCA: fotoTroca,
+      LINK_FOTO_CHECKOUT: fotoCheckout,
+      IA_ORGANIZACAO: iaOrganizacao,
+      IA_STATUS_COMPLIANCE: iaStatusCompliance,
+      IA_RUPTURAS: iaRupturas,
+      LINK_FOTO_ESTOQUE: fotoEstoque,
+    };
+  };
+
+  const reportRows = executionEntries.length > 0
+    ? executionEntries.map(buildReportRow)
+    : [buildReportRow()];
+  const primaryRow = reportRows.find(row => row.INDUSTRIA === selectedIndustry) || reportRows[0];
 
   return {
-    DATA_VISITA: formatBrasiliaDate(payload.timestamp || payload.checkInTime),
-    ID_VISITA: payload.visitId || generateVisitId(),
-    NOME_PROMOTOR: cleanText(payload.user?.name, 'Promotor'),
-    NOME_LOJA: cleanText(payload.currentStore, 'Loja'),
-    HORA_ENTRADA_CHECK_IN: formatBrasiliaTime(payload.checkInTime),
-    HORA_SAIDA_CHECK_OUT: formatBrasiliaTime(payload.checkOutTime),
+    DATA_VISITA: dataVisita,
+    ID_VISITA: idVisita,
+    NOME_PROMOTOR: nomePromotor,
+    NOME_LOJA: nomeLoja,
+    HORA_ENTRADA_CHECK_IN: horaEntrada,
+    'HORA_ENTRADA_CHECK-IN': horaEntrada,
+    HORA_SAIDA_CHECK_OUT: horaSaida,
+    'HORA_SAIDA_CHECK-OUT': horaSaida,
     TEMPO_PERMANENCIA: duration,
-    QTD_ESTOQUE: String(payload.stockQuantities?.[payload.selectedIndustry || ''] || '0'),
-    TEVE_TROCAS: payload.hasReturns ? 'SIM' : 'NÃO',
-    industry: selectedIndustry,
-    INDUSTRIA: selectedIndustry,
-    INDUSTRIA_MAIUSCULA: selectedIndustry.toUpperCase(),
-    industria_minuscula: selectedIndustry.toLowerCase(),
+    QTD_ESTOQUE: primaryRow.QTD_ESTOQUE,
+    TEVE_TROCAS: primaryRow.TEVE_TROCAS,
+    industry: primaryRow.INDUSTRIA,
+    INDUSTRIA: primaryRow.INDUSTRIA,
+    INDUSTRIAS_VISITA: reportRows.map(row => row.INDUSTRIA).join(', '),
+    INDUSTRIA_MAIUSCULA: primaryRow.INDUSTRIA.toUpperCase(),
+    industria_minuscula: primaryRow.INDUSTRIA.toLowerCase(),
     DATA_PASTA: fileDate,
     NOME_CHECKIN: `${storeNameClean}_${fileDate}_CHECKIN.jpg`,
     NOME_ANTES: `${storeNameClean}_${fileDate}_ANTES.jpg`,
@@ -133,15 +188,23 @@ export const buildTransformedPayload = (payload: any) => {
     NOME_DEPOIS: `${storeNameClean}_${fileDate}_DEPOIS.jpg`,
     NOME_TROCA: `${storeNameClean}_${fileDate}_TROCA.jpg`,
     NOME_CHECKOUT: `${storeNameClean}_${fileDate}_CHECKOUT.jpg`,
-    FOTO_CHECKIN: payload.photos?.FACHADA?.[0] || '',
-    FOTO_ANTES: payload.photos?.ANTES?.[0] || '',
-    FOTO_ESTOQUE: payload.photos?.ESTOQUE?.[0] || '',
-    FOTO_DEPOIS: payload.photos?.DEPOIS?.[0] || '',
-    FOTO_TROCA: payload.photos?.TROCAS?.[0] || '',
-    FOTO_CHECKOUT: payload.photos?.CHECKOUT?.[0] || '',
-    IA_ORGANIZACAO: aiAfter.organization || '',
-    IA_STATUS_COMPLIANCE: aiAfter.complianceStatus || '',
-    IA_RUPTURAS: aiAfter.ruptures || '',
+    FOTO_CHECKIN: fotoCheckin,
+    FOTO_ANTES: primaryRow.LINK_FOTO_ANTES,
+    FOTO_ESTOQUE: primaryRow.LINK_FOTO_ESTOQUE,
+    FOTO_DEPOIS: primaryRow.LINK_FOTO_DEPOIS,
+    FOTO_TROCA: primaryRow.LINK_FOTO_TROCA,
+    FOTO_CHECKOUT: fotoCheckout,
+    LINK_FOTO_CHECKIN: fotoCheckin,
+    LINK_FOTO_ANTES: primaryRow.LINK_FOTO_ANTES,
+    LINK_FOTO_DEPOIS: primaryRow.LINK_FOTO_DEPOIS,
+    LINK_FOTO_TROCA: primaryRow.LINK_FOTO_TROCA,
+    LINK_FOTO_CHECKOUT: fotoCheckout,
+    LINK_FOTO_ESTOQUE: primaryRow.LINK_FOTO_ESTOQUE,
+    IA_ORGANIZACAO: primaryRow.IA_ORGANIZACAO,
+    IA_STATUS_COMPLIANCE: primaryRow.IA_STATUS_COMPLIANCE,
+    IA_RUPTURAS: primaryRow.IA_RUPTURAS,
+    RELATORIO_VISITAS: primaryRow,
+    RELATORIO_VISITAS_LINHAS: reportRows,
     storeId: payload.storeId,
     timestamp: getBrasiliaISO(),
   };

@@ -17,7 +17,7 @@ const INITIAL_STATE = {
   user: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
   checkInDone: false, checkInTime: null, checkOutTime: null,
   selectedIndustry: null, tasks: {}, photos: {}, stockQuantities: {}, 
-  aiResults: {}, hasReturns: null, availableStores: [], industries: []
+  aiResults: {}, hasReturns: null, industryExecutions: {}, availableStores: [], industries: []
 };
 
 const App: React.FC = () => {

@@ -1,5 +1,333 @@
 # CHANGELOG
 
+## [2026-07-01] - Ajuste: multiplas industrias por visita
+
+### Alterado
+- A visita de campo passou a aceitar varios fluxos de industria/empresa dentro do mesmo check-in.
+- As etapas `Antes`, `Estoque`, `Depois` e `Trocas` passaram a salvar fotos, tarefas, estoque, IA e resposta de trocas por industria selecionada.
+- O check-out passou a ser liberado somente quando todas as industrias abertas tiverem `Antes`, `Depois` e `Trocas` concluidos.
+- O dashboard passou a exibir resumo de industrias abertas, concluidas e pendentes sem alterar a estrutura visual principal.
+- O payload enviado ao backend/Make passou a incluir `RELATORIO_VISITAS_LINHAS`, com uma linha por industria, mantendo campos antigos no topo por compatibilidade.
+
+### Adicionado
+- Modelo `IndustryExecution` no estado da visita.
+- Campo `industryExecutions` para armazenar os fluxos por industria dentro da mesma visita.
+- Trava de seguranca na tela de check-out e na sincronizacao para impedir envio com fluxo de industria pendente.
+
+### Corrigido
+- Evitada mistura de fotos, quantidades de estoque, resposta de trocas e resultado de IA entre industrias diferentes.
+- Preservada compatibilidade com visitas antigas em andamento que ainda nao possuem `industryExecutions`.
+
+### Seguranca
+- Nenhuma credencial, webhook, chave ou regra sensivel foi exposta no frontend.
+- A sincronizacao continua passando pelo backend seguro antes de acionar integrações externas.
+- A regra de fechamento impede registro parcial de visita com empresas abertas.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Deploy de producao `6a459a8c0ab5e9665cbbca2d` concluido com sucesso.
+- Producao respondeu `200` na URL principal.
+- `/api/health` retornou `ok=true`, com Google Sheets, Make e segredo de sessao configurados.
+
+### Pendencias
+- Validar em aparelho real o fluxo com duas industrias na mesma loja.
+- Ajustar o cenario Make/planilha para consumir `RELATORIO_VISITAS_LINHAS` e inserir uma linha por industria na aba `RELATORIO_VISITAS`.
+
+## [2026-06-28] - Ajuste: payload para RELATORIO_VISITAS
+
+### Alterado
+- O payload enviado para a Make passou a incluir aliases com os nomes exatos das colunas da aba `RELATORIO_VISITAS`.
+- A resposta da Make passou a armazenar um trecho do corpo retornado para melhorar auditoria de sincronizacao.
+
+### Adicionado
+- Objeto `RELATORIO_VISITAS` no payload transformado, com os campos na ordem/nomenclatura esperada pela planilha.
+- Campos `LINK_FOTO_*` como aliases dos campos de foto enviados para a Make.
+
+### Corrigido
+- Reduzida a chance de a Make ignorar campos por divergencia de nomes como `HORA_ENTRADA_CHECK_IN` versus `HORA_ENTRADA_CHECK-IN`.
+
+### Seguranca
+- Nenhuma chave, webhook ou credencial foi exposta.
+- As fotos continuam trafegando pelo backend e pela Make, sem chamada direta do frontend para a planilha.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande.
+- Deploy de producao `6a41d6c8cf65a0c6278714d4` concluido com sucesso.
+- `/api/health` retornou `ok=true` em producao.
+- A aba `RELATORIO_VISITAS` segue com 11 linhas e sem os IDs antigos, pois visitas antigas nao foram reprocessadas.
+
+### Pendencias
+- Confirmar se o cenario da Make esta configurado para inserir linha na aba `RELATORIO_VISITAS`.
+- Reprocessar visitas antigas somente com decisao explicita, para evitar duplicidade em destinos da Make.
+
+## [2026-06-28] - Operacional: validade dos acessos provisorios
+
+### Alterado
+- A validade dos acessos provisorios de `luana.coelho` e `leandro.pinheiro` foi ajustada para 1 semana a partir da data local.
+
+### Adicionado
+- Nenhum arquivo novo nesta etapa.
+
+### Corrigido
+- Nenhuma correcao funcional nesta etapa.
+
+### Seguranca
+- As senhas nao foram alteradas nem gravadas no codigo.
+- As variaveis continuam configuradas como secret no Netlify.
+- A nova expiracao ficou definida para `2026-07-05T23:59:59-03:00`.
+
+### Validacao
+- Deploy de producao `6a41c5e2e986205a51aa573d` concluido com sucesso.
+- `/api/health` retornou 1 supervisor provisorio valido e 1 usuario provisorio valido.
+- Login de `luana.coelho` retornou `SUPERVISOR` e painel com 25 promotores.
+- Login de `leandro.pinheiro` retornou `FIELD_OPS`, 6 lojas e `403` no painel supervisor.
+
+### Pendencias
+- Remover os acessos provisorios quando os testes terminarem.
+
+## [2026-06-28] - Ajuste: anexos por industria no fluxo principal
+
+### Alterado
+- Na etapa `Antes`, a acao de adicionar fotos agora aparece somente depois da selecao da industria e abaixo do bloco de industria.
+- Na etapa `Depois`, a industria vinculada ao `Antes` passou a ser exibida explicitamente antes do anexo de fotos.
+- O campo de anexar foto de `Antes` e `Depois` foi padronizado como bloco abaixo do contexto da industria.
+- A navegacao para `Depois` passou a validar a industria selecionada no `Antes`.
+
+### Adicionado
+- Nenhum arquivo novo nesta etapa.
+
+### Corrigido
+- A validacao de salvar `Antes`/`Depois` agora prioriza a ausencia de industria antes da ausencia de foto.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi alterada.
+- Nenhuma regra de autenticacao ou permissao foi relaxada.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande.
+- Deploy de producao `6a41c4ffd1fce09a6fbaa9c0` concluido com sucesso.
+- `/api/health` retornou `ok=true` em producao.
+- Consulta autenticada em `/api/visits` encontrou a visita `VISIT-09A9FA2E` com `syncStatus=enviado` e `makeResponse.ok=true`.
+
+### Pendencias
+- Validar visualmente em celular real apos deploy.
+
+## [2026-06-28] - Operacional: promotor provisorio de teste
+
+### Alterado
+- O login passou a aceitar usuarios provisorios com papel controlado em `BACKEND_PROVISIONAL_USERS`.
+- O diagnostico seguro em `/api/health` passou a indicar tambem se ha usuarios provisorios configurados.
+- A rota de lojas passou a aceitar `storeResponsible` vindo da sessao para usuarios provisorios de teste.
+
+### Adicionado
+- Suporte a promotor provisorio `FIELD_OPS` sem alterar a planilha operacional.
+- Documentacao de `BACKEND_PROVISIONAL_USERS` no `.env.example`, README e manual tecnico.
+- Suporte a `storeResponsible` para vincular usuario provisorio a uma rota real sem usar ID de promotor existente.
+
+### Corrigido
+- Nenhuma correcao funcional nesta etapa.
+
+### Seguranca
+- A senha provisoria continua armazenada apenas como hash SHA-256 no ambiente do backend.
+- O papel do usuario provisorio e definido no backend e validado como `FIELD_OPS` ou `SUPERVISOR`.
+- O acesso provisorio pode expirar por `expiresAt`.
+- O promotor provisorio fica limitado a rota do `storeResponsible` configurado.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande.
+- Deploy de producao `6a41c0dc0c3f5951f901f6a3` concluido com sucesso.
+- `/api/health` retornou 1 supervisor provisorio valido e 1 usuario provisorio valido.
+- Login de `leandro.pinheiro` retornou `FIELD_OPS`, regiao `Vila Velha` e 6 lojas.
+- Acesso de `leandro.pinheiro` ao painel supervisor retornou `403`.
+- Login de `luana.coelho` continuou retornando `SUPERVISOR` e painel com 25 promotores.
+
+### Pendencias
+- Remover o acesso provisorio apos os testes do Leandro Pinheiro.
+
+## [2026-06-28] - Evolucao: PWA instalavel para promotores
+
+### Alterado
+- O HTML base recebeu metadados de PWA, idioma `pt-BR`, tema e links para manifest/icones.
+- A inicializacao do frontend passou a registrar service worker apenas em build de producao.
+- A documentacao passou a explicar instalacao no celular e limites do cache offline.
+
+### Adicionado
+- `public/manifest.webmanifest`
+- `public/sw.js`
+- `public/icons/icon.svg`
+- `public/icons/icon-192.png`
+- `public/icons/icon-512.png`
+- `src/services/registerServiceWorker.ts`
+
+### Corrigido
+- Nenhuma correcao funcional nesta etapa.
+
+### Seguranca
+- O service worker nao intercepta nem cacheia chamadas `/api/*`.
+- O cache da PWA foi limitado a shell e assets estaticos.
+- Nenhum segredo ou endpoint sensivel foi adicionado ao frontend.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande.
+- Manifest validado como JSON e com `display=standalone`.
+- Preview local respondeu `200` para `/`, `/manifest.webmanifest` e `/sw.js`.
+- Deploy de producao `6a41bce248c4638d7f4de46b` concluido com sucesso.
+- Producao respondeu `200` para `/`, `/manifest.webmanifest`, `/sw.js`, `/icons/icon-192.png` e `/icons/icon-512.png`.
+- `/api/health` continuou retornando `ok=true`.
+- Login supervisor `luana.coelho` retornou `SUPERVISOR` e painel com 25 promotores.
+- Login promotor real retornou `FIELD_OPS`, 6 lojas e `403` no painel supervisor.
+
+### Pendencias
+- Validar instalacao em celular real Android e iOS.
+
+## [2026-06-28] - Planejamento: arquitetura alvo segura
+
+### Alterado
+- O README passou a referenciar o documento de arquitetura alvo.
+- O checklist e o backlog tecnico passaram a registrar a evolucao pos-entrega de forma controlada.
+
+### Adicionado
+- `ARQUITETURA_ALVO.md` com a recomendacao de app PWA para promotores, acesso web para supervisor e backend centralizado.
+- Ordem segura para proximas implementacoes: PWA, validacao em celular real, fortalecimento de sessao, storage de fotos, banco operacional e relatorios.
+
+### Corrigido
+- Nenhuma correcao funcional nesta etapa.
+
+### Seguranca
+- A arquitetura alvo reforca backend como camada obrigatoria para autenticacao, permissoes, segredos, sync e auditoria.
+- Nenhum segredo, webhook ou chave foi alterado.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande.
+- Nenhum arquivo funcional do frontend ou backend foi alterado nesta etapa.
+
+### Pendencias
+- Implementar PWA instalavel em uma etapa separada, com validacao em celular real.
+
+## [2026-06-28] - Operacional: supervisor provisorio seguro
+
+### Alterado
+- O login passou a consultar supervisores provisorios configurados no backend quando o usuario nao existe no Google Sheets.
+
+### Adicionado
+- Suporte a `BACKEND_PROVISIONAL_SUPERVISORS` com lista JSON de supervisores temporarios.
+- Documentacao da nova variavel no `.env.example`, README e manual tecnico.
+- Diagnostico seguro em `/api/health` indicando apenas se ha supervisor provisorio configurado e quantos registros validos foram carregados.
+
+### Corrigido
+- Permitido criar acesso temporario de supervisor sem cadastrar senha fixa no frontend e sem alterar a planilha operacional.
+- A leitura de supervisores provisorios passou a aceitar JSON e formato compacto com `|`, evitando falhas de escape ao configurar variaveis pelo CLI no Windows.
+
+### Seguranca
+- A senha provisoria fica armazenada apenas como hash SHA-256 no ambiente do backend.
+- O acesso provisorio aceita expiracao por `expiresAt` e continua limitado ao papel `SUPERVISOR`.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande.
+- Deploy de producao `6a41747a9bc81887d7b6f75d` concluido com sucesso.
+- `/api/health` retornou `configured=true` e `validCount=1` para supervisores provisorios.
+- Login de `luana.coelho` retornou `SUPERVISOR`.
+- Painel supervisor carregou com 25 promotores.
+- Login de promotor real retornou `FIELD_OPS`, 6 lojas e `403` no painel supervisor.
+
+### Pendencias
+- Remover ou substituir o acesso provisorio quando a Luana for cadastrada oficialmente na planilha.
+
+## [2026-06-28] - Correcao: acesso supervisor configuravel
+
+### Alterado
+- A regra de papel do usuario passou a aceitar supervisor por coluna `ROLE`, compatibilidade antiga por regiao `SUPERVISOR` ou variavel `BACKEND_SUPERVISOR_USERS`.
+- O cache de cadastro passou a exigir industrias, promotores e lojas antes de ser considerado valido.
+
+### Adicionado
+- Variavel `BACKEND_SUPERVISOR_USERS` documentada no `.env.example`, README e manual tecnico.
+
+### Corrigido
+- Corrigido o risco de nenhum usuario conseguir acessar o painel supervisor quando a planilha nao possui linha/regiao `SUPERVISOR`.
+- Corrigido o risco de cache incompleto de cadastro causar falha de login em producao.
+
+### Seguranca
+- Nenhum usuario foi promovido a supervisor em producao sem definicao explicita.
+- O painel supervisor continua exigindo sessao autenticada com papel `SUPERVISOR`.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso.
+- Deploy de producao `6a4166b10c3f59668101f69c` concluido com sucesso.
+- Login de promotor em producao retornou `FIELD_OPS`, 6 lojas e `403` no dashboard supervisor.
+- Preview com `BACKEND_SUPERVISOR_USERS=22` retornou `SUPERVISOR` e carregou dashboard com 25 promotores.
+- Variaveis temporarias de deploy-preview foram removidas apos o teste.
+
+### Pendencias
+- Definir qual usuario real deve ser supervisor em producao e configurar `BACKEND_SUPERVISOR_USERS` ou coluna `ROLE` na planilha.
+
+## [2026-06-28] - Fase 8: entrega final e documentacao
+
+### Alterado
+- O README foi atualizado para apontar para a documentacao final.
+- O backlog tecnico e o checklist do projeto foram fechados com o status final.
+- A entrega ganhou manuais separados para uso operacional e referencia tecnica.
+
+### Adicionado
+- `MANUAL_DE_USO.md`
+- `MANUAL_TECNICO.md`
+
+### Corrigido
+- A explicacao do fluxo deixou de depender apenas de anotacoes internas e passou a existir em documentação final.
+- O caminho para localizar dados, filas e fotos ficou documentado de forma explicita.
+
+### Seguranca
+- A documentacao passou a reforcar que as chaves continuam fora do frontend.
+- O manual tecnico explica o acesso aos registros sem expor segredos.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso.
+- Revisao dos fluxos de login, check-in, fotos, sincronizacao, fila local e painel supervisor concluida a partir do codigo.
+
+### Pendencias
+- Nenhuma pendencia critica para entrega documental.
+- Melhorias futuras podem incluir reducao do bundle e configuracao da chave do Gemini, se o cliente desejar usar IA em producao.
+
+## [2026-06-27] - Fase 7: publicacao e implantacao no Netlify
+
+### Alterado
+- O projeto foi publicado em producao no Netlify.
+- O frontend continua preservado como Vite + React + TypeScript.
+- A documentacao foi ajustada para refletir o host final em producao.
+
+### Adicionado
+- `vercel.json` e gateway de compatibilidade para migracao futura, sem impacto visual no app atual.
+- Adaptador de storage com suporte a runtime Netlify e fallback alternativo preparado.
+
+### Corrigido
+- Resolvido o bloqueio de deploy que existia quando o Netlify estava sem credito.
+- Removido o ruido de variavel de teste no contexto de desenvolvimento do Netlify.
+
+### Seguranca
+- Segredos permanecem fora do frontend.
+- `APP_SESSION_SECRET`, Google Sheets e Make seguem configurados no backend do host.
+- A chave de Gemini continua opcional e, sem ela, a IA falha de forma controlada.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso.
+- `npx.cmd netlify deploy --prod --message "Fase 7 - Criativa Field Ops"` concluido com sucesso.
+- Smoke check em `https://criativa-field-ops-574.netlify.app/` retornou `200`.
+- Smoke check em `https://criativa-field-ops-574.netlify.app/api/health` retornou `200` com `googleSheets=true`, `make=true`, `sessionSecret=true` e `gemini=false`.
+- Smoke check em `https://criativa-field-ops-574.netlify.app/api/config` retornou `200`.
+
+### Pendencias
+- `BACKEND_GEMINI_API_KEY` ainda nao esta configurada em producao.
+- Fase 8: documentação final, guia de suporte e entrega conclusiva.
+
 ## [2026-06-27] - Fase 6: IA e analise de imagem segura
 
 ### Alterado

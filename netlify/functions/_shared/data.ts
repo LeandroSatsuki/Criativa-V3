@@ -1,7 +1,8 @@
-import { getStore } from '@netlify/blobs';
 import { getEnv } from './env';
+import { getJsonStore } from './storage';
 import { getBrasiliaDate, getBrasiliaISO } from './time';
 import type { Role, User } from '../../../src/types';
+import { createHash } from 'node:crypto';
 
 type SheetRow = {
   c?: Array<{ v?: string | number | null } | null>;
@@ -12,6 +13,7 @@ type SheetTable = {
 };
 
 export type AppData = {
+  schemaVersion?: number;
   industries: string[];
   promoters: Array<{
     id: string;
@@ -19,6 +21,7 @@ export type AppData = {
     user: string;
     pass: string;
     region: string;
+    role?: Role;
   }>;
   stores: Array<{
     id: string;
@@ -29,8 +32,137 @@ export type AppData = {
   timestamp: string | null;
 };
 
+type ProvisionalUser = {
+  id?: string;
+  name?: string;
+  user?: string;
+  passHash?: string;
+  region?: string;
+  storeResponsible?: string;
+  role?: Role;
+  expiresAt?: string;
+};
+
+const CONFIG_SCHEMA_VERSION = 2;
 const defaultIndustries = ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
-const configStore = getStore({ name: 'criativa-config', consistency: 'strong' });
+const configStore = getJsonStore('criativa-config');
+
+const parseSupervisorUsers = () => {
+  const raw = getEnv('BACKEND_SUPERVISOR_USERS') || '';
+  return new Set(
+    raw
+      .split(',')
+      .map((value) => value.toLowerCase().trim())
+      .filter(Boolean),
+  );
+};
+
+const normalizeRole = (value: unknown): Role | undefined => {
+  const normalized = String(value || '').toUpperCase().trim();
+  if (normalized === 'SUPERVISOR') return 'SUPERVISOR';
+  if (normalized === 'FIELD_OPS') return 'FIELD_OPS';
+  return undefined;
+};
+
+const normalizeCredential = (value: string) => value.toLowerCase().trim();
+
+const hashCredential = (value: string) =>
+  createHash('sha256').update(normalizeCredential(value)).digest('hex');
+
+const normalizeProvisionalUsers = (users: ProvisionalUser[], defaultRole: Role) =>
+  users
+    .map((user) => ({
+      id: String(user.id || user.user || '').toLowerCase().trim(),
+      name: String(user.name || '').trim(),
+      user: String(user.user || '').toLowerCase().trim(),
+      passHash: String(user.passHash || '').toLowerCase().trim(),
+      region: String(user.region || (defaultRole === 'SUPERVISOR' ? 'SUPERVISOR' : '')).trim(),
+      storeResponsible: String(user.storeResponsible || '').trim(),
+      role: normalizeRole(user.role) || defaultRole,
+      expiresAt: user.expiresAt ? String(user.expiresAt).trim() : '',
+    }))
+    .filter((user) => {
+      if (!user.id || !user.name || !user.user || !user.passHash || !user.region) return false;
+      if (!/^[a-f0-9]{64}$/.test(user.passHash)) return false;
+      if (!user.expiresAt) return true;
+
+      const expiration = new Date(user.expiresAt).getTime();
+      return Number.isFinite(expiration) && expiration > Date.now();
+    });
+
+const parseDelimitedProvisionalUsers = (raw: string): ProvisionalUser[] =>
+  raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [id, name, user, passHash, region, roleOrExpiresAt, expiresAt, storeResponsible] = line
+        .split('|')
+        .map((value) => value?.trim() || '');
+      const role = normalizeRole(roleOrExpiresAt);
+      return {
+        id,
+        name,
+        user,
+        passHash,
+        region,
+        role,
+        expiresAt: role ? expiresAt : roleOrExpiresAt,
+        storeResponsible,
+      };
+    });
+
+const parseProvisionalUsersFromEnv = (envName: string, defaultRole: Role) => {
+  const raw = getEnv(envName) || '';
+  if (!raw.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as ProvisionalUser[] | ProvisionalUser;
+    const users = Array.isArray(parsed) ? parsed : [parsed];
+    return normalizeProvisionalUsers(users, defaultRole);
+  } catch {
+    return normalizeProvisionalUsers(parseDelimitedProvisionalUsers(raw), defaultRole);
+  }
+};
+
+const parseProvisionalUsers = () => [
+  ...parseProvisionalUsersFromEnv('BACKEND_PROVISIONAL_SUPERVISORS', 'SUPERVISOR'),
+  ...parseProvisionalUsersFromEnv('BACKEND_PROVISIONAL_USERS', 'FIELD_OPS'),
+];
+
+export const getProvisionalSupervisorDiagnostics = () => {
+  const raw = getEnv('BACKEND_PROVISIONAL_SUPERVISORS') || '';
+  const rawUsers = getEnv('BACKEND_PROVISIONAL_USERS') || '';
+  const provisionalSupervisors = parseProvisionalUsersFromEnv('BACKEND_PROVISIONAL_SUPERVISORS', 'SUPERVISOR');
+  const provisionalUsers = parseProvisionalUsersFromEnv('BACKEND_PROVISIONAL_USERS', 'FIELD_OPS');
+  return {
+    configured: Boolean(raw.trim()),
+    validCount: provisionalSupervisors.length,
+    provisionalUsers: {
+      configured: Boolean(rawUsers.trim()),
+      validCount: provisionalUsers.length,
+    },
+  };
+};
+
+const resolvePromoterRole = (promoter: { id: string; user: string; region: string; role?: Role }): Role => {
+  const envSupervisors = parseSupervisorUsers();
+  if (promoter.role) return promoter.role;
+  if (promoter.region.toUpperCase().trim() === 'SUPERVISOR') return 'SUPERVISOR';
+  if (envSupervisors.has(promoter.user) || envSupervisors.has(promoter.id)) return 'SUPERVISOR';
+  return 'FIELD_OPS';
+};
+
+const isCompleteConfig = (data: AppData | null | undefined) =>
+  Boolean(
+    data?.schemaVersion === CONFIG_SCHEMA_VERSION &&
+    data.industries?.length &&
+    data.promoters?.length &&
+    data.stores?.length,
+  );
+
+const hasOperationalData = (data: AppData | null | undefined) =>
+  Boolean(data?.industries?.length && data.promoters?.length && data.stores?.length);
 
 const parseSheet = (text: string) => {
   const jsonStart = text.indexOf('{');
@@ -75,6 +207,7 @@ const mapConfig = async (): Promise<AppData> => {
       user: String(row.c?.[2]?.v || '').toLowerCase().trim(),
       pass: String(row.c?.[3]?.v || '').toLowerCase().trim(),
       region: String(row.c?.[4]?.v || ''),
+      role: normalizeRole(row.c?.[5]?.v),
     }))
     .filter((p) => p.user && p.user !== 'usuario') ?? [];
 
@@ -88,6 +221,7 @@ const mapConfig = async (): Promise<AppData> => {
     .filter((store) => store.name && store.name !== 'NOME_LOJA') ?? [];
 
   return {
+    schemaVersion: CONFIG_SCHEMA_VERSION,
     industries: industries.length > 0 ? industries : defaultIndustries,
     promoters,
     stores,
@@ -96,17 +230,26 @@ const mapConfig = async (): Promise<AppData> => {
 };
 
 export const getAppData = async () => {
-  const cached = await configStore.get('latest', { type: 'json' }) as AppData | null;
-  if (cached?.industries?.length) return cached;
+  const cached = await configStore.get<AppData>('latest');
+  if (isCompleteConfig(cached)) return cached;
 
   const fresh = await mapConfig();
-  await configStore.setJSON('latest', fresh);
+  if (hasOperationalData(fresh)) {
+    await configStore.set('latest', fresh);
+    return fresh;
+  }
+
+  if (hasOperationalData(cached)) return cached;
+
+  await configStore.set('latest', fresh);
   return fresh;
 };
 
 export const refreshAppData = async () => {
   const fresh = await mapConfig();
-  await configStore.setJSON('latest', fresh);
+  if (hasOperationalData(fresh)) {
+    await configStore.set('latest', fresh);
+  }
   return fresh;
 };
 
@@ -119,7 +262,7 @@ export const getStoresForUser = (data: AppData, user: User) => {
   }
 
   const promoter = promoters.find((p) => p.id === user.id);
-  const promoterName = promoter?.name || user.name || '';
+  const promoterName = user.storeResponsible || promoter?.name || user.name || '';
   const regional = promoter?.region || user.region || '';
 
   const myStores = allStores.filter((store) => store.responsible === promoterName);
@@ -132,13 +275,28 @@ export const getStoresForUser = (data: AppData, user: User) => {
 
 export const findUserByCredentials = async (userName: string, password: string) => {
   const data = await getAppData();
-  const u = userName.toLowerCase().trim();
-  const p = password.toLowerCase().trim();
+  const u = normalizeCredential(userName);
+  const p = normalizeCredential(password);
 
   const found = data.promoters.find((promoter) => promoter.user === u && promoter.pass === p);
-  if (!found) return null;
+  if (!found) {
+    const provisional = parseProvisionalUsers().find(
+      (user) => user.user === u && user.passHash === hashCredential(p),
+    );
 
-  const role: Role = found.region.toUpperCase() === 'SUPERVISOR' ? 'SUPERVISOR' : 'FIELD_OPS';
+    if (!provisional) return null;
+
+    return {
+      id: provisional.id,
+      name: provisional.name,
+      role: provisional.role,
+      region: provisional.region,
+      storeResponsible: provisional.storeResponsible,
+      user: provisional.user,
+    } as User;
+  }
+
+  const role = resolvePromoterRole(found);
   return {
     id: found.id,
     name: found.name,

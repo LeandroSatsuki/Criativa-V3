@@ -21,6 +21,7 @@ export default async (request: Request, _context: Context) => {
     name: auth.name,
     role: auth.role,
     region: auth.region,
+    storeResponsible: auth.storeResponsible,
     user: auth.user,
   };
 

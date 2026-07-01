@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { SectionId, VisitState, Industry } from '../types';
+import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { logService } from '../services/logService';
 import { analyzeProductPhoto } from '../services/geminiService';
@@ -88,10 +88,79 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const tasks = visitState.tasks || {};
   const stockQuantities = visitState.stockQuantities || {};
   const selectedIndustry = visitState.selectedIndustry || '';
-  const selectedStockQuantity = selectedIndustry ? String(stockQuantities[selectedIndustry] ?? '').trim() : '';
+  const industryExecutions = visitState.industryExecutions || {};
+  const openedIndustryExecutions = Object.values(industryExecutions);
+  const selectedExecution = selectedIndustry ? industryExecutions[selectedIndustry] : null;
+  const selectedStockQuantity = selectedIndustry
+    ? String(selectedExecution?.stockQuantities?.[selectedIndustry] ?? stockQuantities[selectedIndustry] ?? '').trim()
+    : '';
   const isSelectedStockQuantityValid = /^\d+$/.test(selectedStockQuantity);
+  const industryStepIds = [SectionId.Antes, SectionId.Estoque, SectionId.Depois, SectionId.Trocas];
+
+  const createIndustryExecution = (industry: string, existing?: Partial<IndustryExecution>): IndustryExecution => ({
+    industry,
+    status: existing?.status || 'aberto',
+    tasks: existing?.tasks || {},
+    photos: existing?.photos || {},
+    stockQuantities: existing?.stockQuantities || {},
+    aiResults: existing?.aiResults || {},
+    hasReturns: existing?.hasReturns ?? null,
+    openedAt: existing?.openedAt || getBrasiliaISO(),
+    completedAt: existing?.completedAt || null,
+  });
+
+  const isIndustryStep = (section: string) => industryStepIds.includes(section as SectionId);
+  const isExecutionComplete = (execution?: Partial<IndustryExecution> | null) => Boolean(
+    execution?.tasks?.[SectionId.Antes]
+    && execution?.tasks?.[SectionId.Depois]
+    && execution?.tasks?.[SectionId.Trocas]
+  );
+
+  const getExecutionWithStatus = (execution: IndustryExecution): IndustryExecution => {
+    const complete = isExecutionComplete(execution);
+    return {
+      ...execution,
+      status: complete ? 'concluido' : 'aberto',
+      completedAt: complete ? (execution.completedAt || getBrasiliaISO()) : null,
+    };
+  };
+
+  const openIndustryExecution = (industry: string) => {
+    updateVisit('selectedIndustry', industry);
+    updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => ({
+      ...prev,
+      [industry]: createIndustryExecution(industry, prev[industry]),
+    }));
+  };
+
+  const updateSelectedExecution = (updater: (execution: IndustryExecution) => IndustryExecution) => {
+    if (!selectedIndustry) return;
+    updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+      const current = createIndustryExecution(selectedIndustry, prev[selectedIndustry]);
+      const updated = getExecutionWithStatus(updater(current));
+      return {
+        ...prev,
+        [selectedIndustry]: updated,
+      };
+    });
+  };
+
+  const getIndustryPhotos = (section: SectionId) => {
+    if (!selectedIndustry) return [];
+    return selectedExecution?.photos?.[section] || photos[section] || [];
+  };
+
+  const selectedTasks = selectedExecution?.tasks || {};
+  const pendingIndustryExecutions = openedIndustryExecutions.filter(execution => !isExecutionComplete(execution));
+  const legacyFlowComplete = openedIndustryExecutions.length === 0
+    && Boolean(tasks[SectionId.Antes] && tasks[SectionId.Depois] && tasks[SectionId.Trocas]);
+  const canCheckOut = legacyFlowComplete || (openedIndustryExecutions.length > 0 && pendingIndustryExecutions.length === 0);
+  const totalIndustryPhotos = openedIndustryExecutions.reduce((total, execution) => (
+    total + Object.values(execution.photos || {}).flat().length
+  ), 0);
 
   const handlePhotoCapture = async (section: string, file: File) => {
+    const activeIndustry = selectedIndustry;
     const reader = new FileReader();
     reader.onloadend = () => {
       const img = new Image();
@@ -107,6 +176,24 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1]; // 0.5 quality for smaller payload
         
+        if (isIndustryStep(section) && activeIndustry) {
+          updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+            const current = createIndustryExecution(activeIndustry, prev[activeIndustry]);
+            const currentCategoryPhotos = current.photos?.[section] || [];
+            return {
+              ...prev,
+              [activeIndustry]: {
+                ...current,
+                photos: {
+                  ...current.photos,
+                  [section]: [...currentCategoryPhotos, compressedBase64],
+                },
+              },
+            };
+          });
+          return;
+        }
+
         // Use functional update to avoid stale state
         updateVisit('photos', (prevPhotos: any = {}) => {
           const currentCategoryPhotos = prevPhotos[section] || [];
@@ -205,6 +292,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     if (!checkoutPhoto) {
       const msg = "ERRO: Foto de Saída não encontrada. Por favor, volte e tire a foto de saída novamente.";
       setSyncError(msg);
+      return;
+    }
+
+    if (!canCheckOut) {
+      const pending = pendingIndustryExecutions.map(execution => execution.industry).join(', ') || 'nenhuma empresa aberta';
+      setSyncError(`ERRO: finalize todos os fluxos de empresa antes de sincronizar. Pendentes: ${pending}.`);
       return;
     }
 
@@ -333,6 +426,30 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               )}
             </div>
 
+            {visitState.checkInDone && openedIndustryExecutions.length > 0 && (
+              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Empresas nesta visita</p>
+                    <p className="font-black uppercase text-lg tracking-tight text-[#0F172A]">
+                      {openedIndustryExecutions.filter(isExecutionComplete).length}/{openedIndustryExecutions.length} fluxos concluídos
+                    </p>
+                  </div>
+                  {selectedIndustry && (
+                    <div className="bg-slate-50 px-4 py-3 rounded-2xl">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Empresa atual</p>
+                      <p className="font-black uppercase text-sm text-[#0F172A]">{selectedIndustry}</p>
+                    </div>
+                  )}
+                </div>
+                {pendingIndustryExecutions.length > 0 && (
+                  <p className="text-[10px] font-bold text-orange-600 uppercase tracking-widest bg-orange-50 p-4 rounded-2xl">
+                    Check-out bloqueado até concluir: {pendingIndustryExecutions.map(execution => execution.industry).join(', ')}.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {!visitState.checkInDone ? (
                 <button 
@@ -348,50 +465,60 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               ) : (
                 <>
                   <DashboardCard 
-                    icon={<Camera className={tasks[SectionId.Antes] ? "text-emerald-500" : "text-[#E65C5C]"} />} 
+                    icon={<Camera className={selectedTasks[SectionId.Antes] ? "text-emerald-500" : "text-[#E65C5C]"} />} 
                     title="1. Antes" 
-                    count={photos[SectionId.Antes]?.length || 0} 
-                    status={tasks[SectionId.Antes] ? "Concluído" : "Pendente"}
-                    isCompleted={tasks[SectionId.Antes]}
+                    count={selectedExecution?.photos?.[SectionId.Antes]?.length || 0} 
+                    status={selectedTasks[SectionId.Antes] ? "Concluído" : "Pendente"}
+                    isCompleted={selectedTasks[SectionId.Antes]}
                     onClick={() => navigateTo(SectionId.Antes)}
                   />
                   <DashboardCard 
-                    icon={<Boxes className={tasks[SectionId.Estoque] ? "text-emerald-500" : "text-blue-500"} />} 
+                    icon={<Boxes className={selectedTasks[SectionId.Estoque] ? "text-emerald-500" : "text-blue-500"} />} 
                     title="2. Estoque (Opcional)" 
-                    count={photos[SectionId.Estoque]?.length || 0}
-                    status={tasks[SectionId.Estoque] ? "Concluído" : "Pendente"} 
-                    isCompleted={tasks[SectionId.Estoque]}
-                    isDisabled={!tasks[SectionId.Antes]}
+                    count={selectedExecution?.photos?.[SectionId.Estoque]?.length || 0}
+                    status={selectedTasks[SectionId.Estoque] ? "Concluído" : "Pendente"} 
+                    isCompleted={selectedTasks[SectionId.Estoque]}
+                    isDisabled={!selectedIndustry || !selectedTasks[SectionId.Antes]}
                     onClick={() => {
-                      if (!tasks[SectionId.Antes]) return alert("Complete a etapa 'ANTES' primeiro.");
-                      if (!visitState.selectedIndustry) {
-                        alert("Por favor, selecione a Indústria na seção 'ANTES' antes de prosseguir.");
+                      if (!selectedIndustry) {
+                        alert("Selecione ou abra uma empresa na seção 'ANTES' antes de prosseguir.");
                         navigateTo(SectionId.Antes);
-                      } else {
-                        navigateTo(SectionId.Estoque);
+                        return;
                       }
+                      if (!selectedTasks[SectionId.Antes]) return alert("Complete a etapa 'ANTES' desta empresa primeiro.");
+                      navigateTo(SectionId.Estoque);
                     }}
                   />
                   <DashboardCard 
-                    icon={<Camera className={tasks[SectionId.Depois] ? "text-emerald-500" : "text-purple-500"} />} 
+                    icon={<Camera className={selectedTasks[SectionId.Depois] ? "text-emerald-500" : "text-purple-500"} />} 
                     title="3. Depois" 
-                    count={photos[SectionId.Depois]?.length || 0} 
-                    status={tasks[SectionId.Depois] ? "Concluído" : "Pendente"}
-                    isCompleted={tasks[SectionId.Depois]}
-                    isDisabled={!tasks[SectionId.Antes]}
+                    count={selectedExecution?.photos?.[SectionId.Depois]?.length || 0} 
+                    status={selectedTasks[SectionId.Depois] ? "Concluído" : "Pendente"}
+                    isCompleted={selectedTasks[SectionId.Depois]}
+                    isDisabled={!selectedIndustry || !selectedTasks[SectionId.Antes]}
                     onClick={() => {
-                      if (!tasks[SectionId.Antes]) return alert("Complete a etapa 'ANTES' primeiro.");
+                      if (!selectedIndustry) {
+                        alert("Selecione ou abra uma empresa na seção 'ANTES' antes de prosseguir.");
+                        navigateTo(SectionId.Antes);
+                        return;
+                      }
+                      if (!selectedTasks[SectionId.Antes]) return alert("Complete a etapa 'ANTES' desta empresa primeiro.");
                       navigateTo(SectionId.Depois);
                     }}
                   />
                   <DashboardCard 
-                    icon={<PackageOpen className={tasks[SectionId.Trocas] ? "text-emerald-500" : "text-orange-500"} />} 
+                    icon={<PackageOpen className={selectedTasks[SectionId.Trocas] ? "text-emerald-500" : "text-orange-500"} />} 
                     title="4. Trocas" 
-                    status={tasks[SectionId.Trocas] ? "Concluído" : "Pendente"} 
-                    isCompleted={tasks[SectionId.Trocas]}
-                    isDisabled={!tasks[SectionId.Depois]}
+                    status={selectedTasks[SectionId.Trocas] ? "Concluído" : "Pendente"} 
+                    isCompleted={selectedTasks[SectionId.Trocas]}
+                    isDisabled={!selectedIndustry || !selectedTasks[SectionId.Depois]}
                     onClick={() => {
-                      if (!tasks[SectionId.Depois]) return alert("Complete a etapa 'DEPOIS' primeiro.");
+                      if (!selectedIndustry) {
+                        alert("Selecione uma empresa em andamento primeiro.");
+                        navigateTo(SectionId.Antes);
+                        return;
+                      }
+                      if (!selectedTasks[SectionId.Depois]) return alert("Complete a etapa 'DEPOIS' desta empresa primeiro.");
                       navigateTo(SectionId.Trocas);
                     }}
                   />
@@ -400,9 +527,17 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     title="5. Check-out" 
                     status={tasks[SectionId.CheckOut] ? "Concluído" : "Pendente"}
                     isCompleted={tasks[SectionId.CheckOut]}
-                    isDisabled={!tasks[SectionId.Trocas]}
+                    isDisabled={!canCheckOut}
                     onClick={() => {
-                      if (!tasks[SectionId.Trocas]) return alert("Complete a etapa 'TROCAS' primeiro.");
+                      if (!canCheckOut) {
+                        if (openedIndustryExecutions.length === 0) {
+                          alert("Abra pelo menos uma empresa na etapa 'ANTES' antes do check-out.");
+                          navigateTo(SectionId.Antes);
+                          return;
+                        }
+                        alert(`Finalize os fluxos em aberto antes do check-out: ${pendingIndustryExecutions.map(execution => execution.industry).join(', ')}.`);
+                        return;
+                      }
                       navigateTo(SectionId.CheckOut);
                     }}
                   />
@@ -467,35 +602,14 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         const industries: string[] = visitState.industries && visitState.industries.length > 0 
           ? visitState.industries 
           : ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
-        const currentPhotos = photos[sectionId] || [];
+        const currentPhotos = getIndustryPhotos(sectionId);
+        const canAttachPhotos = Boolean(visitState.selectedIndustry);
 
         return (
           <div className="space-y-8 animate-in">
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-black uppercase tracking-tighter">Fotos de {isAntes ? 'Antes' : 'Depois'}</h2>
-              <div className="flex items-center gap-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{currentPhotos.length}/30 Fotos</p>
-                <div className="relative">
-                  <button 
-                    disabled={currentPhotos.length >= 30}
-                    className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${currentPhotos.length >= 30 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <Plus size={16} /> Tirar Foto
-                  </button>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    capture="environment"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file && currentPhotos.length < 30) {
-                        handlePhotoCapture(sectionId, file);
-                      }
-                    }}
-                  />
-                </div>
-              </div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{currentPhotos.length}/30 Fotos</p>
             </div>
 
             {isAntes && (
@@ -504,17 +618,69 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   {visitState.selectedIndustry ? `Indústria Selecionada: ${visitState.selectedIndustry}` : 'Selecione a Indústria'}
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {industries
-                    .filter(ind => !visitState.selectedIndustry || ind === visitState.selectedIndustry)
-                    .map(ind => (
+                  {industries.map(ind => {
+                    const execution = industryExecutions[ind];
+                    const complete = isExecutionComplete(execution);
+                    const opened = Boolean(execution);
+                    return (
                     <button 
                       key={ind}
-                      onClick={() => updateVisit('selectedIndustry', ind)}
-                      className={`py-3 rounded-xl font-black uppercase text-[10px] tracking-widest border transition-all ${visitState.selectedIndustry === ind ? 'bg-[#0F172A] text-white border-[#0F172A]' : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-slate-200'}`}
+                      onClick={() => openIndustryExecution(ind)}
+                      className={`py-3 rounded-xl font-black uppercase text-[10px] tracking-widest border transition-all ${visitState.selectedIndustry === ind ? 'bg-[#0F172A] text-white border-[#0F172A]' : complete ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : opened ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-slate-200'}`}
                     >
                       {ind}
+                      {complete ? ' ✓' : opened ? ' •' : ''}
                     </button>
-                  ))}
+                  )})}
+                </div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Voce pode abrir outra industria antes do check-out. Cada uma precisa concluir Antes, Depois e Trocas.
+                </p>
+              </div>
+            )}
+
+            {!isAntes && (
+              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-3">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Indústria vinculada ao Antes</p>
+                {visitState.selectedIndustry ? (
+                  <p className="font-black uppercase text-lg tracking-tight text-[#0F172A]">{visitState.selectedIndustry}</p>
+                ) : (
+                  <p className="text-[10px] font-bold text-[#E65C5C] uppercase bg-red-50 p-4 rounded-xl">
+                    Selecione a indústria na etapa "ANTES" antes de registrar fotos do Depois.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {canAttachPhotos && (
+              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Anexar fotos</p>
+                    <p className="text-xs font-bold text-slate-500 mt-1">
+                      {isAntes ? 'Registre a situação inicial' : 'Registre a situação final'} de {visitState.selectedIndustry}.
+                    </p>
+                  </div>
+                  <div className="relative shrink-0">
+                    <button 
+                      disabled={currentPhotos.length >= 30}
+                      className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${currentPhotos.length >= 30 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <Plus size={16} /> Adicionar Foto
+                    </button>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file && currentPhotos.length < 30) {
+                          handlePhotoCapture(sectionId, file);
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -526,7 +692,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   <button 
                     onClick={() => {
                       const newPhotos = currentPhotos.filter((_, i) => i !== idx);
-                      updateVisit('photos', (prev: any) => ({ ...prev, [sectionId]: newPhotos }));
+                      updateSelectedExecution(execution => ({
+                        ...execution,
+                        photos: {
+                          ...execution.photos,
+                          [sectionId]: newPhotos,
+                        },
+                      }));
                     }}
                     className="absolute top-2 right-2 bg-white/20 backdrop-blur-md p-1.5 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
                   >
@@ -540,12 +712,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               <button 
                 disabled={isAnalyzing}
                 onClick={async () => {
-                  if (currentPhotos.length === 0) return alert("Tire pelo menos uma foto.");
                   if (!visitState.selectedIndustry) {
                     alert("Selecione uma indústria primeiro.");
                     if (isAntes) navigateTo(SectionId.Antes);
                     return;
                   }
+                  if (currentPhotos.length === 0) return alert("Tire pelo menos uma foto.");
 
                   const resolvedVisitId = visitState.visitId || generateVisitId();
                   if (!visitState.visitId) {
@@ -555,6 +727,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   setIsAnalyzing(true);
                   
                   // Mark task as done and navigate IMMEDIATELY for instant feel
+                  updateSelectedExecution(execution => ({
+                    ...execution,
+                    tasks: {
+                      ...execution.tasks,
+                      [sectionId]: true,
+                    },
+                  }));
                   updateVisit('tasks', { ...tasks, [sectionId]: true });
                   navigateTo(SectionId.Dashboard);
 
@@ -570,6 +749,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                         setAiResult(result);
                         const updatedAiResults = { ...visitState.aiResults, [sectionId]: result };
                         updateVisit('aiResults', updatedAiResults);
+                        updateSelectedExecution(execution => ({
+                          ...execution,
+                          aiResults: {
+                            ...execution.aiResults,
+                            [sectionId]: result,
+                          },
+                        }));
                       })
                       .catch(err => console.error("AI Background Error:", err))
                       .finally(() => {
@@ -609,7 +795,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         );
 
       case SectionId.Estoque:
-        const estoquePhotos = photos[SectionId.Estoque] || [];
+        const estoquePhotos = getIndustryPhotos(SectionId.Estoque);
         const industriesEstoque: string[] = visitState.industries && visitState.industries.length > 0 
           ? visitState.industries 
           : ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
@@ -657,9 +843,16 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       <input 
                         type="number" 
                         placeholder="Qtd"
-                        value={stockQuantities[ind] || ''}
+                        value={selectedExecution?.stockQuantities?.[ind] ?? stockQuantities[ind] ?? ''}
                         onChange={(e) => {
                           const val = e.target.value;
+                          updateSelectedExecution(execution => ({
+                            ...execution,
+                            stockQuantities: {
+                              ...execution.stockQuantities,
+                              [ind]: val,
+                            },
+                          }));
                           updateVisit('stockQuantities', (prev: any) => ({ ...prev, [ind]: val }));
                         }}
                         className="w-24 p-3 bg-slate-50 rounded-xl font-bold text-center border border-slate-100 focus:border-blue-500 outline-none"
@@ -681,7 +874,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     <button 
                       onClick={() => {
                         const newPhotos = estoquePhotos.filter((_, i) => i !== idx);
-                        updateVisit('photos', (prev: any) => ({ ...prev, [SectionId.Estoque]: newPhotos }));
+                        updateSelectedExecution(execution => ({
+                          ...execution,
+                          photos: {
+                            ...execution.photos,
+                            [SectionId.Estoque]: newPhotos,
+                          },
+                        }));
                       }}
                       className="absolute top-2 right-2 bg-white/20 backdrop-blur-md p-1 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
                     >
@@ -706,6 +905,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 }
 
                 updateVisit('tasks', (prev: any) => ({ ...prev, [SectionId.Estoque]: true }));
+                updateSelectedExecution(execution => ({
+                  ...execution,
+                  tasks: {
+                    ...execution.tasks,
+                    [SectionId.Estoque]: true,
+                  },
+                }));
                 navigateTo(SectionId.Dashboard);
               }}
               className="w-full bg-[#0F172A] text-white py-6 rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-slate-900/20"
@@ -716,7 +922,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         );
 
       case SectionId.Trocas:
-        const returnsPhotos = photos[SectionId.Trocas] || [];
+        const returnsPhotos = getIndustryPhotos(SectionId.Trocas);
+        const selectedHasReturns = selectedExecution?.hasReturns ?? visitState.hasReturns;
         return (
           <div className="space-y-8 animate-in">
             <h2 className="text-3xl font-black uppercase tracking-tighter">Trocas e Avarias</h2>
@@ -730,24 +937,35 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 <h3 className="text-xl font-black uppercase tracking-tight">Houve trocas ou avarias{visitState.selectedIndustry ? ` (${visitState.selectedIndustry})` : ''}?</h3>
                 <div className="flex gap-4 max-w-xs mx-auto">
                   <button 
-                    onClick={() => updateVisit('hasReturns', true)}
-                    className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${visitState.hasReturns === true ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-400'}`}
+                    onClick={() => {
+                      updateSelectedExecution(execution => ({ ...execution, hasReturns: true }));
+                      updateVisit('hasReturns', true);
+                    }}
+                    className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${selectedHasReturns === true ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-400'}`}
                   >
                     Sim
                   </button>
                   <button 
                     onClick={() => {
+                      updateSelectedExecution(execution => ({
+                        ...execution,
+                        hasReturns: false,
+                        photos: {
+                          ...execution.photos,
+                          [SectionId.Trocas]: [],
+                        },
+                      }));
                       updateVisit('hasReturns', false);
                       updateVisit('photos', (prev: any) => ({ ...prev, [SectionId.Trocas]: [] }));
                     }}
-                    className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${visitState.hasReturns === false ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-400'}`}
+                    className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${selectedHasReturns === false ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-400'}`}
                   >
                     Não
                   </button>
                 </div>
               </div>
 
-              {visitState.hasReturns && (
+              {selectedHasReturns && (
                 <div className="space-y-6 pt-6 border-t border-slate-50">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fotos das Trocas ({returnsPhotos.length}/10)</p>
@@ -784,12 +1002,24 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               )}
 
               <button 
-                disabled={visitState.hasReturns === null || (visitState.hasReturns === true && returnsPhotos.length === 0)}
+                disabled={selectedHasReturns === null || (selectedHasReturns === true && returnsPhotos.length === 0)}
                 onClick={() => {
+                  if (!selectedIndustry) {
+                    alert("Selecione uma empresa antes de salvar Trocas.");
+                    navigateTo(SectionId.Antes);
+                    return;
+                  }
                   updateVisit('tasks', (prev: any) => ({ ...prev, [SectionId.Trocas]: true }));
+                  updateSelectedExecution(execution => ({
+                    ...execution,
+                    tasks: {
+                      ...execution.tasks,
+                      [SectionId.Trocas]: true,
+                    },
+                  }));
                   navigateTo(SectionId.Dashboard);
                 }}
-                className={`w-full py-6 rounded-3xl font-black uppercase tracking-widest transition-all ${visitState.hasReturns !== null ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-300'}`}
+                className={`w-full py-6 rounded-3xl font-black uppercase tracking-widest transition-all ${selectedHasReturns !== null ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-300'}`}
               >
                 Salvar e Continuar
               </button>
@@ -798,14 +1028,38 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         );
       case SectionId.CheckOut:
         const checkoutPhoto = (photos[SectionId.CheckOut] || [])[0];
+        if (!canCheckOut) {
+          return (
+            <div className="space-y-8 animate-in">
+              <h2 className="text-3xl font-black uppercase tracking-tighter">Finalizar Visita</h2>
+              <div className="bg-orange-50 p-8 rounded-[32px] border border-orange-100 text-orange-700 space-y-4">
+                <p className="font-black uppercase tracking-widest text-xs">Check-out bloqueado</p>
+                <p className="text-sm font-bold leading-relaxed">
+                  Conclua todos os fluxos de empresas abertos antes de registrar a saída.
+                </p>
+                {pendingIndustryExecutions.length > 0 && (
+                  <p className="text-[10px] font-black uppercase tracking-widest">
+                    Pendentes: {pendingIndustryExecutions.map(execution => execution.industry).join(', ')}
+                  </p>
+                )}
+                <button
+                  onClick={() => navigateTo(SectionId.Dashboard)}
+                  className="bg-[#0F172A] text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest"
+                >
+                  Voltar ao progresso
+                </button>
+              </div>
+            </div>
+          );
+        }
         return (
           <div className="space-y-8 animate-in">
             <h2 className="text-3xl font-black uppercase tracking-tighter">Finalizar Visita</h2>
             <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm space-y-8">
               <div className="grid grid-cols-2 gap-6">
                 <SummaryItem label="Check-in" value={checkInTimeDisplay} />
-                <SummaryItem label="Fotos Total" value={Object.values(photos).flat().length.toString()} />
-                <SummaryItem label="Tarefas" value={Object.keys(tasks).length.toString()} />
+                <SummaryItem label="Fotos Total" value={(Object.values(photos).flat().length + totalIndustryPhotos).toString()} />
+                <SummaryItem label="Empresas" value={`${openedIndustryExecutions.length}`} />
                 <SummaryItem label="Loja" value={visitState.currentStore} />
               </div>
 

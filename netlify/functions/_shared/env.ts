@@ -6,4 +6,4 @@ type NetlifyRuntime = {
 
 const getRuntime = () => (globalThis as typeof globalThis & { Netlify?: NetlifyRuntime }).Netlify;
 
-export const getEnv = (name: string) => getRuntime()?.env.get(name);
+export const getEnv = (name: string) => getRuntime()?.env.get(name) || process.env[name];

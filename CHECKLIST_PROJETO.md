@@ -81,6 +81,35 @@ Data da ultima auditoria: 2026-06-27
 - [x] Smoke check de persistencia de `aiResults` no backend executado.
 - [x] Smoke check da rota de IA sem chave configurada executado.
 
+## Fase 7 - Publicacao e implantacao
+
+- [x] Projeto autenticado no Netlify.
+- [x] Variaveis de ambiente configuradas no host de producao.
+- [x] Deploy de producao concluido com sucesso.
+- [x] Smoke check do ambiente publicado concluido.
+- [x] URL publica validada em navegador.
+- [x] README e instrucoes de operacao atualizados para o host final.
+- [x] CHANGELOG atualizado com a fase 7 concluida.
+
+## Fase 8 - Entrega final e documentacao
+
+- [x] Manual de uso criado com o fluxo do promotor e supervisor.
+- [x] Manual tecnico criado com arquitetura, fluxo de dados e acesso aos registros.
+- [x] Arquitetura alvo documentada para PWA do promotor e web do supervisor.
+- [x] README final atualizado com links para os manuais.
+- [x] CHANGELOG atualizado com a fase 8 concluida.
+- [x] Backlog tecnico atualizado com o status final do projeto.
+- [x] Checklist do projeto atualizado com a entrega concluida.
+
+## Evolucao segura pos-entrega
+
+- [x] Definir arquitetura alvo preservando o app atual.
+- [x] Habilitar PWA instalavel para promotores.
+- [ ] Validar PWA em celular real.
+- [ ] Revisar sessao, login e rate limit.
+- [ ] Separar armazenamento de fotos em storage dedicado.
+- [ ] Avaliar banco operacional para relatorios e auditoria.
+
 ## Checklist da fase 0
 
 - [x] Li os arquivos diretamente envolvidos.
@@ -139,3 +168,6 @@ Data da ultima auditoria: 2026-06-27
 - O painel supervisor deixou de depender de `chartData` fixo e numeros sinteticos.
 - O smoke check autenticado do supervisor retornou `PROMOTERS=25`, `TOTAL_VISITS=0`, `PENDING_SYNC=0`, `TIMELINE_POINTS=6`.
 - O smoke check de IA retornou `AI_SAVED=Bom` na persistencia de visita e `AI_ROUTE=503` sem chave Gemini configurada.
+- A Fase 7 foi publicada no Netlify e validada na URL publica.
+- A chave de Gemini continua opcional e ausente no ambiente de producao, mantendo a rota de IA em fallback seguro.
+- A Fase 8 fechou a documentacao de uso, tecnica e operacao do projeto.

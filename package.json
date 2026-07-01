@@ -12,9 +12,10 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@google/genai": "^1.37.0",
     "@netlify/blobs": "^8.1.0",
     "@netlify/functions": "^4.0.0",
-    "@google/genai": "^1.37.0",
+    "@vercel/blob": "^2.5.0",
     "browser-image-compression": "^2.0.2",
     "framer-motion": "^12.4.7",
     "lucide-react": "^0.475.0",

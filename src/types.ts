@@ -20,10 +20,23 @@ export interface User {
   name: string;
   role: Role;
   region?: string;
+  storeResponsible?: string;
   user: string;
 }
 
 export type Industry = string;
+
+export interface IndustryExecution {
+  industry: Industry;
+  status?: 'aberto' | 'concluido';
+  tasks: Record<string, boolean>;
+  photos: Record<string, string[]>;
+  stockQuantities: Record<string, string>;
+  aiResults: Record<string, any>;
+  hasReturns: boolean | null;
+  openedAt?: string;
+  completedAt?: string | null;
+}
 
 export interface VisitState {
   user: User | null;
@@ -42,6 +55,7 @@ export interface VisitState {
   stockQuantities: Record<string, string>;
   aiResults: Record<string, any>;
   hasReturns: boolean | null;
+  industryExecutions?: Record<string, IndustryExecution>;
   availableStores: any[];
   industries: string[];
 }

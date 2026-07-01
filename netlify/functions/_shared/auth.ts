@@ -8,6 +8,7 @@ type SessionPayload = {
   role: Role;
   user: string;
   region?: string;
+  storeResponsible?: string;
   exp: number;
 };
 
@@ -39,6 +40,7 @@ export const createSessionToken = (user: User) => {
     role: user.role,
     user: user.user,
     region: user.region,
+    storeResponsible: user.storeResponsible,
     exp: Date.now() + TOKEN_TTL_MS,
   };
 

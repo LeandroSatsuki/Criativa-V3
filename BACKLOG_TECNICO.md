@@ -19,8 +19,9 @@ O app ja possui o fluxo visual principal do promotor, mas hoje a confianca opera
 O build atual passa, mas a base ainda nao esta pronta para uso real com seguranca e rastreabilidade completas.
 
 Status da fase atual:
-- Fase 6 concluida e validada.
-- Proxima fase recomendada: Fase 7, com implantacao e configuracao de ambiente.
+- Fase 8 concluida e validada.
+- Deploy de producao publicado no Netlify.
+- Arquitetura alvo pos-entrega documentada em `ARQUITETURA_ALVO.md`.
 
 ## Arquivos principais e responsabilidades
 
@@ -130,7 +131,8 @@ Recomendacao inicial: manter o frontend React + Vite e adicionar uma camada de b
 
 ### Opcao recomendada
 
-- Backend serverless em Netlify Functions ou Vercel Functions.
+- Backend serverless em Netlify Functions no deploy final, mantendo compatibilidade de storage alternativa preparada no código quando necessario.
+- Storage de visitas em runtime do Netlify, com adaptador alternativo preparado para futuras migrações se o cliente mudar de host.
 - Banco principal em Supabase free tier.
 - Google Sheets mantido apenas como origem inicial de cadastro, se o cliente ainda precisar.
 - Make.com acionado somente pelo backend, nao pelo navegador.
@@ -176,5 +178,13 @@ Recomendacao inicial: manter o frontend React + Vite e adicionar uma camada de b
 4. Fase 4: endurecer o fluxo completo do promotor.
 5. Fase 5: substituir mock do supervisor por dados reais.
 6. Fase 6: mover Gemini para camada segura.
-7. Fase 7: preparar deploy.
+7. Fase 7: publicar em Netlify, configurar variaveis e validar acesso real.
 8. Fase 8: documentacao final e entrega.
+
+## Proximas evolucoes recomendadas
+
+1. Validar instalacao e uso da PWA em celular real sem alterar o fluxo visual.
+2. Fortalecer sessao e login com controles adicionais.
+3. Separar storage de fotos para reduzir payloads em base64.
+4. Avaliar Supabase/Postgres como banco operacional para relatorios e auditoria.
+5. Expandir relatorios do supervisor com filtros e exportacao controlada.
