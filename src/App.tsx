@@ -11,7 +11,7 @@ import { SectionId, STORAGE_KEY } from './types';
 import { apiService } from './services/apiService';
 import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
 import { appConfig } from './config/appConfig';
-import { clearSession } from './services/session';
+import { clearSession, getLastLoginUser, getSession } from './services/session';
 
 const INITIAL_STATE = {
   user: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -24,14 +24,16 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loginForm, setLoginForm] = useState({ user: '', pass: '' });
+  const [loginForm, setLoginForm] = useState(() => ({ user: getLastLoginUser(), pass: '' }));
   const [visitState, setVisitState] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
+      const session = getSession();
       if (saved) {
         const parsed = JSON.parse(saved);
-        return { ...INITIAL_STATE, ...parsed };
+        return { ...INITIAL_STATE, ...parsed, user: parsed.user || session?.user || null };
       }
+      if (session?.user) return { ...INITIAL_STATE, user: session.user };
     } catch (e) {
       console.error("Erro ao carregar estado do localStorage:", e);
       localStorage.removeItem(STORAGE_KEY);

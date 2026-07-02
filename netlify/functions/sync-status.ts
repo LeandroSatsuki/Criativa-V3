@@ -8,7 +8,7 @@ export default async (request: Request, context: Context) => {
     return json({ error: 'Method not allowed' }, 405);
   }
 
-  const auth = authenticate(request);
+  const auth = await authenticate(request);
   if (!auth) {
     return json({ error: 'Não autorizado' }, 401);
   }

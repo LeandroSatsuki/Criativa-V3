@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: retomada de fluxo e sessao unica
+
+### Alterado
+- O dashboard passou a listar as empresas iniciadas na visita em vez de exibir apenas `Empresa atual`.
+- O app passou a restaurar o usuario salvo da sessao local quando reaberto.
+- O login passou a manter o ultimo usuario preenchido sem armazenar senha.
+- A autenticacao do backend passou a validar uma sessao ativa unica por usuario.
+
+### Adicionado
+- `sessionId` no token de sessao do backend.
+- Registro de sessao ativa por usuario no armazenamento seguro do backend.
+
+### Corrigido
+- As etapas `Antes` e `Depois` passaram a marcar a empresa como concluida na primeira confirmacao de salvar.
+- Se o app fechar durante a visita, o estado local continua sendo retomado ao abrir novamente enquanto a sessao for valida.
+- Um novo login com o mesmo usuario invalida o token anterior.
+
+### Seguranca
+- Nenhuma senha e salva no navegador.
+- Apenas o ultimo nome de usuario fica preservado para facilitar novo acesso.
+- O backend bloqueia tokens antigos quando a mesma conta faz novo login.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+
+### Pendencias
+- Usuarios que estavam com sessao antiga antes deste deploy podem precisar entrar novamente.
+
 ## [2026-07-02] - Ajuste: Trocas exige resposta de todas as empresas
 
 ### Alterado

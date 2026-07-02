@@ -6,7 +6,7 @@ import { authenticate } from './_shared/auth';
 export default async (request: Request, _context: Context) => {
   const url = new URL(request.url);
   const force = url.searchParams.get('force') === 'true';
-  const auth = authenticate(request);
+  const auth = await authenticate(request);
 
   if (force) {
     if (!auth) {

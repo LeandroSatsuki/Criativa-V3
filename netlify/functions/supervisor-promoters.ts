@@ -9,7 +9,7 @@ export default async (request: Request, context: Context) => {
     return json({ error: 'Method not allowed' }, 405);
   }
 
-  const auth = authenticate(request);
+  const auth = await authenticate(request);
   if (!auth || auth.role !== 'SUPERVISOR') {
     return json({ error: 'Acesso restrito ao supervisor' }, 403);
   }

@@ -7,6 +7,7 @@ export type SessionData = {
 };
 
 const SESSION_KEY = 'criativa_session';
+const LAST_LOGIN_USER_KEY = 'criativa_last_login_user';
 
 export const getSession = (): SessionData | null => {
   try {
@@ -21,8 +22,11 @@ export const getSessionToken = () => getSession()?.token || null;
 
 export const setSession = (session: SessionData) => {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  localStorage.setItem(LAST_LOGIN_USER_KEY, session.user.user);
 };
 
 export const clearSession = () => {
   localStorage.removeItem(SESSION_KEY);
 };
+
+export const getLastLoginUser = () => localStorage.getItem(LAST_LOGIN_USER_KEY) || '';

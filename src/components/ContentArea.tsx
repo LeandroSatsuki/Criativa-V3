@@ -174,6 +174,24 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const totalIndustryPhotos = activeIndustryExecutions.reduce((total, execution) => (
     total + Object.values(execution.photos || {}).flat().length
   ), 0);
+  const activeIndustryNames = activeIndustryExecutions.map(execution => execution.industry).join(', ');
+
+  const markIndustryTask = (industry: string, taskId: SectionId) => {
+    updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+      const current = createIndustryExecution(industry, prev[industry]);
+      const updated = getExecutionWithStatus({
+        ...current,
+        tasks: {
+          ...current.tasks,
+          [taskId]: true,
+        },
+      });
+      return {
+        ...prev,
+        [industry]: updated,
+      };
+    });
+  };
 
   const getBackTarget = () => {
     switch (sectionId) {
@@ -493,10 +511,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       {activeIndustryExecutions.filter(isExecutionComplete).length}/{activeIndustryExecutions.length} fluxos concluídos
                     </p>
                   </div>
-                  {selectedIndustry && (
+                  {activeIndustryNames && (
                     <div className="bg-slate-50 px-4 py-3 rounded-2xl">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Empresa atual</p>
-                      <p className="font-black uppercase text-sm text-[#0F172A]">{selectedIndustry}</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Empresas iniciadas</p>
+                      <p className="font-black uppercase text-sm text-[#0F172A]">{activeIndustryNames}</p>
                     </div>
                   )}
                 </div>
@@ -808,13 +826,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   setIsAnalyzing(true);
                   
                   // Mark task as done and navigate IMMEDIATELY for instant feel
-                  updateSelectedExecution(execution => ({
-                    ...execution,
-                    tasks: {
-                      ...execution.tasks,
-                      [sectionId]: true,
-                    },
-                  }));
+                  markIndustryTask(visitState.selectedIndustry, sectionId);
                   updateVisit('tasks', { ...tasks, [sectionId]: true });
                   navigateTo(SectionId.Dashboard);
 

@@ -4,7 +4,7 @@ import { authenticate } from './_shared/auth';
 import { generateVisitId, listVisits, saveVisit, upsertVisit } from './_shared/visits';
 
 export default async (request: Request, _context: Context) => {
-  const auth = authenticate(request);
+  const auth = await authenticate(request);
   if (!auth) {
     return json({ error: 'Não autorizado' }, 401);
   }

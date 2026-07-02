@@ -22,7 +22,7 @@ export default async (request: Request, _context: Context) => {
   }
 
   try {
-    const token = createSessionToken(found);
+    const token = await createSessionToken(found);
     return json({
       user: found,
       token,
