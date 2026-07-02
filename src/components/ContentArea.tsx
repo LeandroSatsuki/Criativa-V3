@@ -1039,7 +1039,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
       case SectionId.Trocas:
         const returnsPhotos = getIndustryPhotos(SectionId.Trocas);
-        const selectedHasReturns = selectedExecution?.hasReturns ?? (openedIndustryExecutions.length === 0 ? visitState.hasReturns : null);
+        const selectedHasReturns = selectedExecution?.hasReturns ?? (activeIndustryExecutions.length === 0 ? visitState.hasReturns : null);
         return (
           <div className="space-y-8 animate-in">
             <div className="flex items-center justify-between gap-4">
@@ -1047,6 +1047,32 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               <div className="flex-1" />
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tighter">Trocas e Avarias</h2>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Empresas abertas em Antes</p>
+              {afterIndustryExecutions.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {afterIndustryExecutions.map(execution => {
+                    const isSelected = visitState.selectedIndustry === execution.industry;
+                    const answered = execution.hasReturns !== null;
+                    return (
+                      <button
+                        key={execution.industry}
+                        onClick={() => openIndustryExecution(execution.industry)}
+                        className={`py-3 rounded-xl font-black uppercase text-[10px] tracking-widest border transition-all ${isSelected ? 'bg-[#0F172A] text-white border-[#0F172A]' : answered ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-slate-200'}`}
+                      >
+                        {execution.industry}
+                        {answered ? ' ✓' : ' •'}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-[10px] font-bold text-[#E65C5C] uppercase bg-red-50 p-4 rounded-xl">
+                  Abra uma empresa em "ANTES" antes de informar trocas.
+                </p>
+              )}
+            </div>
             
             <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm text-center space-y-8">
               <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto">
@@ -1058,6 +1084,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 <div className="flex gap-4 max-w-xs mx-auto">
                   <button 
                     onClick={() => {
+                      if (!visitState.selectedIndustry) {
+                        alert("Selecione uma empresa da lista acima para informar trocas.");
+                        return;
+                      }
                       updateSelectedExecution(execution => ({ ...execution, hasReturns: true }));
                       updateVisit('hasReturns', true);
                     }}
@@ -1067,6 +1097,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   </button>
                   <button 
                     onClick={() => {
+                      if (!visitState.selectedIndustry) {
+                        alert("Selecione uma empresa da lista acima para informar trocas.");
+                        return;
+                      }
                       updateSelectedExecution(execution => ({
                         ...execution,
                         hasReturns: false,

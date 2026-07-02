@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: Trocas lista empresas abertas em Antes
+
+### Alterado
+- A tela `Trocas` passou a exibir as empresas que abriram fluxo em `Antes`.
+- A resposta `sim/não` agora e aplicada a empresa escolhida na lista da propria tela.
+
+### Adicionado
+- Lista visual de empresas abertas em `Antes` dentro da tela `Trocas`.
+
+### Corrigido
+- `Trocas` nao depende mais da ultima empresa global selecionada.
+- O usuario consegue registrar trocas por empresa, seguindo o mesmo padrao de `Depois`.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- O backend continua recebendo apenas dados de empresas realmente abertas.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+
+### Pendencias
+- Validar no celular se a leitura da lista de empresas em `Trocas` fica clara com muitas empresas abertas.
+
 ## [2026-07-02] - Ajuste: Depois lista empresas abertas em Antes
 
 ### Alterado
