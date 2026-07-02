@@ -118,8 +118,12 @@ export const buildTransformedPayload = (payload: any) => {
   const horaSaida = formatBrasiliaTime(payload.checkOutTime);
   const fotoCheckin = payload.photos?.FACHADA?.[0] || '';
   const fotoCheckout = payload.photos?.CHECKOUT?.[0] || '';
-  const executionEntries = Object.values(payload.industryExecutions || {}) as any[];
   const selectedIndustry = cleanText(payload.selectedIndustry || payload.industry, 'GERAL');
+  const allExecutions = Object.values(payload.industryExecutions || {}) as any[];
+  const executionEntries = allExecutions.filter((execution) => (
+    Object.values(execution?.photos || {}).some((photos: any) => Array.isArray(photos) && photos.length > 0)
+  ));
+  const hasLegacyPhotos = Object.values(payload.photos || {}).some((photos: any) => Array.isArray(photos) && photos.length > 0);
 
   const buildReportRow = (execution?: any) => {
     const industry = cleanText(execution?.industry || selectedIndustry, 'GERAL');
@@ -161,8 +165,10 @@ export const buildTransformedPayload = (payload: any) => {
 
   const reportRows = executionEntries.length > 0
     ? executionEntries.map(buildReportRow)
-    : [buildReportRow()];
+    : (hasLegacyPhotos ? [buildReportRow()] : []);
   const primaryRow = reportRows.find(row => row.INDUSTRIA === selectedIndustry) || reportRows[0];
+  const fallbackRow = buildReportRow();
+  const resolvedPrimaryRow = primaryRow || fallbackRow;
 
   return {
     DATA_VISITA: dataVisita,
@@ -174,13 +180,13 @@ export const buildTransformedPayload = (payload: any) => {
     HORA_SAIDA_CHECK_OUT: horaSaida,
     'HORA_SAIDA_CHECK-OUT': horaSaida,
     TEMPO_PERMANENCIA: duration,
-    QTD_ESTOQUE: primaryRow.QTD_ESTOQUE,
-    TEVE_TROCAS: primaryRow.TEVE_TROCAS,
-    industry: primaryRow.INDUSTRIA,
-    INDUSTRIA: primaryRow.INDUSTRIA,
+    QTD_ESTOQUE: resolvedPrimaryRow.QTD_ESTOQUE,
+    TEVE_TROCAS: resolvedPrimaryRow.TEVE_TROCAS,
+    industry: resolvedPrimaryRow.INDUSTRIA,
+    INDUSTRIA: resolvedPrimaryRow.INDUSTRIA,
     INDUSTRIAS_VISITA: reportRows.map(row => row.INDUSTRIA).join(', '),
-    INDUSTRIA_MAIUSCULA: primaryRow.INDUSTRIA.toUpperCase(),
-    industria_minuscula: primaryRow.INDUSTRIA.toLowerCase(),
+    INDUSTRIA_MAIUSCULA: resolvedPrimaryRow.INDUSTRIA.toUpperCase(),
+    industria_minuscula: resolvedPrimaryRow.INDUSTRIA.toLowerCase(),
     DATA_PASTA: fileDate,
     NOME_CHECKIN: `${storeNameClean}_${fileDate}_CHECKIN.jpg`,
     NOME_ANTES: `${storeNameClean}_${fileDate}_ANTES.jpg`,
@@ -189,21 +195,21 @@ export const buildTransformedPayload = (payload: any) => {
     NOME_TROCA: `${storeNameClean}_${fileDate}_TROCA.jpg`,
     NOME_CHECKOUT: `${storeNameClean}_${fileDate}_CHECKOUT.jpg`,
     FOTO_CHECKIN: fotoCheckin,
-    FOTO_ANTES: primaryRow.LINK_FOTO_ANTES,
-    FOTO_ESTOQUE: primaryRow.LINK_FOTO_ESTOQUE,
-    FOTO_DEPOIS: primaryRow.LINK_FOTO_DEPOIS,
-    FOTO_TROCA: primaryRow.LINK_FOTO_TROCA,
+    FOTO_ANTES: resolvedPrimaryRow.LINK_FOTO_ANTES,
+    FOTO_ESTOQUE: resolvedPrimaryRow.LINK_FOTO_ESTOQUE,
+    FOTO_DEPOIS: resolvedPrimaryRow.LINK_FOTO_DEPOIS,
+    FOTO_TROCA: resolvedPrimaryRow.LINK_FOTO_TROCA,
     FOTO_CHECKOUT: fotoCheckout,
     LINK_FOTO_CHECKIN: fotoCheckin,
-    LINK_FOTO_ANTES: primaryRow.LINK_FOTO_ANTES,
-    LINK_FOTO_DEPOIS: primaryRow.LINK_FOTO_DEPOIS,
-    LINK_FOTO_TROCA: primaryRow.LINK_FOTO_TROCA,
+    LINK_FOTO_ANTES: resolvedPrimaryRow.LINK_FOTO_ANTES,
+    LINK_FOTO_DEPOIS: resolvedPrimaryRow.LINK_FOTO_DEPOIS,
+    LINK_FOTO_TROCA: resolvedPrimaryRow.LINK_FOTO_TROCA,
     LINK_FOTO_CHECKOUT: fotoCheckout,
-    LINK_FOTO_ESTOQUE: primaryRow.LINK_FOTO_ESTOQUE,
-    IA_ORGANIZACAO: primaryRow.IA_ORGANIZACAO,
-    IA_STATUS_COMPLIANCE: primaryRow.IA_STATUS_COMPLIANCE,
-    IA_RUPTURAS: primaryRow.IA_RUPTURAS,
-    RELATORIO_VISITAS: primaryRow,
+    LINK_FOTO_ESTOQUE: resolvedPrimaryRow.LINK_FOTO_ESTOQUE,
+    IA_ORGANIZACAO: resolvedPrimaryRow.IA_ORGANIZACAO,
+    IA_STATUS_COMPLIANCE: resolvedPrimaryRow.IA_STATUS_COMPLIANCE,
+    IA_RUPTURAS: resolvedPrimaryRow.IA_RUPTURAS,
+    RELATORIO_VISITAS: resolvedPrimaryRow,
     RELATORIO_VISITAS_LINHAS: reportRows,
     storeId: payload.storeId,
     timestamp: getBrasiliaISO(),

@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: trava somente para empresas com fotos
+
+### Alterado
+- A trava de check-out passou a considerar apenas empresas que realmente possuem fotos em alguma etapa da execução.
+- A simples seleção de uma empresa nao cria mais um fluxo pendente.
+
+### Adicionado
+- Remocao automatica de execucoes vazias, sem fotos, ao desfazer a captura.
+- Filtro no backend para gerar linhas de relatorio somente para empresas com fotos registradas.
+
+### Corrigido
+- Escolher uma empresa por engano, sem tirar foto, nao bloqueia mais o fechamento da visita.
+- Apagar todas as fotos de uma empresa remove essa execucao do bloqueio.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- O backend continua filtrando o que vai para o relatorio, sem confiar em selecao vazia do frontend.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+
+### Pendencias
+- Validar no celular se o fluxo apagado desaparece imediatamente da trava do check-out.
+- Confirmar no relatorio da Make que execucoes sem fotos deixam de gerar linha.
+
 ## [2026-07-02] - Correcao: sessao expirada exibida como sem conexao
 
 ### Alterado

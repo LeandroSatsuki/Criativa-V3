@@ -110,6 +110,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   });
 
   const isIndustryStep = (section: string) => industryStepIds.includes(section as SectionId);
+  const hasIndustryPhotos = (execution?: Partial<IndustryExecution> | null) => industryStepIds.some((section) => (
+    (execution?.photos?.[section]?.length || 0) > 0
+  ));
   const isExecutionComplete = (execution?: Partial<IndustryExecution> | null) => Boolean(
     execution?.tasks?.[SectionId.Antes]
     && execution?.tasks?.[SectionId.Depois]
@@ -127,10 +130,6 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   const openIndustryExecution = (industry: string) => {
     updateVisit('selectedIndustry', industry);
-    updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => ({
-      ...prev,
-      [industry]: createIndustryExecution(industry, prev[industry]),
-    }));
   };
 
   const updateSelectedExecution = (updater: (execution: IndustryExecution) => IndustryExecution) => {
@@ -138,6 +137,11 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
       const current = createIndustryExecution(selectedIndustry, prev[selectedIndustry]);
       const updated = getExecutionWithStatus(updater(current));
+      if (!hasIndustryPhotos(updated)) {
+        const next = { ...prev };
+        delete next[selectedIndustry];
+        return next;
+      }
       return {
         ...prev,
         [selectedIndustry]: updated,
@@ -151,11 +155,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const selectedTasks = selectedExecution?.tasks || {};
-  const pendingIndustryExecutions = openedIndustryExecutions.filter(execution => !isExecutionComplete(execution));
+  const activeIndustryExecutions = openedIndustryExecutions.filter(hasIndustryPhotos);
+  const pendingIndustryExecutions = activeIndustryExecutions.filter(execution => !isExecutionComplete(execution));
   const legacyFlowComplete = openedIndustryExecutions.length === 0
     && Boolean(tasks[SectionId.Antes] && tasks[SectionId.Depois] && tasks[SectionId.Trocas]);
-  const canCheckOut = legacyFlowComplete || (openedIndustryExecutions.length > 0 && pendingIndustryExecutions.length === 0);
-  const totalIndustryPhotos = openedIndustryExecutions.reduce((total, execution) => (
+  const canCheckOut = legacyFlowComplete || (activeIndustryExecutions.length > 0 && pendingIndustryExecutions.length === 0);
+  const totalIndustryPhotos = activeIndustryExecutions.reduce((total, execution) => (
     total + Object.values(execution.photos || {}).flat().length
   ), 0);
 
@@ -426,13 +431,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               )}
             </div>
 
-            {visitState.checkInDone && openedIndustryExecutions.length > 0 && (
+            {visitState.checkInDone && activeIndustryExecutions.length > 0 && (
               <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Empresas nesta visita</p>
                     <p className="font-black uppercase text-lg tracking-tight text-[#0F172A]">
-                      {openedIndustryExecutions.filter(isExecutionComplete).length}/{openedIndustryExecutions.length} fluxos concluídos
+                      {activeIndustryExecutions.filter(isExecutionComplete).length}/{activeIndustryExecutions.length} fluxos concluídos
                     </p>
                   </div>
                   {selectedIndustry && (
@@ -530,7 +535,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     isDisabled={!canCheckOut}
                     onClick={() => {
                       if (!canCheckOut) {
-                        if (openedIndustryExecutions.length === 0) {
+                        if (activeIndustryExecutions.length === 0) {
                           alert("Abra pelo menos uma empresa na etapa 'ANTES' antes do check-out.");
                           navigateTo(SectionId.Antes);
                           return;
@@ -923,7 +928,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
       case SectionId.Trocas:
         const returnsPhotos = getIndustryPhotos(SectionId.Trocas);
-        const selectedHasReturns = selectedExecution?.hasReturns ?? visitState.hasReturns;
+        const selectedHasReturns = selectedExecution?.hasReturns ?? (openedIndustryExecutions.length === 0 ? visitState.hasReturns : null);
         return (
           <div className="space-y-8 animate-in">
             <h2 className="text-3xl font-black uppercase tracking-tighter">Trocas e Avarias</h2>
@@ -1059,7 +1064,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               <div className="grid grid-cols-2 gap-6">
                 <SummaryItem label="Check-in" value={checkInTimeDisplay} />
                 <SummaryItem label="Fotos Total" value={(Object.values(photos).flat().length + totalIndustryPhotos).toString()} />
-                <SummaryItem label="Empresas" value={`${openedIndustryExecutions.length}`} />
+                <SummaryItem label="Empresas" value={`${activeIndustryExecutions.length}`} />
                 <SummaryItem label="Loja" value={visitState.currentStore} />
               </div>
 
