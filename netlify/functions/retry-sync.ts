@@ -29,7 +29,7 @@ export default async (request: Request, context: Context) => {
     syncStatus: 'reenviar',
   });
 
-  const status = result.syncStatus === 'enviado' ? 200 : result.syncStatus === 'erro' ? 502 : 202;
+  const status = result.syncStatus === 'enviando' ? 202 : 200;
   return json(result, status);
 };
 

@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## [2026-07-02] - Correcao: sincronizacao multiindustria com Make
+
+### Alterado
+- A sincronizacao com a Make passou a enviar uma chamada por industria quando a visita tem multiplos fluxos.
+- O payload enviado em cada chamada voltou a ser simples, sem array `RELATORIO_VISITAS_LINHAS`.
+- As rotas de sincronizacao deixaram de retornar `HTTP 502` para falhas controladas da Make; agora retornam o status da visita com `syncStatus=erro` para o app exibir a causa real e manter reenvio.
+
+### Adicionado
+- Transformador `buildTransformedPayloads` para separar a visita em payloads compativeis por industria.
+- Metadados `LINHA_INDUSTRIA_INDICE` e `LINHA_INDUSTRIA_TOTAL` no payload enviado.
+- Mensagem de erro com o HTTP real retornado pela Make, por exemplo `Make retornou HTTP 500`.
+
+### Corrigido
+- Corrigida a exibicao generica de `HTTP 502` no app quando a Make recusa a execucao.
+- Reduzido o tamanho e a complexidade de cada chamada enviada ao webhook.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- O webhook continua sendo chamado apenas pelo backend.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Retry em producao da visita `VISIT-C9EF2B7B` executado apos o deploy inicial: a Make ainda retornou `Scenario failed to initialize`.
+- Deploy Netlify producao `6a466555d65e444d655d6206` concluido com sucesso.
+- `/api/health` em producao retornou `ok=true`, com Google Sheets, Make e segredo de sessao configurados.
+- Retry em producao da visita `VISIT-C9EF2B7B` retornou HTTP `200` controlado com `syncStatus=erro` e `syncError=Make retornou HTTP 500: Scenario failed to initialize.`.
+
+### Pendencias
+- Verificar no Make.com se o webhook esta associado a um cenario ativo e se alguma conexao/modulo do cenario precisa ser reautenticado.
+- Reenviar a visita `VISIT-C9EF2B7B` depois da correcao do cenario Make para confirmar aceite final.
+
 ## [2026-07-02] - Correcao: conclusao real de multiplas industrias
 
 ### Alterado

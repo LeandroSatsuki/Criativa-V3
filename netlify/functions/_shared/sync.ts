@@ -1,5 +1,5 @@
 import { getEnv } from './env';
-import { buildTransformedPayload, saveVisit, type VisitRecord } from './visits';
+import { buildTransformedPayloads, saveVisit, type VisitRecord } from './visits';
 import { getBrasiliaISO } from './time';
 
 export type SyncResult = {
@@ -33,36 +33,46 @@ export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> =
   });
 
   try {
-    const transformedPayload = buildTransformedPayload(sending.payload);
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(transformedPayload),
-    });
-    const responseText = await response.text().catch(() => '');
-    const responseBody = responseText.slice(0, 1000);
+    const transformedPayloads = buildTransformedPayloads(sending.payload);
+    const makeResponses: Array<{ status: number; ok: boolean; body: string }> = [];
 
-    if (!response.ok) {
-      const errored = await saveVisit({
-        ...sending,
-        syncStatus: 'erro',
-        syncError: responseBody || response.statusText,
-        makeResponse: { status: response.status, ok: false, body: responseBody },
-        updatedAt: getBrasiliaISO(),
+    for (const transformedPayload of transformedPayloads) {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transformedPayload),
       });
+      const responseText = await response.text().catch(() => '');
+      const responseBody = responseText.slice(0, 1000);
+      makeResponses.push({ status: response.status, ok: response.ok, body: responseBody });
 
-      return {
-        visitId: errored.visitId,
-        syncStatus: errored.syncStatus,
-        syncError: errored.syncError,
-      };
+      if (!response.ok) {
+        const syncError = `Make retornou HTTP ${response.status}: ${responseBody || response.statusText}`;
+        const errored = await saveVisit({
+          ...sending,
+          syncStatus: 'erro',
+          syncError,
+          makeResponse: { status: response.status, ok: false, body: responseBody },
+          updatedAt: getBrasiliaISO(),
+        });
+
+        return {
+          visitId: errored.visitId,
+          syncStatus: errored.syncStatus,
+          syncError: errored.syncError,
+        };
+      }
     }
 
     const sent = await saveVisit({
       ...sending,
       syncStatus: 'enviado',
       syncError: null,
-      makeResponse: { status: response.status, ok: true, body: responseBody },
+      makeResponse: {
+        status: makeResponses[makeResponses.length - 1]?.status || 200,
+        ok: true,
+        body: JSON.stringify(makeResponses).slice(0, 1000),
+      },
       updatedAt: getBrasiliaISO(),
     });
 

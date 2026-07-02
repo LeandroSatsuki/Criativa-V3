@@ -215,3 +215,46 @@ export const buildTransformedPayload = (payload: any) => {
     timestamp: getBrasiliaISO(),
   };
 };
+
+export const buildTransformedPayloads = (payload: any) => {
+  const aggregatePayload = buildTransformedPayload(payload);
+  const rows = Array.isArray(aggregatePayload.RELATORIO_VISITAS_LINHAS)
+    ? aggregatePayload.RELATORIO_VISITAS_LINHAS
+    : [];
+
+  if (rows.length <= 1) return [aggregatePayload];
+
+  return rows.map((row: any, index: number) => {
+    const industry = row.INDUSTRIA || aggregatePayload.INDUSTRIA;
+    const suffix = String(industry || 'GERAL').replace(/\s+/g, '_').toUpperCase();
+
+    return {
+      ...aggregatePayload,
+      QTD_ESTOQUE: row.QTD_ESTOQUE,
+      TEVE_TROCAS: row.TEVE_TROCAS,
+      industry,
+      INDUSTRIA: industry,
+      INDUSTRIA_MAIUSCULA: String(industry || '').toUpperCase(),
+      industria_minuscula: String(industry || '').toLowerCase(),
+      NOME_ANTES: aggregatePayload.NOME_ANTES.replace('_ANTES.jpg', `_${suffix}_ANTES.jpg`),
+      NOME_ESTOQUE: aggregatePayload.NOME_ESTOQUE.replace('_ESTOQUE.jpg', `_${suffix}_ESTOQUE.jpg`),
+      NOME_DEPOIS: aggregatePayload.NOME_DEPOIS.replace('_DEPOIS.jpg', `_${suffix}_DEPOIS.jpg`),
+      NOME_TROCA: aggregatePayload.NOME_TROCA.replace('_TROCA.jpg', `_${suffix}_TROCA.jpg`),
+      FOTO_ANTES: row.LINK_FOTO_ANTES,
+      FOTO_ESTOQUE: row.LINK_FOTO_ESTOQUE,
+      FOTO_DEPOIS: row.LINK_FOTO_DEPOIS,
+      FOTO_TROCA: row.LINK_FOTO_TROCA,
+      LINK_FOTO_ANTES: row.LINK_FOTO_ANTES,
+      LINK_FOTO_DEPOIS: row.LINK_FOTO_DEPOIS,
+      LINK_FOTO_TROCA: row.LINK_FOTO_TROCA,
+      LINK_FOTO_ESTOQUE: row.LINK_FOTO_ESTOQUE,
+      IA_ORGANIZACAO: row.IA_ORGANIZACAO,
+      IA_STATUS_COMPLIANCE: row.IA_STATUS_COMPLIANCE,
+      IA_RUPTURAS: row.IA_RUPTURAS,
+      RELATORIO_VISITAS: row,
+      RELATORIO_VISITAS_LINHAS: undefined,
+      LINHA_INDUSTRIA_INDICE: index + 1,
+      LINHA_INDUSTRIA_TOTAL: rows.length,
+    };
+  });
+};

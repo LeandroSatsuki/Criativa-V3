@@ -25,7 +25,7 @@ export default async (request: Request, context: Context) => {
   const existing = await getVisit(resolvedVisitId);
   const visit = existing || await upsertVisit({ ...payload, visitId: resolvedVisitId });
   const result = await syncVisitRecord(visit);
-  const status = result.syncStatus === 'enviado' ? 200 : result.syncStatus === 'enviando' ? 202 : result.syncStatus === 'erro' ? 502 : 200;
+  const status = result.syncStatus === 'enviando' ? 202 : 200;
   return json(result, status);
 };
 
