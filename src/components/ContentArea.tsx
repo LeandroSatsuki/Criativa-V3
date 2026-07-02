@@ -51,6 +51,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [queueCount, setQueueCount] = useState(() => getQueuedVisitCount());
+  const [stockIndustry, setStockIndustry] = useState('');
 
   React.useEffect(() => {
     const refreshQueue = () => setQueueCount(getQueuedVisitCount());
@@ -89,11 +90,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const industryExecutions = visitState.industryExecutions || {};
   const openedIndustryExecutions = Object.values(industryExecutions);
   const selectedExecution = selectedIndustry ? industryExecutions[selectedIndustry] : null;
-  const selectedStockQuantity = selectedIndustry
-    ? String(selectedExecution?.stockQuantities?.[selectedIndustry] ?? stockQuantities[selectedIndustry] ?? '').trim()
+  const currentStockQuantity = stockIndustry
+    ? String(stockQuantities[stockIndustry] ?? industryExecutions[stockIndustry]?.stockQuantities?.[stockIndustry] ?? '').trim()
     : '';
-  const isSelectedStockQuantityValid = /^\d+$/.test(selectedStockQuantity);
+  const isCurrentStockQuantityValid = /^\d+$/.test(currentStockQuantity);
   const industryStepIds = [SectionId.Antes, SectionId.Estoque, SectionId.Depois, SectionId.Trocas];
+  const flowStepIds = [SectionId.Antes, SectionId.Depois, SectionId.Trocas];
 
   const createIndustryExecution = (industry: string, existing?: Partial<IndustryExecution>): IndustryExecution => ({
     industry,
@@ -109,10 +111,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   const isIndustryStep = (section: string) => industryStepIds.includes(section as SectionId);
   const hasIndustryActivity = (execution?: Partial<IndustryExecution> | null) => (
-    industryStepIds.some((section) => (execution?.photos?.[section]?.length || 0) > 0)
-    || Object.values(execution?.stockQuantities || {}).some((value) => String(value || '').trim() !== '')
+    flowStepIds.some((section) => (execution?.photos?.[section]?.length || 0) > 0)
     || execution?.hasReturns !== null
-    || Boolean(execution?.tasks && Object.values(execution.tasks).some(Boolean))
+    || flowStepIds.some((section) => Boolean(execution?.tasks?.[section]))
   );
   const hasStepEvidence = (execution: Partial<IndustryExecution> | null | undefined, section: SectionId) => Boolean(
     execution?.tasks?.[section] || (execution?.photos?.[section]?.length || 0) > 0
@@ -165,7 +166,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   const selectedTasks = selectedExecution?.tasks || {};
   const selectedAntesComplete = hasStepEvidence(selectedExecution, SectionId.Antes);
-  const selectedEstoqueComplete = hasStepEvidence(selectedExecution, SectionId.Estoque);
+  const stockComplete = Boolean(tasks[SectionId.Estoque])
+    || Object.values(stockQuantities).some((value) => String(value || '').trim() !== '')
+    || Object.values(industryExecutions).some((execution) => hasStepEvidence(execution, SectionId.Estoque));
   const selectedDepoisComplete = hasStepEvidence(selectedExecution, SectionId.Depois);
   const activeIndustryExecutions = openedIndustryExecutions.filter(hasIndustryActivity);
   const beforeOpenedIndustryExecutions = activeIndustryExecutions.filter((execution) => (
@@ -260,6 +263,33 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1]; // 0.5 quality for smaller payload
         
         if (isIndustryStep(section) && activeIndustry) {
+          if (section === SectionId.Estoque) {
+            updateVisit('stockQuantities', (prev: any) => ({ ...prev }));
+            updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+              const existing = prev[activeIndustry];
+              if (!existing) return prev;
+              const currentCategoryPhotos = existing.photos?.[section] || [];
+              return {
+                ...prev,
+                [activeIndustry]: {
+                  ...existing,
+                  photos: {
+                    ...existing.photos,
+                    [section]: [...currentCategoryPhotos, compressedBase64],
+                  },
+                },
+              };
+            });
+            updateVisit('photos', (prevPhotos: any = {}) => {
+              const currentCategoryPhotos = prevPhotos[section] || [];
+              return {
+                ...prevPhotos,
+                [section]: [...currentCategoryPhotos, compressedBase64],
+              };
+            });
+            return;
+          }
+
           updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
             const current = createIndustryExecution(activeIndustry, prev[activeIndustry]);
             const currentCategoryPhotos = current.photos?.[section] || [];
@@ -563,11 +593,11 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     onClick={() => navigateTo(SectionId.Antes)}
                   />
                   <DashboardCard 
-                    icon={<Boxes className={selectedEstoqueComplete ? "text-emerald-500" : "text-blue-500"} />} 
+                    icon={<Boxes className={stockComplete ? "text-emerald-500" : "text-blue-500"} />} 
                     title="2. Estoque (Opcional)" 
                     count={selectedExecution?.photos?.[SectionId.Estoque]?.length || 0}
-                    status={selectedEstoqueComplete ? "Concluído" : "Pendente"} 
-                    isCompleted={selectedEstoqueComplete}
+                    status={stockComplete ? "Concluído" : "Pendente"} 
+                    isCompleted={stockComplete}
                     isDisabled={!visitState.checkInDone}
                     onClick={() => {
                       navigateTo(SectionId.Estoque);
@@ -906,7 +936,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         );
 
       case SectionId.Estoque:
-        const estoquePhotos = getIndustryPhotos(SectionId.Estoque);
+        const estoquePhotos = stockIndustry
+          ? (industryExecutions[stockIndustry]?.photos?.[SectionId.Estoque] || photos[SectionId.Estoque] || [])
+          : [];
         const industriesEstoque: string[] = visitState.industries && visitState.industries.length > 0 
           ? visitState.industries 
           : ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
@@ -924,15 +956,15 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {selectedIndustry ? `Empresa ativa no estoque: ${selectedIndustry}` : 'Selecione a empresa para informar o estoque'}
+                {stockIndustry ? `Empresa ativa no estoque: ${stockIndustry}` : 'Selecione a empresa para informar o estoque'}
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {industriesEstoque.map(ind => {
-                  const isActive = selectedIndustry === ind;
+                  const isActive = stockIndustry === ind;
                   return (
                     <button
                       key={ind}
-                      onClick={() => openIndustryExecution(ind)}
+                      onClick={() => setStockIndustry(ind)}
                       className={`py-3 rounded-xl font-black uppercase text-[10px] tracking-widest border transition-all ${isActive ? 'bg-[#0F172A] text-white border-[#0F172A]' : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-slate-200'}`}
                     >
                       {ind}
@@ -947,10 +979,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quantidade de estoque</p>
                   <p className="text-xs font-bold text-slate-500 mt-1">
-                    {selectedIndustry ? `Registro para ${selectedIndustry}` : 'Escolha uma empresa acima para liberar o campo'}
+                    {stockIndustry ? `Registro para ${stockIndustry}` : 'Escolha uma empresa acima para liberar o campo'}
                   </p>
                 </div>
-                {selectedIndustry && (
+                {stockIndustry && (
                   <div className="bg-slate-50 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500">
                     Empresa selecionada
                   </div>
@@ -958,36 +990,43 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               </div>
 
               <div className="flex items-center justify-between gap-4">
-                <span className="font-black uppercase text-xs tracking-tight text-slate-600">{selectedIndustry || 'Empresa'}</span>
+                <span className="font-black uppercase text-xs tracking-tight text-slate-600">{stockIndustry || 'Empresa'}</span>
                 <input
                   type="number"
                   placeholder="Qtd"
-                  value={selectedIndustry ? (selectedExecution?.stockQuantities?.[selectedIndustry] ?? stockQuantities[selectedIndustry] ?? '') : ''}
+                  value={currentStockQuantity}
                   onChange={(e) => {
-                    if (!selectedIndustry) return;
+                    if (!stockIndustry) return;
                     const val = e.target.value;
-                    updateSelectedExecution(execution => ({
-                      ...execution,
-                      stockQuantities: {
-                        ...execution.stockQuantities,
-                        [selectedIndustry]: val,
-                      },
-                    }));
-                    updateVisit('stockQuantities', (prev: any) => ({ ...prev, [selectedIndustry]: val }));
+                    updateVisit('stockQuantities', (prev: any) => ({ ...prev, [stockIndustry]: val }));
+                    updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+                      const existing = prev[stockIndustry];
+                      if (!existing) return prev;
+                      return {
+                        ...prev,
+                        [stockIndustry]: {
+                          ...existing,
+                          stockQuantities: {
+                            ...existing.stockQuantities,
+                            [stockIndustry]: val,
+                          },
+                        },
+                      };
+                    });
                   }}
-                  disabled={!selectedIndustry}
+                  disabled={!stockIndustry}
                   className="w-28 p-3 bg-slate-50 rounded-xl font-bold text-center border border-slate-100 focus:border-blue-500 outline-none disabled:opacity-50"
                 />
               </div>
             </div>
 
-            {selectedIndustry && (
+            {stockIndustry && (
               <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Anexar fotos</p>
                     <p className="text-xs font-bold text-slate-500 mt-1">
-                      Foto opcional do estoque de {selectedIndustry}.
+                      Foto opcional do estoque de {stockIndustry}.
                     </p>
                   </div>
                   <div className="relative shrink-0">
@@ -1005,7 +1044,42 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file && estoquePhotos.length < 30) {
-                          handlePhotoCapture(SectionId.Estoque, file);
+                          const previousStockIndustry = stockIndustry;
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const img = new Image();
+                            img.src = reader.result as string;
+                            img.onload = () => {
+                              const canvas = document.createElement('canvas');
+                              const maxWidth = 600;
+                              const scaleSize = maxWidth / img.width;
+                              canvas.width = maxWidth;
+                              canvas.height = img.height * scaleSize;
+                              const ctx = canvas.getContext('2d');
+                              ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+                              updateVisit('photos', (prev: any = {}) => {
+                                const currentCategoryPhotos = prev[SectionId.Estoque] || [];
+                                return { ...prev, [SectionId.Estoque]: [...currentCategoryPhotos, compressedBase64] };
+                              });
+                              updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+                                const existing = prev[previousStockIndustry];
+                                if (!existing) return prev;
+                                const currentCategoryPhotos = existing.photos?.[SectionId.Estoque] || [];
+                                return {
+                                  ...prev,
+                                  [previousStockIndustry]: {
+                                    ...existing,
+                                    photos: {
+                                      ...existing.photos,
+                                      [SectionId.Estoque]: [...currentCategoryPhotos, compressedBase64],
+                                    },
+                                  },
+                                };
+                              });
+                            };
+                          };
+                          reader.readAsDataURL(file);
                         }
                       }}
                     />
@@ -1021,17 +1095,21 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   <button 
                     onClick={() => {
                       const newPhotos = estoquePhotos.filter((_, i) => i !== idx);
-                      updateSelectedExecution(execution => ({
-                        ...execution,
-                        tasks: {
-                          ...execution.tasks,
-                          [SectionId.Estoque]: newPhotos.length > 0 ? true : execution.tasks?.[SectionId.Estoque],
-                        },
-                        photos: {
-                          ...execution.photos,
-                          [SectionId.Estoque]: newPhotos,
-                        },
-                      }));
+                      updateVisit('photos', (prev: any = {}) => ({ ...prev, [SectionId.Estoque]: newPhotos }));
+                      updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+                        const existing = stockIndustry ? prev[stockIndustry] : null;
+                        if (!stockIndustry || !existing) return prev;
+                        return {
+                          ...prev,
+                          [stockIndustry]: {
+                            ...existing,
+                            photos: {
+                              ...existing.photos,
+                              [SectionId.Estoque]: newPhotos,
+                            },
+                          },
+                        };
+                      });
                     }}
                     className="absolute top-2 right-2 bg-white/20 backdrop-blur-md p-1 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
                   >
@@ -1043,27 +1121,34 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
             <button 
               onClick={() => {
-                if (!selectedIndustry) {
+                if (!stockIndustry) {
                   alert("Selecione uma empresa para salvar o estoque.");
                   return;
                 }
 
-                if (!isSelectedStockQuantityValid) {
-                  alert(`Informe uma quantidade válida para ${selectedIndustry} antes de salvar o estoque.`);
+                if (!isCurrentStockQuantityValid) {
+                  alert(`Informe uma quantidade válida para ${stockIndustry} antes de salvar o estoque.`);
                   return;
                 }
 
                 updateVisit('tasks', (prev: any) => ({ ...prev, [SectionId.Estoque]: true }));
-                updateSelectedExecution(execution => ({
-                  ...execution,
-                  tasks: {
-                    ...execution.tasks,
-                    [SectionId.Estoque]: true,
-                  },
-                }));
+                updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+                  const existing = prev[stockIndustry];
+                  if (!existing) return prev;
+                  return {
+                    ...prev,
+                    [stockIndustry]: {
+                      ...existing,
+                      stockQuantities: {
+                        ...existing.stockQuantities,
+                        [stockIndustry]: currentStockQuantity,
+                      },
+                    },
+                  };
+                });
                 navigateTo(SectionId.Dashboard);
               }}
-              disabled={!selectedIndustry}
+              disabled={!stockIndustry}
               className="w-full bg-[#0F172A] text-white py-6 rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Salvar Registros de Estoque

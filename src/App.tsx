@@ -295,13 +295,15 @@ const App: React.FC = () => {
                   {promptSyncing ? 'Sincronizando' : 'Sincronizar agora'}
                 </button>
               )}
-              <button
-                disabled={promptSyncing}
-                onClick={() => setShowPendingSyncPrompt(false)}
-                className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
-              >
-                Depois
-              </button>
+              {promptSyncError && (
+                <button
+                  disabled={promptSyncing}
+                  onClick={() => setShowPendingSyncPrompt(false)}
+                  className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
+                >
+                  Depois
+                </button>
+              )}
             </div>
           </div>
         </div>

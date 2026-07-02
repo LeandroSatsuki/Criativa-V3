@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2026-07-02] - Correcao: estoque independente e popup de reenvio
+
+### Alterado
+- A etapa `Estoque` deixou de alterar a empresa ativa do fluxo principal (`Antes`, `Depois`, `Trocas`).
+- Registros de estoque passam a usar uma selecao propria de empresa, independente da industria em execucao no fluxo principal.
+- Estoque deixou de criar/travar fluxo obrigatorio de industria quando a empresa ainda nao foi aberta em `Antes`.
+- O popup de envios pendentes agora exibe o botao `Depois` somente depois de uma tentativa de sincronizacao falhar.
+
+### Adicionado
+- Estado local separado para a empresa selecionada em `Estoque`.
+- Conclusao visual de `Estoque` baseada em qualquer quantidade/foto de estoque salva, sem depender da empresa ativa em `Antes`.
+
+### Corrigido
+- Corrigido caso em que preencher `Estoque` de outra industria fazia o app aparentar perder a validacao de `Antes`.
+- Corrigido comportamento do popup que permitia adiar antes de tentar sincronizar.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- A sincronizacao continua usando os endpoints autenticados existentes.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Deploy Netlify producao `6a46ad3d6425aca6a79992e5` concluido com sucesso.
+- `/api/health` em producao retornou `ok=true`.
+
+### Pendencias
+- Validar manualmente: salvar `Antes`, registrar `Estoque` de outra industria e confirmar que `Antes` permanece concluido sem exigir fluxo da industria de estoque.
+
 ## [2026-07-02] - Ajuste: fila pendente e reset da sincronizacao
 
 ### Alterado
