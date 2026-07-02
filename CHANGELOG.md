@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: fila pendente e reset da sincronizacao
+
+### Alterado
+- A tela final de sincronizacao agora reseta estado visual sempre que for acessada, evitando manter `Sucesso` de uma operacao anterior.
+- Ao abrir o app com envios pendentes na fila local, o sistema exibe um popup perguntando se deseja sincronizar agora ou deixar para depois.
+- O popup de fila pendente mostra uma barra de carregamento durante o envio.
+- O botao `Depois` fica disponivel desde o inicio do popup para permitir continuar sem internet.
+- Se o reenvio falhar, o popup mostra a mensagem de erro e deixa apenas a opcao `Depois`.
+
+### Adicionado
+- Sincronizacao da fila local diretamente pelo popup de abertura do app.
+- Evento local para atualizar o contador da fila quando a sincronizacao for feita fora da tela final.
+
+### Corrigido
+- Corrigido estado visual antigo de sucesso aparecendo ao entrar novamente na tela de sincronizacao.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- O popup reutiliza os endpoints autenticados existentes.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Deploy Netlify producao `6a46a37b081dcb790a972f53` concluido com sucesso.
+- `/api/health` em producao retornou `ok=true`.
+
+### Pendencias
+- Validar manualmente em aparelho com uma visita pendente na fila local.
+
 ## [2026-07-02] - Correcao: persistencia da validacao entre etapas
 
 ### Alterado

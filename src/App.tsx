@@ -9,9 +9,10 @@ import ContentArea from './components/ContentArea';
 import CriativaIcon from './components/CriativaIcon';
 import { SectionId, STORAGE_KEY } from './types';
 import { apiService } from './services/apiService';
-import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
+import { LogOut, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession } from './services/session';
+import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
 
 const INITIAL_STATE = {
   user: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -45,6 +46,11 @@ const App: React.FC = () => {
 
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [showPendingSyncPrompt, setShowPendingSyncPrompt] = useState(false);
+  const [promptSyncing, setPromptSyncing] = useState(false);
+  const [promptSyncMessage, setPromptSyncMessage] = useState('');
+  const [promptSyncError, setPromptSyncError] = useState<string | null>(null);
+  const [promptQueueCount, setPromptQueueCount] = useState(0);
 
   useEffect(() => {
     document.title = appConfig.title;
@@ -92,6 +98,82 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...visitState, step: activeSection }));
   }, [visitState, activeSection]);
+
+  useEffect(() => {
+    if (loading || !visitState.user) return;
+
+    const queuedCount = getQueuedVisitCount();
+    if (queuedCount > 0) {
+      setPromptQueueCount(queuedCount);
+      setPromptSyncMessage(`${queuedCount} envio${queuedCount > 1 ? 's' : ''} pendente${queuedCount > 1 ? 's' : ''} na fila local.`);
+      setPromptSyncError(null);
+      setShowPendingSyncPrompt(true);
+    }
+  }, [loading, visitState.user?.id]);
+
+  const formatSyncError = (message: string) => {
+    if (/make retornou http 500/i.test(message) || /scenario failed to initialize/i.test(message)) {
+      return 'A integração Make não inicializou o cenário. A visita continua salva para reenvio.';
+    }
+
+    return message;
+  };
+
+  const notifyQueueChanged = () => {
+    window.dispatchEvent(new Event('criativa-sync-queue-updated'));
+  };
+
+  const syncPendingQueueFromPrompt = async () => {
+    const queuedVisits = listQueuedVisits();
+    if (queuedVisits.length === 0) {
+      setShowPendingSyncPrompt(false);
+      return;
+    }
+
+    setPromptSyncing(true);
+    setPromptSyncError(null);
+
+    try {
+      for (let index = 0; index < queuedVisits.length; index += 1) {
+        const queuedVisit = queuedVisits[index];
+        setPromptSyncMessage(`Sincronizando ${index + 1}/${queuedVisits.length}...`);
+        updateQueuedVisit(queuedVisit.visitId, {
+          status: 'syncing',
+          error: null,
+        });
+
+        const draft = await apiService.createVisit({ ...queuedVisit.payload, visitId: queuedVisit.visitId });
+        const serverVisitId = draft.visitId || queuedVisit.visitId;
+        const result = await apiService.retrySync(serverVisitId);
+
+        if (result.syncStatus === 'enviado') {
+          removeQueuedVisit(serverVisitId);
+          if (serverVisitId !== queuedVisit.visitId) {
+            removeQueuedVisit(queuedVisit.visitId);
+          }
+          notifyQueueChanged();
+          continue;
+        }
+
+        updateQueuedVisit(serverVisitId, {
+          status: 'error',
+          error: result.syncError || 'Falha na sincronização',
+          attempts: queuedVisit.attempts + 1,
+        });
+        throw new Error(result.syncError || 'Falha na sincronização');
+      }
+
+      notifyQueueChanged();
+      setPromptSyncMessage('Fila sincronizada com sucesso.');
+      setTimeout(() => setShowPendingSyncPrompt(false), 1200);
+    } catch (error: any) {
+      setPromptSyncError(formatSyncError(error.message || 'Não foi possível sincronizar a fila agora.'));
+      setPromptQueueCount(getQueuedVisitCount());
+      notifyQueueChanged();
+    } finally {
+      setPromptSyncing(false);
+    }
+  };
 
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -174,6 +256,56 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row">
+      {showPendingSyncPrompt && (
+        <div className="fixed inset-0 z-[80] bg-[#0F172A]/50 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="w-full max-w-md bg-white rounded-[36px] p-8 shadow-2xl border border-slate-100 space-y-6">
+            <div className="space-y-2 text-center">
+              <div className="w-16 h-16 mx-auto rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                {promptSyncing ? <Loader2 className="animate-spin" size={28} /> : <RefreshCw size={28} />}
+              </div>
+              <h2 className="text-2xl font-black uppercase tracking-tighter text-[#0F172A]">Envios pendentes</h2>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                Existem {promptQueueCount} registro{promptQueueCount !== 1 ? 's' : ''} aguardando sincronização.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-500 ${promptSyncing ? 'w-2/3 bg-blue-500 animate-pulse' : promptSyncError ? 'w-1/3 bg-orange-500' : 'w-1/4 bg-emerald-500'}`} />
+              </div>
+              <p className="text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
+                {promptSyncMessage}
+              </p>
+            </div>
+
+            {promptSyncError && (
+              <div className="bg-orange-50 border border-orange-100 p-4 rounded-2xl flex items-start gap-3 text-orange-700">
+                <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                <p className="text-xs font-bold uppercase tracking-tight">{promptSyncError}</p>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              {!promptSyncError && (
+                <button
+                  disabled={promptSyncing}
+                  onClick={syncPendingQueueFromPrompt}
+                  className="flex-1 bg-[#E65C5C] text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
+                >
+                  {promptSyncing ? 'Sincronizando' : 'Sincronizar agora'}
+                </button>
+              )}
+              <button
+                disabled={promptSyncing}
+                onClick={() => setShowPendingSyncPrompt(false)}
+                className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
+              >
+                Depois
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <Sidebar activeSection={activeSection} onSelect={(id) => setActiveSection(id as SectionId)} onLogout={logout} tasksCompleted={visitState.tasks} isCheckInDone={visitState.checkInDone} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={visitState.user} />
       <main className="flex-1 md:ml-72 flex flex-col min-h-screen">
         <header className="h-20 px-4 md:px-8 flex items-center justify-between gap-3 bg-white border-b border-slate-100 sticky top-0 z-40">

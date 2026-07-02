@@ -56,8 +56,21 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     const refreshQueue = () => setQueueCount(getQueuedVisitCount());
     refreshQueue();
     window.addEventListener('storage', refreshQueue);
-    return () => window.removeEventListener('storage', refreshQueue);
+    window.addEventListener('criativa-sync-queue-updated', refreshQueue);
+    return () => {
+      window.removeEventListener('storage', refreshQueue);
+      window.removeEventListener('criativa-sync-queue-updated', refreshQueue);
+    };
   }, []);
+
+  React.useEffect(() => {
+    if (sectionId !== SectionId.Sync) return;
+    setSyncSuccess(false);
+    setSyncError(null);
+    setIsSyncing(false);
+    setSyncMessage('Enviando dados para o servidor central');
+    setQueueCount(getQueuedVisitCount());
+  }, [sectionId]);
 
   const handleCheckIn = (store: any) => {
     if (!visitState.visitId) {
