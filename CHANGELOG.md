@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajustes: Trocas, checkout e sincronizacao
+
+### Alterado
+- O card de `Trocas` no progresso da visita passou a usar a regra real de conclusao das empresas abertas, evitando perder a marcacao verde quando o fluxo ja esta completo.
+- A tela de `Finalizar Visita` deixou de exibir o horario de check-in para o promotor.
+- O indicador do painel principal passou a mostrar apenas `Check-in realizado`, sem horario.
+- A tela de `Sincronizar Agora` deixou de exibir o log de auditoria tecnico e passou a mostrar apenas uma barra simples de progresso.
+- A mensagem de erro da Make para o promotor ficou operacional, informando que a visita foi salva para reenvio.
+
+### Adicionado
+- Tratamento de mensagem para falha `Make retornou HTTP 500: Scenario failed to initialize`, orientando verificacao do cenario ativo/conexoes da Make.
+
+### Corrigido
+- Corrigida divergencia visual em que `Trocas` podia aparecer pendente mesmo com o fluxo completo.
+- Removida exposicao de horario de check-in no fluxo visivel ao promotor.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- O erro da Make continua sendo tratado sem expor URL sensivel no frontend.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Deploy Netlify producao `6a4692ba67c58fbd1bfe4983` concluido com sucesso.
+- `/api/health` em producao retornou `ok=true`.
+
+### Pendencias
+- Corrigir no Make.com o erro externo `Scenario failed to initialize`, verificando se o webhook esta associado a cenario ativo e se as conexoes/modulos inicializam corretamente.
+
 ## [2026-07-02] - Correcao: sincronizacao multiindustria com Make
 
 ### Alterado

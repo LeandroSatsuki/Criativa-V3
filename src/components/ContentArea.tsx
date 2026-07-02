@@ -6,7 +6,6 @@
 import React, { useState, useEffect } from 'react';
 import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
-import { logService } from '../services/logService';
 import { analyzeProductPhoto } from '../services/geminiService';
 import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
 import { generateVisitId } from '../services/visitId';
@@ -50,15 +49,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [logs, setLogs] = React.useState<any[]>([]);
   const [isTesting, setIsTesting] = useState(false);
   const [queueCount, setQueueCount] = useState(() => getQueuedVisitCount());
-
-  React.useEffect(() => {
-    return logService.subscribe((newLogs) => {
-      setLogs([...newLogs]);
-    });
-  }, []);
 
   React.useEffect(() => {
     const refreshQueue = () => setQueueCount(getQueuedVisitCount());
@@ -66,14 +58,6 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     window.addEventListener('storage', refreshQueue);
     return () => window.removeEventListener('storage', refreshQueue);
   }, []);
-
-  const logEndRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    if (logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs]);
 
   const handleCheckIn = (store: any) => {
     if (!visitState.visitId) {
@@ -175,6 +159,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const afterIndustryExecutions = beforeOpenedIndustryExecutions.length > 0
     ? beforeOpenedIndustryExecutions
     : activeIndustryExecutions;
+  const returnsStepComplete = afterIndustryExecutions.length > 0
+    ? afterIndustryExecutions.every(hasReturnsEvidence)
+    : Boolean(tasks[SectionId.Trocas]);
   const pendingIndustryExecutions = activeIndustryExecutions.filter(execution => !isExecutionComplete(execution));
   const legacyFlowComplete = openedIndustryExecutions.length === 0
     && Boolean(tasks[SectionId.Antes] && tasks[SectionId.Depois] && tasks[SectionId.Trocas]);
@@ -289,19 +276,27 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   const [syncSuccess, setSyncSuccess] = useState(false);
 
+  const formatSyncError = (message: string) => {
+    if (/make retornou http 500/i.test(message) || /scenario failed to initialize/i.test(message)) {
+      return 'Visita salva para reenvio. A integração Make não inicializou o cenário. Verifique o cenário ativo/conexões da Make e reenvie a fila.';
+    }
+
+    return message;
+  };
+
   const handleTestConnection = async () => {
     setIsTesting(true);
-    logService.clear();
-    logService.addLog("Iniciando teste de conexão simples...", "info");
+    setSyncError(null);
+    setSyncMessage('Testando conexão com o servidor...');
     try {
       const ok = await apiService.pingMake();
       if (ok) {
-        logService.addLog("✅ Conexão com o backend estabelecida com sucesso!", "success");
+        setSyncMessage('Servidor conectado e integrações configuradas.');
       } else {
-        logService.addLog("❌ O backend respondeu, mas retornou um erro.", "error");
+        setSyncError('O servidor respondeu, mas retornou configuração incompleta.');
       }
     } catch (e: any) {
-      logService.addLog(`❌ Falha total na conexão: ${e.message}`, "error");
+      setSyncError(`Falha na conexão com o servidor: ${e.message}`);
     } finally {
       setIsTesting(false);
     }
@@ -364,8 +359,6 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     console.log(">>> BOTAO SINCRONIZAR CLICADO <<<");
     setSyncError(null);
     setSyncSuccess(false);
-    logService.clear();
-    logService.addLog("Iniciando processo de sincronização...", "info");
     
     const checkoutPhoto = photos[SectionId.CheckOut]?.[0];
     
@@ -394,7 +387,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         onReset();
       }, 3000);
     } catch (error: any) {
-      setSyncError(error.message || "Erro desconhecido na sincronização");
+      setSyncError(formatSyncError(error.message || "Erro desconhecido na sincronização"));
     } finally {
       setIsSyncing(false);
     }
@@ -410,8 +403,6 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     setIsSyncing(true);
     setSyncError(null);
     setSyncSuccess(false);
-    logService.clear();
-    logService.addLog(`Reenviando fila local (${queuedVisits.length})...`, 'info');
 
     try {
       for (const queuedVisit of queuedVisits) {
@@ -425,17 +416,11 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         onReset();
       }, 3000);
     } catch (error: any) {
-      setSyncError(error.message || 'Não foi possível reenviar a fila local.');
+      setSyncError(formatSyncError(error.message || 'Não foi possível reenviar a fila local.'));
     } finally {
       setIsSyncing(false);
     }
   };
-
-  useEffect(() => {
-    if (logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs]);
 
   const renderSection = () => {
     switch (sectionId) {
@@ -505,7 +490,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               </div>
               {visitState.checkInDone && (
                 <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-                  Check-in: {visitState.checkInTime ? new Date(visitState.checkInTime).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  Check-in realizado
                 </div>
               )}
             </div>
@@ -585,10 +570,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     }}
                   />
                   <DashboardCard 
-                    icon={<PackageOpen className={selectedTasks[SectionId.Trocas] ? "text-emerald-500" : "text-orange-500"} />} 
+                    icon={<PackageOpen className={returnsStepComplete ? "text-emerald-500" : "text-orange-500"} />} 
                     title="4. Trocas" 
-                    status={selectedTasks[SectionId.Trocas] ? "Concluído" : "Pendente"} 
-                    isCompleted={selectedTasks[SectionId.Trocas]}
+                    status={returnsStepComplete ? "Concluído" : "Pendente"} 
+                    isCompleted={returnsStepComplete}
                     isDisabled={!selectedIndustry || !selectedTasks[SectionId.Depois]}
                     onClick={() => {
                       if (!selectedIndustry) {
@@ -1251,8 +1236,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tighter">Finalizar Visita</h2>
             <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm space-y-8">
-              <div className="grid grid-cols-2 gap-6">
-                <SummaryItem label="Check-in" value={checkInTimeDisplay} />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <SummaryItem label="Fotos Total" value={(Object.values(photos).flat().length + totalIndustryPhotos).toString()} />
                 <SummaryItem label="Empresas" value={`${activeIndustryExecutions.length}`} />
                 <SummaryItem label="Loja" value={visitState.currentStore} />
@@ -1312,36 +1296,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               </p>
             </div>
 
-            {/* Log Viewer Panel */}
-            <div className="w-full max-w-md bg-slate-900 rounded-3xl p-6 shadow-2xl overflow-hidden border border-slate-800">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Log de Auditoria</h3>
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 rounded-full bg-red-500/50" />
-                  <div className="w-2 h-2 rounded-full bg-yellow-500/50" />
-                  <div className="w-2 h-2 rounded-full bg-green-500/50" />
-                </div>
-              </div>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto font-mono text-[10px] scrollbar-hide">
-                {logs.length === 0 ? (
-                  <p className="text-slate-600 italic">Aguardando início do processo...</p>
-                ) : (
-                  logs.map((log, i) => (
-                    <div key={i} className="flex gap-3 border-b border-slate-800/50 pb-2">
-                      <span className="text-slate-600 shrink-0">{log.timestamp}</span>
-                      <span className={
-                        log.type === 'error' ? 'text-red-400' : 
-                        log.type === 'success' ? 'text-emerald-400' : 
-                        log.type === 'warn' ? 'text-yellow-400' : 
-                        'text-slate-300'
-                      }>
-                        {log.message}
-                      </span>
-                    </div>
-                  ))
-                )}
-                <div ref={logEndRef} />
-              </div>
+            <div className="w-full max-w-md h-3 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${syncSuccess ? 'w-full bg-emerald-500' : isSyncing ? 'w-2/3 bg-blue-500 animate-pulse' : 'w-1/4 bg-emerald-500'}`}
+              />
             </div>
 
             {isSyncing && (
@@ -1407,12 +1365,6 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         return <div>Seção não encontrada</div>;
     }
   };
-
-  const checkInTimeDisplay = visitState.checkInTime ? new Date(visitState.checkInTime).toLocaleTimeString('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
-    hour: '2-digit',
-    minute: '2-digit'
-  }) : '--:--';
 
   return (
     <div className="max-w-5xl mx-auto">
