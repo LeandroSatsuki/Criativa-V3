@@ -22,6 +22,7 @@ import {
   CloudUpload, 
   AlertCircle, 
   Loader2,
+  ArrowLeft,
   ChevronRight,
   Plus,
   Trash2,
@@ -166,6 +167,44 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const totalIndustryPhotos = activeIndustryExecutions.reduce((total, execution) => (
     total + Object.values(execution.photos || {}).flat().length
   ), 0);
+
+  const getBackTarget = () => {
+    switch (sectionId) {
+      case SectionId.Facade:
+        return SectionId.CheckIn;
+      case SectionId.CheckIn:
+        return SectionId.Dashboard;
+      case SectionId.Antes:
+        return SectionId.Dashboard;
+      case SectionId.Estoque:
+        return SectionId.Dashboard;
+      case SectionId.Depois:
+        return SectionId.Antes;
+      case SectionId.Trocas:
+        return SectionId.Depois;
+      case SectionId.CheckOut:
+        return SectionId.Dashboard;
+      case SectionId.Sync:
+        return SectionId.CheckOut;
+      default:
+        return null;
+    }
+  };
+
+  const renderBackButton = () => {
+    const target = getBackTarget();
+    if (!target) return null;
+
+    return (
+      <button
+        onClick={() => navigateTo(target)}
+        className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-white border border-slate-100 shadow-sm text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-[#E65C5C] hover:border-[#E65C5C]/20 transition-all"
+      >
+        <ArrowLeft size={14} />
+        Voltar
+      </button>
+    );
+  };
 
   const handlePhotoCapture = async (section: string, file: File) => {
     const activeIndustry = selectedIndustry;
@@ -374,6 +413,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         const facadePhotos = photos[SectionId.Facade] || [];
         return (
           <div className="space-y-8 animate-in">
+            <div className="flex items-center justify-between gap-4">
+              {renderBackButton()}
+              <div className="flex-1" />
+            </div>
             <div className="text-center space-y-4">
               <h2 className="text-3xl font-black uppercase tracking-tighter text-[#0F172A]">Capturar Fachada</h2>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tire uma foto da frente da loja para iniciar</p>
@@ -560,6 +603,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       case SectionId.CheckIn:
         return (
           <div className="max-w-2xl mx-auto space-y-8 py-6 animate-in">
+            <div className="flex items-center justify-between gap-4">
+              {renderBackButton()}
+              <div className="flex-1" />
+            </div>
             <div className="text-center space-y-4">
               <div className="w-20 h-20 bg-white rounded-[24px] shadow-xl shadow-slate-200/40 flex items-center justify-center mx-auto border border-slate-50 relative">
                 <div className="absolute inset-0 bg-gradient-to-br from-white to-slate-50 rounded-[24px]" />
@@ -609,6 +656,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
         return (
           <div className="space-y-8 animate-in">
+            <div className="flex items-center justify-between gap-4">
+              {renderBackButton()}
+              <div className="flex-1" />
+            </div>
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-black uppercase tracking-tighter">Fotos de {isAntes ? 'Antes' : 'Depois'}</h2>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{currentPhotos.length}/30 Fotos</p>
@@ -804,6 +855,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
         return (
           <div className="space-y-8 animate-in">
+            <div className="flex items-center justify-between gap-4">
+              {renderBackButton()}
+              <div className="flex-1" />
+            </div>
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-black uppercase tracking-tighter">Check de Estoque</h2>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{estoquePhotos.length}/30 Fotos</p>
@@ -959,6 +1014,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         const selectedHasReturns = selectedExecution?.hasReturns ?? (openedIndustryExecutions.length === 0 ? visitState.hasReturns : null);
         return (
           <div className="space-y-8 animate-in">
+            <div className="flex items-center justify-between gap-4">
+              {renderBackButton()}
+              <div className="flex-1" />
+            </div>
             <h2 className="text-3xl font-black uppercase tracking-tighter">Trocas e Avarias</h2>
             
             <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm text-center space-y-8">
@@ -1064,6 +1123,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         if (!canCheckOut) {
           return (
             <div className="space-y-8 animate-in">
+              <div className="flex items-center justify-between gap-4">
+                {renderBackButton()}
+                <div className="flex-1" />
+              </div>
               <h2 className="text-3xl font-black uppercase tracking-tighter">Finalizar Visita</h2>
               <div className="bg-orange-50 p-8 rounded-[32px] border border-orange-100 text-orange-700 space-y-4">
                 <p className="font-black uppercase tracking-widest text-xs">Check-out bloqueado</p>
@@ -1087,6 +1150,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         }
         return (
           <div className="space-y-8 animate-in">
+            <div className="flex items-center justify-between gap-4">
+              {renderBackButton()}
+              <div className="flex-1" />
+            </div>
             <h2 className="text-3xl font-black uppercase tracking-tighter">Finalizar Visita</h2>
             <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm space-y-8">
               <div className="grid grid-cols-2 gap-6">
@@ -1135,6 +1202,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       case SectionId.Sync:
         return (
           <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-8 animate-in py-10">
+            <div className="w-full flex items-center justify-start">
+              {renderBackButton()}
+            </div>
             <div className={`w-24 h-24 rounded-[32px] flex items-center justify-center transition-all ${syncSuccess ? 'bg-emerald-500' : isSyncing ? 'bg-blue-50' : 'bg-emerald-50'}`}>
               {syncSuccess ? <CheckCircle2 className="text-white w-10 h-10" /> : isSyncing ? <Loader2 className="animate-spin text-blue-600 w-10 h-10" /> : <CloudUpload className="text-emerald-600 w-10 h-10" />}
             </div>

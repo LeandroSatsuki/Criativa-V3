@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: botao de voltar nas telas do fluxo
+
+### Alterado
+- As telas internas do fluxo passaram a exibir um botao de voltar no estilo do app.
+- O botao foi inserido nas etapas de `Check-in`, `Fachada`, `Antes`, `Estoque`, `Depois`, `Trocas`, `Check-out` e `Sincronizacao`.
+
+### Adicionado
+- Componente de retorno visual padronizado com seta e estilo discreto do cliente.
+
+### Corrigido
+- O usuario agora consegue retornar com mais facilidade entre as telas do fluxo sem depender apenas do menu lateral.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- A navegacao de retorno respeita os destinos internos do fluxo, sem criar atalhos novos de permissao.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+
+### Pendencias
+- Validar no celular se a posicao do botao ficou ergonomica em telas menores.
+
 ## [2026-07-02] - Ajuste: estoque com selecao autonoma de empresa
 
 ### Alterado
