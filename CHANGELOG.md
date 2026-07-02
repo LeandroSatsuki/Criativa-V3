@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [2026-07-02] - Correcao: conclusao real de multiplas industrias
+
+### Alterado
+- A regra de conclusao do fluxo por industria passou a considerar evidencias reais: foto de `Antes`, foto de `Depois` e resposta/foto de `Trocas`.
+- O salvamento final de `Trocas` passou a recalcular o status completo de todas as industrias abertas.
+
+### Adicionado
+- Validacao de foto obrigatoria quando `Trocas` for respondido como `Sim`.
+
+### Corrigido
+- Corrigido caso em que a visita com duas industrias podia aparentar finalizar apenas uma industria no final do fluxo.
+- Reduzida dependencia de flags intermediarias que podiam ficar inconsistentes durante troca rapida entre empresas.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- A sincronizacao continua bloqueada ate todos os fluxos ativos estarem completos.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+
+### Pendencias
+- Validar em celular real o fluxo com duas industrias completas na mesma visita.
+
 ## [2026-07-02] - Ajuste: retomada de fluxo e sessao unica
 
 ### Alterado

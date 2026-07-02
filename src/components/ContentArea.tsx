@@ -117,10 +117,18 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     || execution?.hasReturns !== null
     || Boolean(execution?.tasks && Object.values(execution.tasks).some(Boolean))
   );
+  const hasStepEvidence = (execution: Partial<IndustryExecution> | null | undefined, section: SectionId) => Boolean(
+    execution?.tasks?.[section] || (execution?.photos?.[section]?.length || 0) > 0
+  );
+  const hasReturnsEvidence = (execution?: Partial<IndustryExecution> | null) => (
+    Boolean(execution?.tasks?.[SectionId.Trocas])
+    || execution?.hasReturns === false
+    || (execution?.hasReturns === true && (execution.photos?.[SectionId.Trocas]?.length || 0) > 0)
+  );
   const isExecutionComplete = (execution?: Partial<IndustryExecution> | null) => Boolean(
-    execution?.tasks?.[SectionId.Antes]
-    && execution?.tasks?.[SectionId.Depois]
-    && execution?.tasks?.[SectionId.Trocas]
+    hasStepEvidence(execution, SectionId.Antes)
+    && hasStepEvidence(execution, SectionId.Depois)
+    && hasReturnsEvidence(execution)
   );
 
   const getExecutionWithStatus = (execution: IndustryExecution): IndustryExecution => {
@@ -1052,8 +1060,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       case SectionId.Trocas:
         const returnsPhotos = getIndustryPhotos(SectionId.Trocas);
         const selectedHasReturns = selectedExecution?.hasReturns ?? (activeIndustryExecutions.length === 0 ? visitState.hasReturns : null);
-        const allReturnsAnswered = afterIndustryExecutions.length > 0 && afterIndustryExecutions.every(execution => execution.hasReturns !== null);
-        const pendingReturnIndustries = afterIndustryExecutions.filter(execution => execution.hasReturns === null);
+        const allReturnsReady = afterIndustryExecutions.length > 0 && afterIndustryExecutions.every(hasReturnsEvidence);
+        const pendingReturnIndustries = afterIndustryExecutions.filter(execution => !hasReturnsEvidence(execution));
         return (
           <div className="space-y-8 animate-in">
             <div className="flex items-center justify-between gap-4">
@@ -1087,9 +1095,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 </p>
               )}
             </div>
-            {afterIndustryExecutions.length > 0 && !allReturnsAnswered && (
+            {afterIndustryExecutions.length > 0 && !allReturnsReady && (
               <p className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 p-4 rounded-2xl">
-                Responda todas as empresas antes de salvar e continuar. Pendentes: {pendingReturnIndustries.map(execution => execution.industry).join(', ')}.
+                Responda todas as empresas antes de salvar e continuar. Se marcar sim, anexe a foto. Pendentes: {pendingReturnIndustries.map(execution => execution.industry).join(', ')}.
               </p>
             )}
             
@@ -1175,10 +1183,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               )}
 
               <button 
-                disabled={!allReturnsAnswered}
+                disabled={!allReturnsReady}
                 onClick={() => {
-                  if (!allReturnsAnswered) {
-                    alert(`Responda todas as empresas antes de salvar e continuar. Pendentes: ${pendingReturnIndustries.map(execution => execution.industry).join(', ')}`);
+                  if (!allReturnsReady) {
+                    alert(`Responda todas as empresas antes de salvar e continuar. Se marcar sim, anexe a foto. Pendentes: ${pendingReturnIndustries.map(execution => execution.industry).join(', ')}`);
                     return;
                   }
                   updateVisit('tasks', (prev: any) => ({ ...prev, [SectionId.Trocas]: true }));
@@ -1186,19 +1194,19 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     const next = { ...prev };
                     afterIndustryExecutions.forEach((execution) => {
                       const current = createIndustryExecution(execution.industry, next[execution.industry]);
-                      next[execution.industry] = {
+                      next[execution.industry] = getExecutionWithStatus({
                         ...current,
                         tasks: {
                           ...current.tasks,
                           [SectionId.Trocas]: true,
                         },
-                      };
+                      });
                     });
                     return next;
                   });
                   navigateTo(SectionId.Dashboard);
                 }}
-                className={`w-full py-6 rounded-3xl font-black uppercase tracking-widest transition-all ${allReturnsAnswered ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-300'}`}
+                className={`w-full py-6 rounded-3xl font-black uppercase tracking-widest transition-all ${allReturnsReady ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-300'}`}
               >
                 Salvar e Continuar
               </button>
