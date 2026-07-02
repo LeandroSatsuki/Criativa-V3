@@ -68,6 +68,15 @@ const App: React.FC = () => {
       }
     } catch (e: any) {
       console.error("Erro ao atualizar dados:", e);
+      const message = String(e?.message || '');
+      if (message.includes('Sessão expirada') || message.includes('Não autorizado')) {
+        clearSession();
+        localStorage.removeItem(STORAGE_KEY);
+        setVisitState(INITIAL_STATE);
+        setActiveSection(SectionId.Dashboard);
+        setLoadingError(null);
+        return;
+      }
       setLoadingError("Não foi possível carregar os dados. Verifique sua conexão ou tente novamente mais tarde.");
     } finally {
       setLoading(false);

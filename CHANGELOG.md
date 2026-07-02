@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## [2026-07-02] - Correcao: sessao expirada exibida como sem conexao
+
+### Alterado
+- O carregamento inicial passou a diferenciar erro de sessao expirada de erro real de conexao.
+
+### Adicionado
+- Nenhum arquivo novo nesta etapa.
+
+### Corrigido
+- Quando havia usuario salvo no navegador/PWA, mas o token local estava expirado, o app mostrava mensagem generica de conexao.
+- Agora, nesses casos, a sessao local e limpa e o usuario volta para a tela de login.
+
+### Seguranca
+- Nenhuma credencial, token ou webhook foi exposto.
+- A correcao remove sessoes expiradas do navegador em vez de tentar reutiliza-las.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- URL de producao respondeu `200`.
+- `/api/health` retornou `ok=true`.
+- `/api/config` retornou industrias e timestamp corretamente.
+
+### Pendencias
+- Se o celular ainda mostrar tela antiga, limpar cache/fechar e abrir novamente a PWA para receber o novo bundle.
+
 ## [2026-07-01] - Ajuste: multiplas industrias por visita
 
 ### Alterado
