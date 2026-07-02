@@ -160,6 +160,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   const selectedTasks = selectedExecution?.tasks || {};
   const activeIndustryExecutions = openedIndustryExecutions.filter(hasIndustryActivity);
+  const beforeOpenedIndustryExecutions = activeIndustryExecutions.filter((execution) => (
+    (execution.photos?.[SectionId.Antes]?.length || 0) > 0
+    || Boolean(execution.tasks?.[SectionId.Antes])
+  ));
+  const afterIndustryExecutions = beforeOpenedIndustryExecutions.length > 0
+    ? beforeOpenedIndustryExecutions
+    : activeIndustryExecutions;
   const pendingIndustryExecutions = activeIndustryExecutions.filter(execution => !isExecutionComplete(execution));
   const legacyFlowComplete = openedIndustryExecutions.length === 0
     && Boolean(tasks[SectionId.Antes] && tasks[SectionId.Depois] && tasks[SectionId.Trocas]);
@@ -652,7 +659,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
           ? visitState.industries 
           : ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
         const currentPhotos = getIndustryPhotos(sectionId);
-        const canAttachPhotos = Boolean(visitState.selectedIndustry);
+        const canAttachPhotos = isAntes
+          ? Boolean(visitState.selectedIndustry)
+          : Boolean(visitState.selectedIndustry && afterIndustryExecutions.some(execution => execution.industry === visitState.selectedIndustry));
 
         return (
           <div className="space-y-8 animate-in">
@@ -694,12 +703,27 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
             {!isAntes && (
               <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Indústria vinculada ao Antes</p>
-                {visitState.selectedIndustry ? (
-                  <p className="font-black uppercase text-lg tracking-tight text-[#0F172A]">{visitState.selectedIndustry}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Empresas abertas em Antes</p>
+                {afterIndustryExecutions.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {afterIndustryExecutions.map(execution => {
+                      const isSelected = visitState.selectedIndustry === execution.industry;
+                      const complete = isExecutionComplete(execution);
+                      return (
+                        <button
+                          key={execution.industry}
+                          onClick={() => openIndustryExecution(execution.industry)}
+                          className={`py-3 rounded-xl font-black uppercase text-[10px] tracking-widest border transition-all ${isSelected ? 'bg-[#0F172A] text-white border-[#0F172A]' : complete ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-slate-200'}`}
+                        >
+                          {execution.industry}
+                          {complete ? ' ✓' : ' •'}
+                        </button>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <p className="text-[10px] font-bold text-[#E65C5C] uppercase bg-red-50 p-4 rounded-xl">
-                    Selecione a indústria na etapa "ANTES" antes de registrar fotos do Depois.
+                    Abra uma empresa em "ANTES" antes de registrar fotos do Depois.
                   </p>
                 )}
               </div>
@@ -768,6 +792,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   if (!visitState.selectedIndustry) {
                     alert("Selecione uma indústria primeiro.");
                     if (isAntes) navigateTo(SectionId.Antes);
+                    return;
+                  }
+                  if (!isAntes && !afterIndustryExecutions.some((execution) => execution.industry === visitState.selectedIndustry)) {
+                    alert("Selecione uma empresa que já abriu fluxo em Antes.");
                     return;
                   }
                   if (currentPhotos.length === 0) return alert("Tire pelo menos uma foto.");

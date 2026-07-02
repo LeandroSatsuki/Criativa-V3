@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: Depois lista empresas abertas em Antes
+
+### Alterado
+- A tela `Depois` passou a exibir apenas as empresas que abriram fluxo em `Antes`.
+- O anexo de fotos em `Depois` agora depende da empresa escolhida nessa lista.
+
+### Adicionado
+- Lista visual de empresas abertas em `Antes` dentro da tela `Depois`.
+
+### Corrigido
+- `Depois` nao depende mais apenas do ultimo valor global de industria selecionada.
+- O usuario agora escolhe explicitamente qual empresa deseja finalizar em `Depois`.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- O backend continua recebendo apenas execucoes vinculadas a empresas realmente abertas.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+
+### Pendencias
+- Validar em aparelho real se a lista de empresas em `Depois` fica suficientemente clara quando houver muitas empresas abertas.
+
 ## [2026-07-02] - Ajuste: botao de voltar nas telas do fluxo
 
 ### Alterado
