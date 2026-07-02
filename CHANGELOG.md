@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## [2026-07-02] - Correcao: persistencia da validacao entre etapas
+
+### Alterado
+- Os cards de `Antes`, `Estoque` e `Depois` passaram a considerar evidencia real da etapa, como foto salva, alem da flag interna de tarefa.
+- Ao capturar foto de uma etapa de industria, o app agora marca a tarefa correspondente junto com a foto e recalcula o status da industria.
+- O salvamento de `Antes` e `Depois` passou a usar atualizacao funcional para nao sobrescrever flags recentes.
+
+### Adicionado
+- Flags derivadas de conclusao para a industria selecionada, reduzindo dependencia de estado intermediario defasado.
+
+### Corrigido
+- Corrigido caso em que finalizar `Depois` podia remover a marcacao verde de `Antes`, mesmo com `Antes` ja completo.
+- Reduzida a chance de perda visual de validacao ao alternar entre etapas ou receber atualizacoes assincronas de foto/IA.
+
+### Seguranca
+- Nenhuma credencial, webhook ou regra sensivel foi alterada.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Deploy Netlify producao `6a46a1e3c3dd653bc4289541` concluido com sucesso.
+- `/api/health` em producao retornou `ok=true`.
+
+### Pendencias
+- Validar manualmente no aparelho: salvar `Antes`, salvar `Depois` e confirmar que a marcacao verde de `Antes` permanece.
+
 ## [2026-07-02] - Ajuste: cabecalho responsivo
 
 ### Alterado

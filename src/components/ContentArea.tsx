@@ -151,6 +151,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const selectedTasks = selectedExecution?.tasks || {};
+  const selectedAntesComplete = hasStepEvidence(selectedExecution, SectionId.Antes);
+  const selectedEstoqueComplete = hasStepEvidence(selectedExecution, SectionId.Estoque);
+  const selectedDepoisComplete = hasStepEvidence(selectedExecution, SectionId.Depois);
   const activeIndustryExecutions = openedIndustryExecutions.filter(hasIndustryActivity);
   const beforeOpenedIndustryExecutions = activeIndustryExecutions.filter((execution) => (
     (execution.photos?.[SectionId.Antes]?.length || 0) > 0
@@ -247,15 +250,20 @@ const ContentArea: React.FC<ContentAreaProps> = ({
           updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
             const current = createIndustryExecution(activeIndustry, prev[activeIndustry]);
             const currentCategoryPhotos = current.photos?.[section] || [];
+            const updated = getExecutionWithStatus({
+              ...current,
+              tasks: {
+                ...current.tasks,
+                [section]: true,
+              },
+              photos: {
+                ...current.photos,
+                [section]: [...currentCategoryPhotos, compressedBase64],
+              },
+            });
             return {
               ...prev,
-              [activeIndustry]: {
-                ...current,
-                photos: {
-                  ...current.photos,
-                  [section]: [...currentCategoryPhotos, compressedBase64],
-                },
-              },
+              [activeIndustry]: updated,
             };
           });
           return;
@@ -534,38 +542,38 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               ) : (
                 <>
                   <DashboardCard 
-                    icon={<Camera className={selectedTasks[SectionId.Antes] ? "text-emerald-500" : "text-[#E65C5C]"} />} 
+                    icon={<Camera className={selectedAntesComplete ? "text-emerald-500" : "text-[#E65C5C]"} />} 
                     title="1. Antes" 
                     count={selectedExecution?.photos?.[SectionId.Antes]?.length || 0} 
-                    status={selectedTasks[SectionId.Antes] ? "Concluído" : "Pendente"}
-                    isCompleted={selectedTasks[SectionId.Antes]}
+                    status={selectedAntesComplete ? "Concluído" : "Pendente"}
+                    isCompleted={selectedAntesComplete}
                     onClick={() => navigateTo(SectionId.Antes)}
                   />
                   <DashboardCard 
-                    icon={<Boxes className={selectedTasks[SectionId.Estoque] ? "text-emerald-500" : "text-blue-500"} />} 
+                    icon={<Boxes className={selectedEstoqueComplete ? "text-emerald-500" : "text-blue-500"} />} 
                     title="2. Estoque (Opcional)" 
                     count={selectedExecution?.photos?.[SectionId.Estoque]?.length || 0}
-                    status={selectedTasks[SectionId.Estoque] ? "Concluído" : "Pendente"} 
-                    isCompleted={selectedTasks[SectionId.Estoque]}
+                    status={selectedEstoqueComplete ? "Concluído" : "Pendente"} 
+                    isCompleted={selectedEstoqueComplete}
                     isDisabled={!visitState.checkInDone}
                     onClick={() => {
                       navigateTo(SectionId.Estoque);
                     }}
                   />
                   <DashboardCard 
-                    icon={<Camera className={selectedTasks[SectionId.Depois] ? "text-emerald-500" : "text-purple-500"} />} 
+                    icon={<Camera className={selectedDepoisComplete ? "text-emerald-500" : "text-purple-500"} />} 
                     title="3. Depois" 
                     count={selectedExecution?.photos?.[SectionId.Depois]?.length || 0} 
-                    status={selectedTasks[SectionId.Depois] ? "Concluído" : "Pendente"}
-                    isCompleted={selectedTasks[SectionId.Depois]}
-                    isDisabled={!selectedIndustry || !selectedTasks[SectionId.Antes]}
+                    status={selectedDepoisComplete ? "Concluído" : "Pendente"}
+                    isCompleted={selectedDepoisComplete}
+                    isDisabled={!selectedIndustry || !selectedAntesComplete}
                     onClick={() => {
                       if (!selectedIndustry) {
                         alert("Selecione ou abra uma empresa na seção 'ANTES' antes de prosseguir.");
                         navigateTo(SectionId.Antes);
                         return;
                       }
-                      if (!selectedTasks[SectionId.Antes]) return alert("Complete a etapa 'ANTES' desta empresa primeiro.");
+                      if (!selectedAntesComplete) return alert("Complete a etapa 'ANTES' desta empresa primeiro.");
                       navigateTo(SectionId.Depois);
                     }}
                   />
@@ -574,14 +582,14 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     title="4. Trocas" 
                     status={returnsStepComplete ? "Concluído" : "Pendente"} 
                     isCompleted={returnsStepComplete}
-                    isDisabled={!selectedIndustry || !selectedTasks[SectionId.Depois]}
+                    isDisabled={!selectedIndustry || !selectedDepoisComplete}
                     onClick={() => {
                       if (!selectedIndustry) {
                         alert("Selecione uma empresa em andamento primeiro.");
                         navigateTo(SectionId.Antes);
                         return;
                       }
-                      if (!selectedTasks[SectionId.Depois]) return alert("Complete a etapa 'DEPOIS' desta empresa primeiro.");
+                      if (!selectedDepoisComplete) return alert("Complete a etapa 'DEPOIS' desta empresa primeiro.");
                       navigateTo(SectionId.Trocas);
                     }}
                   />
@@ -782,6 +790,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       const newPhotos = currentPhotos.filter((_, i) => i !== idx);
                       updateSelectedExecution(execution => ({
                         ...execution,
+                        tasks: {
+                          ...execution.tasks,
+                          [sectionId]: newPhotos.length > 0 ? true : false,
+                        },
                         photos: {
                           ...execution.photos,
                           [sectionId]: newPhotos,
@@ -820,7 +832,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   
                   // Mark task as done and navigate IMMEDIATELY for instant feel
                   markIndustryTask(visitState.selectedIndustry, sectionId);
-                  updateVisit('tasks', { ...tasks, [sectionId]: true });
+                  updateVisit('tasks', (prev: any) => ({ ...prev, [sectionId]: true }));
                   navigateTo(SectionId.Dashboard);
 
                   // Run AI analysis in background without blocking the user
@@ -998,6 +1010,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       const newPhotos = estoquePhotos.filter((_, i) => i !== idx);
                       updateSelectedExecution(execution => ({
                         ...execution,
+                        tasks: {
+                          ...execution.tasks,
+                          [SectionId.Estoque]: newPhotos.length > 0 ? true : execution.tasks?.[SectionId.Estoque],
+                        },
                         photos: {
                           ...execution.photos,
                           [SectionId.Estoque]: newPhotos,
