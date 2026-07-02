@@ -110,9 +110,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   });
 
   const isIndustryStep = (section: string) => industryStepIds.includes(section as SectionId);
-  const hasIndustryPhotos = (execution?: Partial<IndustryExecution> | null) => industryStepIds.some((section) => (
-    (execution?.photos?.[section]?.length || 0) > 0
-  ));
+  const hasIndustryActivity = (execution?: Partial<IndustryExecution> | null) => (
+    industryStepIds.some((section) => (execution?.photos?.[section]?.length || 0) > 0)
+    || Object.values(execution?.stockQuantities || {}).some((value) => String(value || '').trim() !== '')
+    || execution?.hasReturns !== null
+    || Boolean(execution?.tasks && Object.values(execution.tasks).some(Boolean))
+  );
   const isExecutionComplete = (execution?: Partial<IndustryExecution> | null) => Boolean(
     execution?.tasks?.[SectionId.Antes]
     && execution?.tasks?.[SectionId.Depois]
@@ -137,7 +140,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
       const current = createIndustryExecution(selectedIndustry, prev[selectedIndustry]);
       const updated = getExecutionWithStatus(updater(current));
-      if (!hasIndustryPhotos(updated)) {
+      if (!hasIndustryActivity(updated)) {
         const next = { ...prev };
         delete next[selectedIndustry];
         return next;
@@ -155,7 +158,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const selectedTasks = selectedExecution?.tasks || {};
-  const activeIndustryExecutions = openedIndustryExecutions.filter(hasIndustryPhotos);
+  const activeIndustryExecutions = openedIndustryExecutions.filter(hasIndustryActivity);
   const pendingIndustryExecutions = activeIndustryExecutions.filter(execution => !isExecutionComplete(execution));
   const legacyFlowComplete = openedIndustryExecutions.length === 0
     && Boolean(tasks[SectionId.Antes] && tasks[SectionId.Depois] && tasks[SectionId.Trocas]);
@@ -483,14 +486,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     count={selectedExecution?.photos?.[SectionId.Estoque]?.length || 0}
                     status={selectedTasks[SectionId.Estoque] ? "Concluído" : "Pendente"} 
                     isCompleted={selectedTasks[SectionId.Estoque]}
-                    isDisabled={!selectedIndustry || !selectedTasks[SectionId.Antes]}
+                    isDisabled={!visitState.checkInDone}
                     onClick={() => {
-                      if (!selectedIndustry) {
-                        alert("Selecione ou abra uma empresa na seção 'ANTES' antes de prosseguir.");
-                        navigateTo(SectionId.Antes);
-                        return;
-                      }
-                      if (!selectedTasks[SectionId.Antes]) return alert("Complete a etapa 'ANTES' desta empresa primeiro.");
                       navigateTo(SectionId.Estoque);
                     }}
                   />
@@ -809,98 +806,128 @@ const ContentArea: React.FC<ContentAreaProps> = ({
           <div className="space-y-8 animate-in">
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-black uppercase tracking-tighter">Check de Estoque</h2>
-              <div className="flex items-center gap-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{estoquePhotos.length}/30 Fotos</p>
-                <div className="relative">
-                  <button 
-                    disabled={estoquePhotos.length >= 30}
-                    className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${estoquePhotos.length >= 30 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <Plus size={16} /> Tirar Foto
-                  </button>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    capture="environment"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file && estoquePhotos.length < 30) {
-                        handlePhotoCapture(SectionId.Estoque, file);
-                      }
-                    }}
-                  />
-                </div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{estoquePhotos.length}/30 Fotos</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {selectedIndustry ? `Empresa ativa no estoque: ${selectedIndustry}` : 'Selecione a empresa para informar o estoque'}
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {industriesEstoque.map(ind => {
+                  const isActive = selectedIndustry === ind;
+                  return (
+                    <button
+                      key={ind}
+                      onClick={() => openIndustryExecution(ind)}
+                      className={`py-3 rounded-xl font-black uppercase text-[10px] tracking-widest border transition-all ${isActive ? 'bg-[#0F172A] text-white border-[#0F172A]' : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-slate-200'}`}
+                    >
+                      {ind}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm space-y-6">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {visitState.selectedIndustry ? `Estoque: ${visitState.selectedIndustry}` : 'Quantidades por Indústria'}
-                </p>
-                <div className="space-y-4">
-                  {industriesEstoque
-                    .filter(ind => !visitState.selectedIndustry || ind === visitState.selectedIndustry)
-                    .map(ind => (
-                    <div key={ind} className="flex items-center justify-between gap-4">
-                      <span className="font-black uppercase text-xs tracking-tight text-slate-600">{ind}</span>
-                      <input 
-                        type="number" 
-                        placeholder="Qtd"
-                        value={selectedExecution?.stockQuantities?.[ind] ?? stockQuantities[ind] ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          updateSelectedExecution(execution => ({
-                            ...execution,
-                            stockQuantities: {
-                              ...execution.stockQuantities,
-                              [ind]: val,
-                            },
-                          }));
-                          updateVisit('stockQuantities', (prev: any) => ({ ...prev, [ind]: val }));
-                        }}
-                        className="w-24 p-3 bg-slate-50 rounded-xl font-bold text-center border border-slate-100 focus:border-blue-500 outline-none"
-                      />
-                    </div>
-                  ))}
-                  {!visitState.selectedIndustry && (
-                    <p className="text-[10px] font-bold text-[#E65C5C] uppercase text-center bg-red-50 p-4 rounded-xl">
-                      Atenção: Selecione a indústria na tela "ANTES" primeiro.
-                    </p>
-                  )}
+            <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm space-y-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quantidade de estoque</p>
+                  <p className="text-xs font-bold text-slate-500 mt-1">
+                    {selectedIndustry ? `Registro para ${selectedIndustry}` : 'Escolha uma empresa acima para liberar o campo'}
+                  </p>
                 </div>
+                {selectedIndustry && (
+                  <div className="bg-slate-50 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Empresa selecionada
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                {estoquePhotos.map((photo, idx) => (
-                  <div key={idx} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
-                    <img src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Estoque" />
-                    <button 
-                      onClick={() => {
-                        const newPhotos = estoquePhotos.filter((_, i) => i !== idx);
-                        updateSelectedExecution(execution => ({
-                          ...execution,
-                          photos: {
-                            ...execution.photos,
-                            [SectionId.Estoque]: newPhotos,
-                          },
-                        }));
-                      }}
-                      className="absolute top-2 right-2 bg-white/20 backdrop-blur-md p-1 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between gap-4">
+                <span className="font-black uppercase text-xs tracking-tight text-slate-600">{selectedIndustry || 'Empresa'}</span>
+                <input
+                  type="number"
+                  placeholder="Qtd"
+                  value={selectedIndustry ? (selectedExecution?.stockQuantities?.[selectedIndustry] ?? stockQuantities[selectedIndustry] ?? '') : ''}
+                  onChange={(e) => {
+                    if (!selectedIndustry) return;
+                    const val = e.target.value;
+                    updateSelectedExecution(execution => ({
+                      ...execution,
+                      stockQuantities: {
+                        ...execution.stockQuantities,
+                        [selectedIndustry]: val,
+                      },
+                    }));
+                    updateVisit('stockQuantities', (prev: any) => ({ ...prev, [selectedIndustry]: val }));
+                  }}
+                  disabled={!selectedIndustry}
+                  className="w-28 p-3 bg-slate-50 rounded-xl font-bold text-center border border-slate-100 focus:border-blue-500 outline-none disabled:opacity-50"
+                />
               </div>
+            </div>
+
+            {selectedIndustry && (
+              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Anexar fotos</p>
+                    <p className="text-xs font-bold text-slate-500 mt-1">
+                      Foto opcional do estoque de {selectedIndustry}.
+                    </p>
+                  </div>
+                  <div className="relative shrink-0">
+                    <button 
+                      disabled={estoquePhotos.length >= 30}
+                      className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${estoquePhotos.length >= 30 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <Plus size={16} /> Adicionar Foto
+                    </button>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file && estoquePhotos.length < 30) {
+                          handlePhotoCapture(SectionId.Estoque, file);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-3">
+              {estoquePhotos.map((photo, idx) => (
+                <div key={idx} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
+                  <img src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Estoque" />
+                  <button 
+                    onClick={() => {
+                      const newPhotos = estoquePhotos.filter((_, i) => i !== idx);
+                      updateSelectedExecution(execution => ({
+                        ...execution,
+                        photos: {
+                          ...execution.photos,
+                          [SectionId.Estoque]: newPhotos,
+                        },
+                      }));
+                    }}
+                    className="absolute top-2 right-2 bg-white/20 backdrop-blur-md p-1 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
             </div>
 
             <button 
               onClick={() => {
-                if (!visitState.selectedIndustry) {
-                  alert("Selecione uma indústria na etapa ANTES antes de salvar o estoque.");
-                  navigateTo(SectionId.Antes);
+                if (!selectedIndustry) {
+                  alert("Selecione uma empresa para salvar o estoque.");
                   return;
                 }
 
@@ -919,7 +946,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 }));
                 navigateTo(SectionId.Dashboard);
               }}
-              className="w-full bg-[#0F172A] text-white py-6 rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-slate-900/20"
+              disabled={!selectedIndustry}
+              className="w-full bg-[#0F172A] text-white py-6 rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Salvar Registros de Estoque
             </button>

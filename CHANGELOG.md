@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: estoque com selecao autonoma de empresa
+
+### Alterado
+- A etapa `Estoque` passou a permitir selecao de empresa dentro da propria tela, no mesmo padrao das demais etapas.
+- O anexo de foto do estoque foi movido para um bloco inferior, igual ao comportamento de `Antes` e `Depois`.
+
+### Adicionado
+- Selecionador de empresa dentro de `Estoque`.
+- Bloco de anexo de foto abaixo do registro de quantidade.
+
+### Corrigido
+- O estoque nao fica mais preso a uma unica empresa vinda do `Antes`.
+- O usuario consegue alternar a empresa diretamente no estoque sem depender do fluxo anterior.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- O backend continua aceitando apenas dados persistidos por execucao real.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+
+### Pendencias
+- Validar no celular se o bloco de foto do estoque ficou no ponto esperado pelo time de campo.
+
 ## [2026-07-02] - Ajuste: trava somente para empresas com fotos
 
 ### Alterado
