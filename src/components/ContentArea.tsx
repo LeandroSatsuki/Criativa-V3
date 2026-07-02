@@ -1040,6 +1040,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       case SectionId.Trocas:
         const returnsPhotos = getIndustryPhotos(SectionId.Trocas);
         const selectedHasReturns = selectedExecution?.hasReturns ?? (activeIndustryExecutions.length === 0 ? visitState.hasReturns : null);
+        const allReturnsAnswered = afterIndustryExecutions.length > 0 && afterIndustryExecutions.every(execution => execution.hasReturns !== null);
+        const pendingReturnIndustries = afterIndustryExecutions.filter(execution => execution.hasReturns === null);
         return (
           <div className="space-y-8 animate-in">
             <div className="flex items-center justify-between gap-4">
@@ -1073,6 +1075,11 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 </p>
               )}
             </div>
+            {afterIndustryExecutions.length > 0 && !allReturnsAnswered && (
+              <p className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 p-4 rounded-2xl">
+                Responda todas as empresas antes de salvar e continuar. Pendentes: {pendingReturnIndustries.map(execution => execution.industry).join(', ')}.
+              </p>
+            )}
             
             <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-sm text-center space-y-8">
               <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto">
@@ -1156,24 +1163,30 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               )}
 
               <button 
-                disabled={selectedHasReturns === null || (selectedHasReturns === true && returnsPhotos.length === 0)}
+                disabled={!allReturnsAnswered}
                 onClick={() => {
-                  if (!selectedIndustry) {
-                    alert("Selecione uma empresa antes de salvar Trocas.");
-                    navigateTo(SectionId.Antes);
+                  if (!allReturnsAnswered) {
+                    alert(`Responda todas as empresas antes de salvar e continuar. Pendentes: ${pendingReturnIndustries.map(execution => execution.industry).join(', ')}`);
                     return;
                   }
                   updateVisit('tasks', (prev: any) => ({ ...prev, [SectionId.Trocas]: true }));
-                  updateSelectedExecution(execution => ({
-                    ...execution,
-                    tasks: {
-                      ...execution.tasks,
-                      [SectionId.Trocas]: true,
-                    },
-                  }));
+                  updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+                    const next = { ...prev };
+                    afterIndustryExecutions.forEach((execution) => {
+                      const current = createIndustryExecution(execution.industry, next[execution.industry]);
+                      next[execution.industry] = {
+                        ...current,
+                        tasks: {
+                          ...current.tasks,
+                          [SectionId.Trocas]: true,
+                        },
+                      };
+                    });
+                    return next;
+                  });
                   navigateTo(SectionId.Dashboard);
                 }}
-                className={`w-full py-6 rounded-3xl font-black uppercase tracking-widest transition-all ${selectedHasReturns !== null ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-300'}`}
+                className={`w-full py-6 rounded-3xl font-black uppercase tracking-widest transition-all ${allReturnsAnswered ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-300'}`}
               >
                 Salvar e Continuar
               </button>

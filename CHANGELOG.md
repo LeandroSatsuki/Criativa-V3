@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: Trocas exige resposta de todas as empresas
+
+### Alterado
+- A tela `Trocas` agora so permite salvar e continuar quando todas as empresas abertas em `Antes` tiverem resposta registrada.
+
+### Adicionado
+- Aviso visual com a lista das empresas que ainda nao responderam `Sim` ou `Nao`.
+
+### Corrigido
+- Evitado o salvamento parcial de `Trocas` com apenas uma empresa respondida.
+- Ao concluir, o sistema marca `Trocas` em todas as empresas abertas e segue para o dashboard.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- O backend continua recebendo o fechamento apenas quando a visita esta de fato completa.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+
+### Pendencias
+- Validar no celular se a mensagem de pendentes fica clara quando houver muitas empresas abertas.
+
 ## [2026-07-02] - Ajuste: Trocas lista empresas abertas em Antes
 
 ### Alterado
