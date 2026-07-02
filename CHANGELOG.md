@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: cabecalho responsivo
+
+### Alterado
+- O cabecalho do app passou a limitar e truncar o nome do promotor/supervisor para evitar vazamento fora do layout.
+- Os botoes de atualizar e sair ficaram mais compactos em telas pequenas, mantendo os icones visiveis.
+
+### Adicionado
+- Classes responsivas de largura minima, truncamento e reducao de texto no cabecalho.
+
+### Corrigido
+- Corrigido overflow visual do nome do promotor no topo do app.
+
+### Seguranca
+- Nenhuma credencial, webhook ou regra sensivel foi alterada.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Deploy Netlify producao `6a46a108514d8e1dc0b6749f` concluido com sucesso.
+- `/api/health` em producao retornou `ok=true`.
+
+### Pendencias
+- Validar visualmente em aparelho com nome longo de promotor/supervisor.
+
 ## [2026-07-02] - Ajustes: Trocas, checkout e sincronizacao
 
 ### Alterado

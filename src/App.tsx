@@ -176,24 +176,24 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row">
       <Sidebar activeSection={activeSection} onSelect={(id) => setActiveSection(id as SectionId)} onLogout={logout} tasksCompleted={visitState.tasks} isCheckInDone={visitState.checkInDone} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={visitState.user} />
       <main className="flex-1 md:ml-72 flex flex-col min-h-screen">
-        <header className="h-20 px-8 flex items-center justify-between bg-white border-b border-slate-100 sticky top-0 z-40">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-white rounded-xl shadow-md shadow-slate-200/50 flex items-center justify-center border border-slate-50">
+        <header className="h-20 px-4 md:px-8 flex items-center justify-between gap-3 bg-white border-b border-slate-100 sticky top-0 z-40">
+          <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+            <div className="w-10 h-10 bg-white rounded-xl shadow-md shadow-slate-200/50 flex items-center justify-center border border-slate-50 shrink-0">
               <CriativaIcon className="w-6 h-6" />
             </div>
-            <div>
-              <h2 className="font-black text-lg uppercase tracking-tight text-[#0F172A]">
+            <div className="min-w-0 flex-1">
+              <h2 className="font-black text-base md:text-lg uppercase tracking-tight text-[#0F172A] truncate">
                 {activeSection === SectionId.CheckIn ? 'Seleção de Unidade' : 
                  activeSection === SectionId.Dashboard ? 'Painel Geral' : 
                  activeSection === SectionId.Supervisor ? 'Gestão de Equipe' : 'Operação de Campo'}
               </h2>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-0.5">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.16em] md:tracking-[0.2em] mt-0.5 truncate max-w-[48vw] md:max-w-none">
                 {visitState.user?.role === 'SUPERVISOR' ? 'Supervisor' : 'Promotor'}: {visitState.user?.name}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <div className="hidden md:block text-right mr-4">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Última Sincronização</p>
               <p className="text-[10px] font-bold text-slate-600">
@@ -203,17 +203,17 @@ const App: React.FC = () => {
             <button 
               onClick={() => loadConfig(true)}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-blue-100 transition-all shadow-sm"
+              className="flex items-center gap-2 px-3 md:px-4 py-2 bg-blue-50 text-blue-600 font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-blue-100 transition-all shadow-sm"
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              Atualizar Agora
+              <span className="hidden sm:inline">Atualizar Agora</span>
             </button>
             <button 
               onClick={logout}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#FDECEC] text-[#E65C5C] font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-[#FAD7D7] transition-all shadow-sm"
+              className="flex items-center gap-2 px-3 md:px-5 py-2.5 bg-[#FDECEC] text-[#E65C5C] font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-[#FAD7D7] transition-all shadow-sm"
             >
               <LogOut size={14} />
-              Sair da Conta
+              <span className="hidden sm:inline">Sair da Conta</span>
             </button>
           </div>
         </header>
