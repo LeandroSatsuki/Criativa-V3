@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: compressao fina das fotos
+
+### Alterado
+- Qualidade JPEG das fotos reduzida de `0.68` para `0.62`, mantendo resolucao maxima em `1280px`.
+
+### Adicionado
+- Nada.
+
+### Corrigido
+- Reduzido levemente o peso das fotos sem alterar carimbo, formato ou fluxo de envio.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi alterada.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Deploy Netlify producao `6a46d0e3b3ae3e2613078aeb` concluido com sucesso.
+- `/api/health` em producao retornou `ok=true`.
+
+### Pendencias
+- Validar manualmente uma foto nova no aparelho para confirmar peso e legibilidade.
+
 ## [2026-07-02] - Ajuste: padrao de fotos e carimbo visual
 
 ### Alterado

@@ -296,7 +296,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const maxLongEdge = 1280;
-        const jpegQuality = 0.68;
+        const jpegQuality = 0.62;
         const scale = Math.min(1, maxLongEdge / Math.max(img.width, img.height));
         canvas.width = Math.round(img.width * scale);
         canvas.height = Math.round(img.height * scale);
