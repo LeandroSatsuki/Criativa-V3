@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2026-07-02] - Ajuste: padrao de fotos e carimbo visual
+
+### Alterado
+- As fotos capturadas pelo app passam por processamento unico antes de serem salvas/enviadas.
+- Resolucao padrao definida para lado maior de `1280px`, mantendo proporcao original.
+- Qualidade JPEG padronizada em `0.68`, equilibrando relatorio visual e reducao de consumo de dados.
+- Todas as fotos processadas passam a receber carimbo visual com data/hora de Brasilia e nome da loja atual.
+- O carimbo usa texto branco com sombra, inspirado na referencia enviada, sem bloquear a area central da imagem.
+
+### Adicionado
+- Funcoes internas para processar foto, aplicar carimbo e quebrar texto longo da loja em ate 3 linhas.
+- Tratamento de erro caso o navegador nao consiga ler ou processar a foto.
+
+### Corrigido
+- Removida duplicacao de processamento especifica de `Estoque`, que agora usa o mesmo padrao das demais etapas.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi exposta.
+- O processamento acontece no navegador antes do envio ao backend/Make.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Link Drive informado foi testado: a URL de download direto responde `Content-Type: image/jpeg`, mas a visualizacao `/view` pode exigir login/permissao no Drive.
+- Deploy Netlify producao `6a46b7f8913e078c11f755bc` concluido com sucesso.
+- `/api/health` em producao retornou `ok=true`.
+
+### Pendencias
+- Confirmar no Make/Google Drive se os links gravados na planilha devem usar formato direto de download/visualizacao publica para evitar tela de login.
+- Validar manualmente foto nova no aparelho, conferindo carimbo, peso e legibilidade para relatorio.
+
 ## [2026-07-02] - Correcao: estoque independente e popup de reenvio
 
 ### Alterado

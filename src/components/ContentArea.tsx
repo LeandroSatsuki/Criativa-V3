@@ -245,84 +245,163 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     );
   };
 
-  const handlePhotoCapture = async (section: string, file: File) => {
-    const activeIndustry = selectedIndustry;
+  const formatPhotoTimestamp = () => new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date());
+
+  const drawStampLine = (
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    maxWidth: number,
+    lineHeight: number,
+  ) => {
+    const words = text.split(/\s+/).filter(Boolean);
+    const lines: string[] = [];
+    let line = '';
+
+    words.forEach((word) => {
+      const testLine = line ? `${line} ${word}` : word;
+      if (ctx.measureText(testLine).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+        return;
+      }
+      line = testLine;
+    });
+
+    if (line) lines.push(line);
+
+    lines.slice(0, 3).forEach((lineText, index) => {
+      ctx.fillText(lineText, x, y + (index * lineHeight));
+    });
+
+    return lines.slice(0, 3).length * lineHeight;
+  };
+
+  const processPhotoForReport = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Não foi possível ler a foto.'));
     reader.onloadend = () => {
       const img = new Image();
+      img.onerror = () => reject(new Error('Não foi possível processar a foto.'));
       img.src = reader.result as string;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 600; // Reduced for faster transmission
-        const scaleSize = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scaleSize;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1]; // 0.5 quality for smaller payload
-        
-        if (isIndustryStep(section) && activeIndustry) {
-          if (section === SectionId.Estoque) {
-            updateVisit('stockQuantities', (prev: any) => ({ ...prev }));
-            updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-              const existing = prev[activeIndustry];
-              if (!existing) return prev;
-              const currentCategoryPhotos = existing.photos?.[section] || [];
-              return {
-                ...prev,
-                [activeIndustry]: {
-                  ...existing,
-                  photos: {
-                    ...existing.photos,
-                    [section]: [...currentCategoryPhotos, compressedBase64],
-                  },
-                },
-              };
-            });
-            updateVisit('photos', (prevPhotos: any = {}) => {
-              const currentCategoryPhotos = prevPhotos[section] || [];
-              return {
-                ...prevPhotos,
-                [section]: [...currentCategoryPhotos, compressedBase64],
-              };
-            });
-            return;
-          }
+        const maxLongEdge = 1280;
+        const jpegQuality = 0.68;
+        const scale = Math.min(1, maxLongEdge / Math.max(img.width, img.height));
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
 
-          updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-            const current = createIndustryExecution(activeIndustry, prev[activeIndustry]);
-            const currentCategoryPhotos = current.photos?.[section] || [];
-            const updated = getExecutionWithStatus({
-              ...current,
-              tasks: {
-                ...current.tasks,
-                [section]: true,
-              },
-              photos: {
-                ...current.photos,
-                [section]: [...currentCategoryPhotos, compressedBase64],
-              },
-            });
-            return {
-              ...prev,
-              [activeIndustry]: updated,
-            };
-          });
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Não foi possível preparar a foto.'));
           return;
         }
 
-        // Use functional update to avoid stale state
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const padding = Math.max(18, Math.round(canvas.width * 0.035));
+        const fontSize = Math.max(18, Math.round(canvas.width * 0.036));
+        const lineHeight = Math.round(fontSize * 1.22);
+        const maxTextWidth = Math.round(canvas.width * 0.82);
+        const x = canvas.width - padding;
+        let y = padding + fontSize;
+
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = `600 ${fontSize}px Arial, sans-serif`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+        ctx.shadowBlur = Math.max(4, Math.round(fontSize * 0.18));
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+
+        y += drawStampLine(ctx, formatPhotoTimestamp(), x, y, maxTextWidth, lineHeight);
+        drawStampLine(ctx, visitState.currentStore || 'Loja não informada', x, y, maxTextWidth, lineHeight);
+
+        resolve(canvas.toDataURL('image/jpeg', jpegQuality).split(',')[1]);
+      };
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const handlePhotoCapture = async (section: string, file: File) => {
+    const activeIndustry = selectedIndustry;
+    let compressedBase64 = '';
+
+    try {
+      compressedBase64 = await processPhotoForReport(file);
+    } catch (error: any) {
+      alert(error.message || 'Não foi possível processar a foto.');
+      return;
+    }
+        
+    if (isIndustryStep(section) && activeIndustry) {
+      if (section === SectionId.Estoque) {
+        updateVisit('stockQuantities', (prev: any) => ({ ...prev }));
+        updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+          const existing = prev[activeIndustry];
+          if (!existing) return prev;
+          const currentCategoryPhotos = existing.photos?.[section] || [];
+          return {
+            ...prev,
+            [activeIndustry]: {
+              ...existing,
+              photos: {
+                ...existing.photos,
+                [section]: [...currentCategoryPhotos, compressedBase64],
+              },
+            },
+          };
+        });
         updateVisit('photos', (prevPhotos: any = {}) => {
           const currentCategoryPhotos = prevPhotos[section] || [];
           return {
             ...prevPhotos,
-            [section]: [...currentCategoryPhotos, compressedBase64]
+            [section]: [...currentCategoryPhotos, compressedBase64],
           };
         });
+        return;
+      }
+
+      updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+        const current = createIndustryExecution(activeIndustry, prev[activeIndustry]);
+        const currentCategoryPhotos = current.photos?.[section] || [];
+        const updated = getExecutionWithStatus({
+          ...current,
+          tasks: {
+            ...current.tasks,
+            [section]: true,
+          },
+          photos: {
+            ...current.photos,
+            [section]: [...currentCategoryPhotos, compressedBase64],
+          },
+        });
+        return {
+          ...prev,
+          [activeIndustry]: updated,
+        };
+      });
+      return;
+    }
+
+    updateVisit('photos', (prevPhotos: any = {}) => {
+      const currentCategoryPhotos = prevPhotos[section] || [];
+      return {
+        ...prevPhotos,
+        [section]: [...currentCategoryPhotos, compressedBase64],
       };
-    };
-    reader.readAsDataURL(file);
+    });
   };
 
   const [syncSuccess, setSyncSuccess] = useState(false);
@@ -1045,19 +1124,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                         const file = e.target.files?.[0];
                         if (file && estoquePhotos.length < 30) {
                           const previousStockIndustry = stockIndustry;
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            const img = new Image();
-                            img.src = reader.result as string;
-                            img.onload = () => {
-                              const canvas = document.createElement('canvas');
-                              const maxWidth = 600;
-                              const scaleSize = maxWidth / img.width;
-                              canvas.width = maxWidth;
-                              canvas.height = img.height * scaleSize;
-                              const ctx = canvas.getContext('2d');
-                              ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-                              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+                          processPhotoForReport(file)
+                            .then((compressedBase64) => {
                               updateVisit('photos', (prev: any = {}) => {
                                 const currentCategoryPhotos = prev[SectionId.Estoque] || [];
                                 return { ...prev, [SectionId.Estoque]: [...currentCategoryPhotos, compressedBase64] };
@@ -1077,9 +1145,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                                   },
                                 };
                               });
-                            };
-                          };
-                          reader.readAsDataURL(file);
+                            })
+                            .catch((error) => {
+                              alert(error.message || 'Não foi possível processar a foto.');
+                            });
                         }
                       }}
                     />
