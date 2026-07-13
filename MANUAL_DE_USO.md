@@ -74,24 +74,28 @@ A instalação não muda o fluxo do promotor. Ela apenas deixa o acesso mais par
 - O promotor seleciona a indústria.
 - O app permite registrar fotos iniciais da situação do PDV.
 - O fluxo espera uma seleção de indústria para manter os dados vinculados.
+- Cada empresa aceita ate 30 fotos na etapa.
 
 ### 3.5 Estoque
 
 - O promotor informa quantidade por indústria.
 - Se houver fotos de estoque, elas também são registradas.
 - A etapa só pode ser concluída com quantidade válida.
+- Cada empresa aceita ate 30 fotos de estoque.
 
 ### 3.6 Depois
 
 - O promotor registra as fotos finais da execução.
 - Se a análise de imagem estiver configurada, o backend pode gerar uma avaliação.
 - Se a IA falhar, a visita não é bloqueada.
+- Cada empresa aceita ate 30 fotos na etapa.
 
 ### 3.7 Trocas / avarias
 
 - O promotor responde se houve trocas ou avarias.
 - Se a resposta for positiva, o app exige foto das trocas.
 - Se a resposta for negativa, o fluxo segue sem fotos adicionais nessa etapa.
+- Quando houver trocas, cada empresa aceita ate 30 fotos.
 
 ### 3.8 Check-out
 
@@ -121,7 +125,7 @@ A instalação não muda o fluxo do promotor. Ela apenas deixa o acesso mais par
 
 - As fotos não viram arquivos soltos no navegador.
 - O app converte cada foto para base64.
-- Esse conteúdo fica dentro do estado da visita e da fila local.
+- Esse conteúdo fica no rascunho e na fila segura do navegador, usando `IndexedDB`.
 - Na sincronização, os campos de foto são enviados ao backend e ao destino operacional.
 
 ### Nomes de foto usados no fluxo operacional
@@ -154,10 +158,18 @@ Se a sincronização falhar:
 ## 7. Como encerrar uma sessão
 
 1. Toque em sair da conta.
-2. O sistema limpa a sessão do backend.
-3. O estado local da visita é removido do navegador.
+2. O sistema encerra o acesso local, mas preserva uma visita ainda nao sincronizada.
+3. Ao entrar novamente com o mesmo usuario, o app retorna para a etapa salva.
+4. Se outra pessoa entrar no aparelho, ela nao recebe o rascunho do usuario anterior.
 
-## 8. Regras práticas importantes
+## 8. Como pausar e continuar uma visita
+
+1. Pode bloquear a tela ou fechar o aplicativo depois que a foto ou resposta aparecer registrada na tela.
+2. Ao abrir novamente, o app restaura a loja, as empresas, as fotos, as respostas e a ultima etapa ativa.
+3. Se a sessao tiver expirado, faca login novamente com o mesmo usuario para continuar.
+4. Nao limpe os dados do navegador nem desinstale a PWA durante uma visita, pois essas acoes removem o armazenamento local do aparelho.
+
+## 9. Regras práticas importantes
 
 - Não pule o check-in.
 - Não tente concluir estoque sem indústria.

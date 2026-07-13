@@ -10,7 +10,8 @@ Este documento resume a arquitetura real do projeto, o fluxo de dados e onde cad
 - Cadastro base: Google Sheets
 - Sincronização externa: Make.com
 - IA de imagem: Gemini
-- Fila local: `localStorage`
+- Rascunho e fila local: `IndexedDB`
+- Compatibilidade e configuracao leve: `localStorage`
 - Instalacao no celular: PWA com manifest e service worker conservador
 
 ## 2. Fluxo de dados
@@ -33,7 +34,10 @@ Este documento resume a arquitetura real do projeto, o fluxo de dados e onde cad
 
 - Quando o promotor escolhe uma loja, o app cria ou reaproveita um `visitId`.
 - As etapas seguintes atualizam o estado local da visita.
-- O estado principal fica em `localStorage` no navegador, com a chave `criativa_v5_state`.
+- O estado completo, incluindo fotos, fica no `IndexedDB` do navegador.
+- A chave `criativa_v5_state` no `localStorage` mantém apenas uma copia leve, sem o conteudo das fotos, para compatibilidade e migracao.
+- Cada alteracao de etapa, resposta ou foto entra em uma sequencia de gravacao para preservar a ordem correta do rascunho.
+- Ao reabrir o app, o estado completo e a etapa ativa sao restaurados antes da continuidade operacional.
 
 ### 2.4 Fotos
 
@@ -41,7 +45,7 @@ Este documento resume a arquitetura real do projeto, o fluxo de dados e onde cad
 - O app redimensiona e comprime a imagem antes de salvar.
 - Cada foto é armazenada como string base64 dentro de:
   - `visitState.photos`
-  - `criativa_sync_queue`
+  - rascunho e fila no `IndexedDB`
   - payload da visita no backend
 
 ### 2.5 Sincronização
@@ -74,8 +78,9 @@ Este documento resume a arquitetura real do projeto, o fluxo de dados e onde cad
 
 No navegador o app usa:
 
-- `criativa_v5_state`
-- `criativa_sync_queue`
+- banco `criativa-field-ops`, store `visit-drafts`
+- banco `criativa-field-ops-sync`, store `queued-visits`
+- `criativa_v5_state`, somente como copia leve sem fotos
 - `CRIATIVA_APP_CONFIG_CACHE`
 - `criativa_session`
 
@@ -85,6 +90,8 @@ Esses dados servem para:
 - manter fila de reenvio
 - guardar sessão
 - evitar repetir chamadas desnecessárias
+
+O rascunho fica vinculado ao ID do usuario que iniciou a visita. Uma sessao expirada ou uma saida manual nao apaga a coleta; o mesmo usuario pode autenticar novamente e continuar na etapa salva. Um usuario diferente nao recebe o rascunho anterior.
 
 ### 3.2 Backend
 

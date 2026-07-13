@@ -107,6 +107,8 @@ Data da ultima auditoria: 2026-06-27
 - [x] Habilitar PWA instalavel para promotores.
 - [ ] Validar PWA em celular real.
 - [ ] Revisar sessao, login e rate limit.
+- [x] Migrar rascunho completo e fila offline para `IndexedDB`.
+- [x] Preservar visita em expiracao de sessao e saida da conta.
 - [ ] Separar armazenamento de fotos em storage dedicado.
 - [ ] Avaliar banco operacional para relatorios e auditoria.
 
@@ -151,10 +153,10 @@ Data da ultima auditoria: 2026-06-27
 - [ ] Remover fallback de senha fixa `admin/admin`.
 - [ ] Eliminar uso de `Math.random` em dashboard de producao.
 - [ ] Definir persistencia real para visitas e status de sync.
-- [ ] Implementar fila de reenvio confiavel.
+- [x] Implementar fila de reenvio confiavel.
 - [ ] Validar permissao por papel e por rota.
 - [ ] Garantir que o supervisor veja dados reais.
-- [ ] Reduzir dependencia de `localStorage` como fonte unica.
+- [x] Reduzir dependencia de `localStorage` como fonte unica.
 - [ ] Revisar bundle grande e dividir quando necessario.
 
 ## Observacoes operacionais

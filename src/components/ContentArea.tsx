@@ -37,6 +37,8 @@ interface ContentAreaProps {
   onReset: () => void;
 }
 
+const MAX_PHOTOS_PER_SECTION = 30;
+
 const ContentArea: React.FC<ContentAreaProps> = ({ 
   sectionId, 
   visitState, 
@@ -50,12 +52,16 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const [aiResult, setAiResult] = useState<any>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
-  const [queueCount, setQueueCount] = useState(() => getQueuedVisitCount());
+  const [queueCount, setQueueCount] = useState(0);
   const [stockIndustry, setStockIndustry] = useState('');
 
   React.useEffect(() => {
-    const refreshQueue = () => setQueueCount(getQueuedVisitCount());
-    refreshQueue();
+    const refreshQueue = () => {
+      getQueuedVisitCount()
+        .then(setQueueCount)
+        .catch((error) => console.error('Erro ao consultar fila local:', error));
+    };
+    void refreshQueue();
     window.addEventListener('storage', refreshQueue);
     window.addEventListener('criativa-sync-queue-updated', refreshQueue);
     return () => {
@@ -70,7 +76,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     setSyncError(null);
     setIsSyncing(false);
     setSyncMessage('Enviando dados para o servidor central');
-    setQueueCount(getQueuedVisitCount());
+    getQueuedVisitCount().then(setQueueCount).catch((error) => console.error('Erro ao consultar fila local:', error));
   }, [sectionId]);
 
   const handleCheckIn = (store: any) => {
@@ -433,13 +439,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const syncQueuedVisit = async (payload: any, queueVisitId?: string, useRetryEndpoint = false) => {
-    const queued = upsertQueuedVisit(payload, queueVisitId || payload.visitId, useRetryEndpoint ? 'syncing' : 'pending');
+    const queued = await upsertQueuedVisit(payload, queueVisitId || payload.visitId, useRetryEndpoint ? 'syncing' : 'pending');
     const resolvedVisitId = queued.visitId;
     let activeVisitId = resolvedVisitId;
     updateVisit('visitId', resolvedVisitId);
 
     try {
-      updateQueuedVisit(resolvedVisitId, {
+      await updateQueuedVisit(resolvedVisitId, {
         status: 'syncing',
         error: null,
         payload: { ...payload, visitId: resolvedVisitId },
@@ -451,8 +457,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       updateVisit('visitId', serverVisitId);
 
       if (serverVisitId !== resolvedVisitId) {
-        removeQueuedVisit(resolvedVisitId);
-        upsertQueuedVisit(payload, serverVisitId, 'pending');
+        await removeQueuedVisit(resolvedVisitId);
+        await upsertQueuedVisit(payload, serverVisitId, 'pending');
       }
 
       const result = useRetryEndpoint
@@ -460,27 +466,27 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         : await apiService.syncVisit({ ...payload, visitId: serverVisitId }, (msg) => setSyncMessage(msg));
 
       if (result.syncStatus === 'enviado') {
-        removeQueuedVisit(serverVisitId);
-        setQueueCount(getQueuedVisitCount());
+        await removeQueuedVisit(serverVisitId);
+        setQueueCount(await getQueuedVisitCount());
         return result;
       }
 
-      updateQueuedVisit(serverVisitId, {
+      await updateQueuedVisit(serverVisitId, {
         status: 'error',
         error: result.syncError || 'Falha na sincronização',
         attempts: queued.attempts + 1,
         payload: { ...payload, visitId: serverVisitId },
       });
-      setQueueCount(getQueuedVisitCount());
+      setQueueCount(await getQueuedVisitCount());
       throw new Error(result.syncError || 'Falha na sincronização');
     } catch (error: any) {
-      updateQueuedVisit(activeVisitId, {
+      await updateQueuedVisit(activeVisitId, {
         status: 'error',
         error: error.message || 'Falha na sincronização',
         attempts: queued.attempts + 1,
         payload: { ...payload, visitId: activeVisitId },
       });
-      setQueueCount(getQueuedVisitCount());
+      setQueueCount(await getQueuedVisitCount());
       throw error;
     }
   };
@@ -512,7 +518,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         timestamp: getBrasiliaISO()
       }, visitState.visitId || undefined);
       setSyncSuccess(true);
-      setQueueCount(getQueuedVisitCount());
+      setQueueCount(await getQueuedVisitCount());
       setTimeout(() => {
         onReset();
       }, 3000);
@@ -524,7 +530,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const handleRetryQueue = async () => {
-    const queuedVisits = listQueuedVisits();
+    const queuedVisits = await listQueuedVisits();
     if (queuedVisits.length === 0) {
       setSyncError('Não há visitas na fila local para reenviar.');
       return;
@@ -541,7 +547,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       }
 
       setSyncSuccess(true);
-      setQueueCount(getQueuedVisitCount());
+      setQueueCount(await getQueuedVisitCount());
       setTimeout(() => {
         onReset();
       }, 3000);
@@ -812,7 +818,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             </div>
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-black uppercase tracking-tighter">Fotos de {isAntes ? 'Antes' : 'Depois'}</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{currentPhotos.length}/30 Fotos</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{currentPhotos.length}/{MAX_PHOTOS_PER_SECTION} Fotos</p>
             </div>
 
             {isAntes && (
@@ -881,8 +887,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   </div>
                   <div className="relative shrink-0">
                     <button 
-                      disabled={currentPhotos.length >= 30}
-                      className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${currentPhotos.length >= 30 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={currentPhotos.length >= MAX_PHOTOS_PER_SECTION}
+                      className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${currentPhotos.length >= MAX_PHOTOS_PER_SECTION ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Plus size={16} /> Adicionar Foto
                     </button>
@@ -893,7 +899,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       className="absolute inset-0 opacity-0 cursor-pointer"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file && currentPhotos.length < 30) {
+                        if (file && currentPhotos.length < MAX_PHOTOS_PER_SECTION) {
                           handlePhotoCapture(sectionId, file);
                         }
                       }}
@@ -1030,7 +1036,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             </div>
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-black uppercase tracking-tighter">Check de Estoque</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{estoquePhotos.length}/30 Fotos</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{estoquePhotos.length}/{MAX_PHOTOS_PER_SECTION} Fotos</p>
             </div>
 
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
@@ -1110,8 +1116,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   </div>
                   <div className="relative shrink-0">
                     <button 
-                      disabled={estoquePhotos.length >= 30}
-                      className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${estoquePhotos.length >= 30 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={estoquePhotos.length >= MAX_PHOTOS_PER_SECTION}
+                      className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${estoquePhotos.length >= MAX_PHOTOS_PER_SECTION ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Plus size={16} /> Adicionar Foto
                     </button>
@@ -1122,7 +1128,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       className="absolute inset-0 opacity-0 cursor-pointer"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file && estoquePhotos.length < 30) {
+                        if (file && estoquePhotos.length < MAX_PHOTOS_PER_SECTION) {
                           const previousStockIndustry = stockIndustry;
                           processPhotoForReport(file)
                             .then((compressedBase64) => {
@@ -1317,11 +1323,11 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               {selectedHasReturns && (
                 <div className="space-y-6 pt-6 border-t border-slate-50">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fotos das Trocas ({returnsPhotos.length}/10)</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fotos das Trocas ({returnsPhotos.length}/{MAX_PHOTOS_PER_SECTION})</p>
                     <div className="relative">
                       <button 
-                        disabled={returnsPhotos.length >= 10}
-                        className={`bg-orange-500 text-white px-5 py-3 rounded-xl font-black uppercase text-[9px] tracking-widest flex items-center gap-2 ${returnsPhotos.length >= 10 ? 'opacity-50' : ''}`}
+                        disabled={returnsPhotos.length >= MAX_PHOTOS_PER_SECTION}
+                        className={`bg-orange-500 text-white px-5 py-3 rounded-xl font-black uppercase text-[9px] tracking-widest flex items-center gap-2 ${returnsPhotos.length >= MAX_PHOTOS_PER_SECTION ? 'opacity-50' : ''}`}
                       >
                         <Camera size={14} /> Capturar
                       </button>
@@ -1332,7 +1338,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                         className="absolute inset-0 opacity-0 cursor-pointer"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file && returnsPhotos.length < 10) {
+                          if (file && returnsPhotos.length < MAX_PHOTOS_PER_SECTION) {
                             handlePhotoCapture(SectionId.Trocas, file);
                           }
                         }}

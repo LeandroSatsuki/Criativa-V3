@@ -40,6 +40,7 @@ export interface IndustryExecution {
 
 export interface VisitState {
   user: User | null;
+  draftOwnerId?: string | null;
   visitId?: string | null;
   currentStore: string;
   currentStoreId: string;

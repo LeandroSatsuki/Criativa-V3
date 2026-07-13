@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ContentArea from './components/ContentArea';
 import CriativaIcon from './components/CriativaIcon';
@@ -13,9 +13,10 @@ import { LogOut, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession } from './services/session';
 import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
+import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 
 const INITIAL_STATE = {
-  user: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
+  user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
   checkInDone: false, checkInTime: null, checkOutTime: null,
   selectedIndustry: null, tasks: {}, photos: {}, stockQuantities: {}, 
   aiResults: {}, hasReturns: null, industryExecutions: {}, availableStores: [], industries: []
@@ -28,16 +29,21 @@ const App: React.FC = () => {
   const [loginForm, setLoginForm] = useState(() => ({ user: getLastLoginUser(), pass: '' }));
   const [visitState, setVisitState] = useState(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = readLegacyVisitState(STORAGE_KEY);
       const session = getSession();
       if (saved) {
-        const parsed = JSON.parse(saved);
-        return { ...INITIAL_STATE, ...parsed, user: parsed.user || session?.user || null };
+        const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
+        const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
+        return {
+          ...INITIAL_STATE,
+          ...(sessionMatchesDraft ? saved : {}),
+          user: session?.user || null,
+          draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
+        };
       }
-      if (session?.user) return { ...INITIAL_STATE, user: session.user };
+      if (session?.user) return { ...INITIAL_STATE, user: session.user, draftOwnerId: session.user.id };
     } catch (e) {
       console.error("Erro ao carregar estado do localStorage:", e);
-      localStorage.removeItem(STORAGE_KEY);
     }
     return INITIAL_STATE;
   });
@@ -51,6 +57,43 @@ const App: React.FC = () => {
   const [promptSyncMessage, setPromptSyncMessage] = useState('');
   const [promptSyncError, setPromptSyncError] = useState<string | null>(null);
   const [promptQueueCount, setPromptQueueCount] = useState(0);
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const persistenceAlertShown = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const restoreDraft = async () => {
+      const saved = await loadVisitDraft(STORAGE_KEY);
+      if (cancelled) return;
+
+      const session = getSession();
+      if (saved) {
+        const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
+        const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
+        const restored = sessionMatchesDraft ? saved : {};
+        setVisitState({
+          ...INITIAL_STATE,
+          ...restored,
+          user: session?.user || null,
+          draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
+        });
+        setActiveSection(sessionMatchesDraft && saved.step ? saved.step : SectionId.Dashboard);
+      }
+
+      await requestPersistentVisitStorage();
+      if (!cancelled) setDraftHydrated(true);
+    };
+
+    restoreDraft().catch((error) => {
+      console.error('Erro ao restaurar rascunho da visita:', error);
+      if (!cancelled) setDraftHydrated(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     document.title = appConfig.title;
@@ -79,9 +122,12 @@ const App: React.FC = () => {
       const message = String(e?.message || '');
       if (message.includes('Sessão expirada') || message.includes('Não autorizado')) {
         clearSession();
-        localStorage.removeItem(STORAGE_KEY);
-        setVisitState(INITIAL_STATE);
-        setActiveSection(SectionId.Dashboard);
+        setVisitState((prev: any) => ({
+          ...prev,
+          draftOwnerId: prev.draftOwnerId || prev.user?.id || null,
+          user: null,
+          step: activeSection,
+        }));
         setLoadingError(null);
         return;
       }
@@ -96,19 +142,28 @@ const App: React.FC = () => {
   }, [visitState.user?.id]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...visitState, step: activeSection }));
-  }, [visitState, activeSection]);
+    if (!draftHydrated) return;
+
+    saveVisitDraft(STORAGE_KEY, { ...visitState, step: activeSection }).catch((error) => {
+      console.error('Erro ao persistir rascunho da visita:', error);
+      if (!persistenceAlertShown.current) {
+        persistenceAlertShown.current = true;
+        alert('Não foi possível salvar o progresso neste aparelho. Verifique o espaço disponível antes de fechar o aplicativo.');
+      }
+    });
+  }, [visitState, activeSection, draftHydrated]);
 
   useEffect(() => {
     if (loading || !visitState.user) return;
 
-    const queuedCount = getQueuedVisitCount();
-    if (queuedCount > 0) {
-      setPromptQueueCount(queuedCount);
-      setPromptSyncMessage(`${queuedCount} envio${queuedCount > 1 ? 's' : ''} pendente${queuedCount > 1 ? 's' : ''} na fila local.`);
-      setPromptSyncError(null);
-      setShowPendingSyncPrompt(true);
-    }
+    getQueuedVisitCount().then((queuedCount) => {
+      if (queuedCount > 0) {
+        setPromptQueueCount(queuedCount);
+        setPromptSyncMessage(`${queuedCount} envio${queuedCount > 1 ? 's' : ''} pendente${queuedCount > 1 ? 's' : ''} na fila local.`);
+        setPromptSyncError(null);
+        setShowPendingSyncPrompt(true);
+      }
+    }).catch((error) => console.error('Erro ao consultar fila local:', error));
   }, [loading, visitState.user?.id]);
 
   const formatSyncError = (message: string) => {
@@ -124,7 +179,7 @@ const App: React.FC = () => {
   };
 
   const syncPendingQueueFromPrompt = async () => {
-    const queuedVisits = listQueuedVisits();
+    const queuedVisits = await listQueuedVisits();
     if (queuedVisits.length === 0) {
       setShowPendingSyncPrompt(false);
       return;
@@ -137,7 +192,7 @@ const App: React.FC = () => {
       for (let index = 0; index < queuedVisits.length; index += 1) {
         const queuedVisit = queuedVisits[index];
         setPromptSyncMessage(`Sincronizando ${index + 1}/${queuedVisits.length}...`);
-        updateQueuedVisit(queuedVisit.visitId, {
+        await updateQueuedVisit(queuedVisit.visitId, {
           status: 'syncing',
           error: null,
         });
@@ -147,15 +202,15 @@ const App: React.FC = () => {
         const result = await apiService.retrySync(serverVisitId);
 
         if (result.syncStatus === 'enviado') {
-          removeQueuedVisit(serverVisitId);
+          await removeQueuedVisit(serverVisitId);
           if (serverVisitId !== queuedVisit.visitId) {
-            removeQueuedVisit(queuedVisit.visitId);
+            await removeQueuedVisit(queuedVisit.visitId);
           }
           notifyQueueChanged();
           continue;
         }
 
-        updateQueuedVisit(serverVisitId, {
+        await updateQueuedVisit(serverVisitId, {
           status: 'error',
           error: result.syncError || 'Falha na sincronização',
           attempts: queuedVisit.attempts + 1,
@@ -168,7 +223,7 @@ const App: React.FC = () => {
       setTimeout(() => setShowPendingSyncPrompt(false), 1200);
     } catch (error: any) {
       setPromptSyncError(formatSyncError(error.message || 'Não foi possível sincronizar a fila agora.'));
-      setPromptQueueCount(getQueuedVisitCount());
+      setPromptQueueCount(await getQueuedVisitCount());
       notifyQueueChanged();
     } finally {
       setPromptSyncing(false);
@@ -182,8 +237,18 @@ const App: React.FC = () => {
     setLoginError(null);
     try {
       const userData = await apiService.login(loginForm);
-      setVisitState((prev: any) => ({ ...prev, user: userData }));
-      setActiveSection(userData.role === 'SUPERVISOR' ? SectionId.Supervisor : SectionId.CheckIn);
+      const sameDraftOwner = !visitState.draftOwnerId || visitState.draftOwnerId === userData.id;
+      const hasActiveVisit = sameDraftOwner && Boolean(visitState.visitId || visitState.checkInDone || visitState.currentStoreId);
+      setVisitState((prev: any) => sameDraftOwner
+        ? { ...prev, user: userData, draftOwnerId: userData.id }
+        : { ...INITIAL_STATE, user: userData, draftOwnerId: userData.id });
+      setActiveSection(
+        userData.role === 'SUPERVISOR'
+          ? SectionId.Supervisor
+          : hasActiveVisit
+            ? (visitState.step || SectionId.Dashboard)
+            : SectionId.CheckIn,
+      );
     } catch (err: any) { 
       setLoginError(err.message);
     }
@@ -191,9 +256,12 @@ const App: React.FC = () => {
 
   const logout = () => {
     clearSession();
-    localStorage.removeItem(STORAGE_KEY);
-    setVisitState(INITIAL_STATE);
-    setActiveSection(SectionId.Dashboard);
+    setVisitState((prev: any) => ({
+      ...prev,
+      draftOwnerId: prev.draftOwnerId || prev.user?.id || null,
+      user: null,
+      step: activeSection,
+    }));
   };
 
   if (loading) {

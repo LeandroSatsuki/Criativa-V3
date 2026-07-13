@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## [2026-07-12] - Correcao: continuidade da visita e limite de 30 fotos
+
+### Alterado
+- Rascunho completo da visita, incluindo fotos, migrado de `localStorage` para `IndexedDB`.
+- Fila offline de sincronizacao migrada para `IndexedDB`, com migracao automatica de filas antigas.
+- Limite de fotos centralizado em 30 para `Antes`, `Estoque`, `Depois` e `Trocas/Avarias`.
+- Manuais e checklist atualizados com o funcionamento real da continuidade offline.
+
+### Adicionado
+- Persistencia sequencial do rascunho para evitar que gravacoes concorrentes restaurem uma versao antiga.
+- Solicitacao de armazenamento persistente ao navegador quando a plataforma oferece esse recurso.
+- Vinculo do rascunho ao ID do usuario que iniciou a visita.
+- Aviso operacional caso o aparelho nao consiga salvar o progresso local.
+
+### Corrigido
+- `Trocas/Avarias` deixou de bloquear novas fotos ao atingir 10 e agora respeita o limite esperado de 30.
+- Bloquear a tela, fechar a PWA, sair da conta ou expirar a sessao nao apaga mais uma visita em andamento.
+- Apos nova autenticacao do mesmo usuario, o app retoma a etapa exata salva.
+- Um login de outro usuario no mesmo aparelho nao herda o rascunho anterior.
+- Fotos e payloads grandes deixaram de depender do limite reduzido do `localStorage`.
+
+### Seguranca
+- A expiracao de sessao continua exigindo nova autenticacao; somente o rascunho local e preservado.
+- O rascunho fica associado ao usuario original para evitar continuidade por outra conta.
+- Nenhuma credencial, webhook ou chave foi alterada ou exposta.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- `npx.cmd netlify status` confirmou autenticacao e vinculo ao projeto `criativa-field-ops-574`.
+- Deploy de previa `6a545386fd98e0dae3e31f5b` validado com pagina `200`, healthcheck `ok=true` e bundle contendo as stores novas.
+- Deploy Netlify de producao `6a5453e16508f4daeeb94ded` concluido com sucesso.
+- Producao validada com pagina `200`, manifest PWA `200`, `/api/health` com `ok=true` e bundle correto.
+- Busca estatica confirmou que todas as etapas usam `MAX_PHOTOS_PER_SECTION = 30` e nao restou limite de 10 em `Trocas/Avarias`.
+
+### Pendencias
+- Validar em celular real a restauracao apos capturar varias fotos, bloquear a tela e encerrar completamente a PWA.
+- O armazenamento remoto dedicado das fotos continua como evolucao futura; o ajuste atual protege o rascunho e a fila no aparelho.
+
 ## [2026-07-02] - Ajuste: compressao fina das fotos
 
 ### Alterado

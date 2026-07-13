@@ -72,6 +72,8 @@ Se houver migração futura para outro host, o projeto também já tem compatibi
 - A Fase 1 centraliza a configuração em variáveis de ambiente.
 - A Fase 2 moveu as integrações sensíveis para Netlify Functions.
 - A Fase 3 adiciona fila local persistida e retry de sincronização.
+- Rascunhos com fotos e a fila offline usam `IndexedDB`; o `localStorage` guarda apenas sessão, configuração e uma cópia leve de compatibilidade.
+- O progresso da visita é retomado na etapa salva após bloquear ou fechar o app. Se a sessão expirar, o mesmo usuário faz login novamente e continua o rascunho.
 - A Fase 6 mantém a análise de imagem no backend e persiste o resultado quando possível.
 - A Fase 7 publicou o projeto no Netlify sem alterar o visual do app.
 - A Fase 8 fecha a documentação operacional e técnica da entrega.
