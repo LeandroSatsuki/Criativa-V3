@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [2026-07-14] - Correcao: fotos de devolucoes por empresa
+
+### Alterado
+- Fotos de `Trocas/Avarias` passaram a manter um indice explicito por industria selecionada.
+
+### Adicionado
+- Compatibilidade com o formato anterior de fotos dentro de `industryExecutions`.
+
+### Corrigido
+- Alternar entre duas ou mais empresas nao remove mais as fotos registradas na empresa anterior.
+- A validacao de devolucoes continua baseada na resposta e nas fotos da empresa correspondente.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi alterada.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Deploy Netlify de producao `6a56203d7b3fd2489830eb02` concluido com sucesso.
+- Producao validada com pagina `200` e `/api/health` com `ok=true`.
+
+### Pendencias
+- O erro `400 Invalid Value` do Make depende da configuracao do modulo Google Drive e sera corrigido no cenario, conforme orientacao registrada na entrega.
+
 ## [2026-07-12] - Correcao: continuidade da visita e limite de 30 fotos
 
 ### Alterado

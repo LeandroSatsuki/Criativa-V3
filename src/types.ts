@@ -56,6 +56,7 @@ export interface VisitState {
   stockQuantities: Record<string, string>;
   aiResults: Record<string, any>;
   hasReturns: boolean | null;
+  returnsPhotosByIndustry?: Record<string, string[]>;
   industryExecutions?: Record<string, IndustryExecution>;
   availableStores: any[];
   industries: string[];

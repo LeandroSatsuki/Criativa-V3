@@ -94,6 +94,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const stockQuantities = visitState.stockQuantities || {};
   const selectedIndustry = visitState.selectedIndustry || '';
   const industryExecutions = visitState.industryExecutions || {};
+  const returnsPhotosByIndustry = visitState.returnsPhotosByIndustry || {};
   const openedIndustryExecutions = Object.values(industryExecutions);
   const selectedExecution = selectedIndustry ? industryExecutions[selectedIndustry] : null;
   const currentStockQuantity = stockIndustry
@@ -167,6 +168,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   const getIndustryPhotos = (section: SectionId) => {
     if (!selectedIndustry) return [];
+    if (section === SectionId.Trocas && Object.prototype.hasOwnProperty.call(returnsPhotosByIndustry, selectedIndustry)) {
+      return returnsPhotosByIndustry[selectedIndustry] || [];
+    }
     return selectedExecution?.photos?.[section] || photos[section] || [];
   };
 
@@ -398,6 +402,15 @@ const ContentArea: React.FC<ContentAreaProps> = ({
           [activeIndustry]: updated,
         };
       });
+      if (section === SectionId.Trocas) {
+        updateVisit('returnsPhotosByIndustry', (prev: Record<string, string[]> = {}) => ({
+          ...prev,
+          [activeIndustry]: [
+            ...(prev[activeIndustry] || []),
+            compressedBase64,
+          ],
+        }));
+      }
       return;
     }
 
@@ -1312,6 +1325,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       }));
                       updateVisit('hasReturns', false);
                       updateVisit('photos', (prev: any) => ({ ...prev, [SectionId.Trocas]: [] }));
+                      updateVisit('returnsPhotosByIndustry', (prev: Record<string, string[]> = {}) => ({
+                        ...prev,
+                        [visitState.selectedIndustry as string]: [],
+                      }));
                     }}
                     className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${selectedHasReturns === false ? 'bg-[#0F172A] text-white' : 'bg-slate-100 text-slate-400'}`}
                   >
