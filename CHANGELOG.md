@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2026-07-14] - Analise: automacao de relatorios por industria
+
+### Alterado
+- Nenhuma funcionalidade, integracao ou dado de producao foi alterado.
+- O fluxo de relatorios foi redesenhado a partir da planilha real e do book `VENEZA 70.pdf`.
+
+### Adicionado
+- `PROPOSTA_AUTOMACAO_RELATORIOS.md` com diagnostico, modelo de dados, fluxo de IA, revisao humana e geracao automatica de PDF.
+- Proposta de manter `RELATORIO_VISITAS` como indice e registrar cada foto e analise em estruturas proprias.
+
+### Corrigido
+- Documentado que a IA atual analisa somente a primeira foto de `Depois` e nao usa a referencia cadastrada em `INDUSTRIAS`.
+- Documentado que colunas de foto unica nao representam corretamente o limite de ate 30 fotos por etapa.
+
+### Seguranca
+- A consulta da planilha foi somente leitura e limitada aos cabecalhos e cinco linhas de amostra.
+- Nenhuma credencial, webhook, permissao do Drive ou variavel de ambiente foi alterada.
+
+### Validacao
+- Planilha `Sistema Criativa`, aba `RELATORIO_VISITAS`, faixa `A1:AD6`, inspecionada em modo somente leitura.
+- Planilha `Sistema Criativa`, aba `INDUSTRIAS`, faixa `A1:Z10`, inspecionada em modo somente leitura.
+- As 26 paginas de `VENEZA 70.pdf` foram analisadas para mapear a estrutura do book atual.
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- `git diff --check` concluido sem erros de whitespace; houve apenas o aviso de conversao LF/CRLF do Git no Windows.
+- Nenhum deploy de producao foi realizado, pois esta entrega e exclusivamente de arquitetura e documentacao.
+
+### Pendencias
+- Aprovar a arquitetura proposta antes de criar abas, alterar o Make, modificar a IA ou gerar o primeiro book automatico.
+- Obter catalogos e regras de compliance versionados; o site institucional nao deve ser a unica referencia da IA.
+
 ## [2026-07-14] - Correcao: nome completo da loja no carimbo
 
 ### Alterado
