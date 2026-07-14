@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## [2026-07-14] - Correcao: nome completo da loja no carimbo
+
+### Alterado
+- O cadastro de lojas deixou de depender exclusivamente da coluna fixa `c[1]`.
+- A coluna do nome completo passou a ser localizada pelo cabecalho da aba `CADASTRO_LOJAS`.
+
+### Adicionado
+- Reconhecimento de cabecalhos como `NOME_LOJA`, `NOME_DA_LOJA`, `NOME_DO_PDV`, `NOME_PDV`, `PDV` e `LOJA`.
+- Fallback para os indices antigos quando a planilha nao tiver cabecalho reconhecido.
+
+### Corrigido
+- O carimbo das fotos deixa de usar somente o nome da rede, como `PERIM`, quando a planilha possui o nome completo do PDV, como `Itapoa Supermercado - Mata da Praia`.
+
+### Seguranca
+- Nenhuma credencial, webhook ou chave foi alterada.
+
+### Validacao
+- `npm.cmd run lint` concluido com sucesso.
+- `npm.cmd run build` concluido com sucesso, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Deploy Netlify de producao `6a5635b920e1e2af2f1a9587` concluido com sucesso.
+- `/api/health` validado em producao com `ok=true` e integracoes Google Sheets/Make configuradas.
+
+### Pendencias
+- Confirmar no aparelho uma nova foto apos a atualizacao do cadastro.
+
 ## [2026-07-14] - Correcao: fotos de devolucoes por empresa
 
 ### Alterado

@@ -173,6 +173,21 @@ const parseSheet = (text: string) => {
   return JSON.parse(text.slice(jsonStart, jsonEnd + 1)) as { table?: SheetTable };
 };
 
+const normalizeColumnName = (value: unknown) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toUpperCase()
+  .replace(/[^A-Z0-9]/g, '');
+
+const findColumnIndex = (table: SheetTable | null, aliases: string[], fallback: number) => {
+  const headers = table?.rows?.[0]?.c?.map((cell) => normalizeColumnName(cell?.v)) || [];
+  const normalizedAliases = aliases.map(normalizeColumnName);
+  const index = headers.findIndex((header) => normalizedAliases.includes(header));
+  return index >= 0 ? index : fallback;
+};
+
+const getRowValue = (row: SheetRow, columnIndex: number) => String(row.c?.[columnIndex]?.v || '').trim();
+
 const fetchSheetData = async (sheetName: string) => {
   const spreadsheetId = getEnv('BACKEND_GOOGLE_SHEETS_ID');
   if (!spreadsheetId) return null;
@@ -211,14 +226,26 @@ const mapConfig = async (): Promise<AppData> => {
     }))
     .filter((p) => p.user && p.user !== 'usuario') ?? [];
 
+  const storeIdColumn = findColumnIndex(storesTable, ['ID_LOJA', 'CODIGO_LOJA', 'ID'], 0);
+  const storeNameColumn = findColumnIndex(storesTable, [
+    'NOME_LOJA',
+    'NOME_DA_LOJA',
+    'NOME_DO_PDV',
+    'NOME_PDV',
+    'PDV',
+    'LOJA',
+  ], 1);
+  const storeRegionColumn = findColumnIndex(storesTable, ['REGIAO', 'REGIONAL', 'UF', 'CIDADE'], 2);
+  const storeResponsibleColumn = findColumnIndex(storesTable, ['PROMOTOR', 'RESPONSAVEL', 'RESPONSAVEL_LOJA'], 11);
+
   const stores = storesTable?.rows
     .map((row) => ({
-      id: String(row.c?.[0]?.v || ''),
-      name: String(row.c?.[1]?.v || ''),
-      region: String(row.c?.[2]?.v || ''),
-      responsible: String(row.c?.[11]?.v || ''),
+      id: getRowValue(row, storeIdColumn),
+      name: getRowValue(row, storeNameColumn),
+      region: getRowValue(row, storeRegionColumn),
+      responsible: getRowValue(row, storeResponsibleColumn),
     }))
-    .filter((store) => store.name && store.name !== 'NOME_LOJA') ?? [];
+    .filter((store) => store.name && normalizeColumnName(store.name) !== 'NOMELOJA') ?? [];
 
   return {
     schemaVersion: CONFIG_SCHEMA_VERSION,
