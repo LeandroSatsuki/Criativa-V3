@@ -112,6 +112,20 @@ Data da ultima auditoria: 2026-06-27
 - [ ] Separar armazenamento de fotos em storage dedicado.
 - [ ] Avaliar banco operacional para relatorios e auditoria.
 
+## Automacao de relatorios - Etapa A
+
+- [x] Limite de entrada da Netlify reproduzido com payloads de 1 MB a 7 MB.
+- [x] Persistencia fracionada implementada para visitas acima de 4 MB.
+- [x] Fragmentos limitados a 1,5 MB e protegidos por autenticacao.
+- [x] Integridade SHA-256 validada antes de salvar a visita reconstruida.
+- [x] Segundo envio integral da visita removido do fluxo de sincronizacao.
+- [x] Teste integrado com 20 fotos e 6.654.940 bytes concluido.
+- [x] Teste integrado com 30 fotos e 9.982.290 bytes concluido.
+- [x] Abas `FOTOS_VISITA`, `ANALISES_FOTO` e `RELATORIOS_INDUSTRIA` criadas.
+- [x] Novos campos de industria e resumo de visita adicionados sem apagar dados.
+- [ ] Etapa B: adaptar o Make para upload individual e gravacao em `FOTOS_VISITA`.
+- [ ] Etapa B: preencher `LINK_FOTO_CHECKIN` com o `fileId` retornado pelo Drive.
+
 ## Checklist da fase 0
 
 - [x] Li os arquivos diretamente envolvidos.

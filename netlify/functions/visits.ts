@@ -18,7 +18,7 @@ export default async (request: Request, _context: Context) => {
     const record = await upsertVisit({
       ...payload,
       visitId: payload?.visitId || generateVisitId(),
-      user: payload?.user || {
+      user: {
         id: auth.sub,
         name: auth.name,
         role: auth.role,

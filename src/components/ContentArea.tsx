@@ -474,9 +474,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         await upsertQueuedVisit(payload, serverVisitId, 'pending');
       }
 
-      const result = useRetryEndpoint
-        ? await apiService.retrySync(serverVisitId)
-        : await apiService.syncVisit({ ...payload, visitId: serverVisitId }, (msg) => setSyncMessage(msg));
+      setSyncMessage(useRetryEndpoint ? 'Reenviando visita salva...' : 'Enviando visita salva...');
+      const result = await apiService.retrySync(serverVisitId);
 
       if (result.syncStatus === 'enviado') {
         await removeQueuedVisit(serverVisitId);

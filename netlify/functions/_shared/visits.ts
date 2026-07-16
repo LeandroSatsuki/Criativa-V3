@@ -127,6 +127,12 @@ export const buildTransformedPayload = (payload: any) => {
 
   const buildReportRow = (execution?: any) => {
     const industry = cleanText(execution?.industry || selectedIndustry, 'GERAL');
+    const industryId = industry
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Za-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toUpperCase() || 'GERAL';
     const executionPhotos = execution?.photos || {};
     const executionStock = execution?.stockQuantities || {};
     const aiAfter = execution?.aiResults?.['DEPOIS'] || payload.aiResults?.['DEPOIS'] || {};
@@ -139,6 +145,7 @@ export const buildTransformedPayload = (payload: any) => {
     const iaOrganizacao = aiAfter.organization || '';
     const iaStatusCompliance = aiAfter.complianceStatus || '';
     const iaRupturas = aiAfter.ruptures || '';
+    const updatedAt = getBrasiliaISO();
 
     return {
       DATA_VISITA: dataVisita,
@@ -160,6 +167,15 @@ export const buildTransformedPayload = (payload: any) => {
       IA_STATUS_COMPLIANCE: iaStatusCompliance,
       IA_RUPTURAS: iaRupturas,
       LINK_FOTO_ESTOQUE: fotoEstoque,
+      ID_VISITA_INDUSTRIA: `${idVisita}-${industryId}`,
+      QTD_FOTOS_ANTES: executionPhotos.ANTES?.length || payload.photos?.ANTES?.length || 0,
+      QTD_FOTOS_DEPOIS: executionPhotos.DEPOIS?.length || payload.photos?.DEPOIS?.length || 0,
+      QTD_FOTOS_TROCAS: executionPhotos.TROCAS?.length || payload.photos?.TROCAS?.length || 0,
+      QTD_FOTOS_CHECKOUT: payload.photos?.CHECKOUT?.length || 0,
+      STATUS_ANALISE: Object.keys(aiAfter).length > 0 ? 'CONCLUIDA' : 'PENDENTE',
+      STATUS_REVISAO: 'PENDENTE',
+      STATUS_RELATORIO: 'PENDENTE',
+      ATUALIZADO_EM: updatedAt,
     };
   };
 
@@ -209,6 +225,15 @@ export const buildTransformedPayload = (payload: any) => {
     IA_ORGANIZACAO: resolvedPrimaryRow.IA_ORGANIZACAO,
     IA_STATUS_COMPLIANCE: resolvedPrimaryRow.IA_STATUS_COMPLIANCE,
     IA_RUPTURAS: resolvedPrimaryRow.IA_RUPTURAS,
+    ID_VISITA_INDUSTRIA: resolvedPrimaryRow.ID_VISITA_INDUSTRIA,
+    QTD_FOTOS_ANTES: resolvedPrimaryRow.QTD_FOTOS_ANTES,
+    QTD_FOTOS_DEPOIS: resolvedPrimaryRow.QTD_FOTOS_DEPOIS,
+    QTD_FOTOS_TROCAS: resolvedPrimaryRow.QTD_FOTOS_TROCAS,
+    QTD_FOTOS_CHECKOUT: resolvedPrimaryRow.QTD_FOTOS_CHECKOUT,
+    STATUS_ANALISE: resolvedPrimaryRow.STATUS_ANALISE,
+    STATUS_REVISAO: resolvedPrimaryRow.STATUS_REVISAO,
+    STATUS_RELATORIO: resolvedPrimaryRow.STATUS_RELATORIO,
+    ATUALIZADO_EM: resolvedPrimaryRow.ATUALIZADO_EM,
     RELATORIO_VISITAS: resolvedPrimaryRow,
     RELATORIO_VISITAS_LINHAS: reportRows,
     storeId: payload.storeId,
@@ -251,6 +276,15 @@ export const buildTransformedPayloads = (payload: any) => {
       IA_ORGANIZACAO: row.IA_ORGANIZACAO,
       IA_STATUS_COMPLIANCE: row.IA_STATUS_COMPLIANCE,
       IA_RUPTURAS: row.IA_RUPTURAS,
+      ID_VISITA_INDUSTRIA: row.ID_VISITA_INDUSTRIA,
+      QTD_FOTOS_ANTES: row.QTD_FOTOS_ANTES,
+      QTD_FOTOS_DEPOIS: row.QTD_FOTOS_DEPOIS,
+      QTD_FOTOS_TROCAS: row.QTD_FOTOS_TROCAS,
+      QTD_FOTOS_CHECKOUT: row.QTD_FOTOS_CHECKOUT,
+      STATUS_ANALISE: row.STATUS_ANALISE,
+      STATUS_REVISAO: row.STATUS_REVISAO,
+      STATUS_RELATORIO: row.STATUS_RELATORIO,
+      ATUALIZADO_EM: row.ATUALIZADO_EM,
       RELATORIO_VISITAS: row,
       RELATORIO_VISITAS_LINHAS: undefined,
       LINHA_INDUSTRIA_INDICE: index + 1,

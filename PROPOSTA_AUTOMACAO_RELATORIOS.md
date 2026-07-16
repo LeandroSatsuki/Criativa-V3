@@ -267,16 +267,25 @@ e contratos para que o processo seja rastreavel e possa ser migrado depois.
 
 ### Etapa A - Contrato e compatibilidade
 
-- definir IDs e campos definitivos
-- criar as novas abas sem alterar as antigas
-- preencher automaticamente `LINK_FOTO_CHECKIN`
-- manter o cenario atual funcionando em paralelo
+- [x] definir IDs e campos definitivos
+- [x] criar as novas abas sem alterar as antigas
+- [ ] preencher automaticamente `LINK_FOTO_CHECKIN` com a URL retornada pelo Drive
+- [x] manter o cenario atual funcionando em paralelo
+
+Status em 16/07/2026: a estrutura da Etapa A foi criada. O preenchimento do
+link depende da Etapa B, porque somente o modulo de upload do Drive no Make
+conhece o `fileId` definitivo. O campo nao deve receber base64 no lugar da URL.
 
 ### Etapa B - Registro individual de fotos
 
 - fazer o Make devolver `fileId` e URL de cada upload
 - gravar uma linha por foto em `FOTOS_VISITA`
 - validar idempotencia e retries
+
+O processamento deve ocorrer uma foto por operacao. O plano Free do Make limita
+o tamanho de arquivo automatizado a 5 MB; as fotos atuais medidas ficam em torno
+de 0,25 MB apos decodificacao, mas o conjunto em base64 pode ultrapassar os
+limites do webhook e da Netlify se for enviado como um unico JSON.
 
 ### Etapa C - IA auditavel
 
@@ -318,4 +327,3 @@ e contratos para que o processo seja rastreavel e possa ser migrado depois.
 3. Fornecer ou aprovar o catalogo de produtos e as regras de compliance de cada
    industria; os sites atuais nao sao suficientes como unica fonte de verdade.
 4. Confirmar quem fara a revisao humana inicial das fotos sugeridas pela IA.
-

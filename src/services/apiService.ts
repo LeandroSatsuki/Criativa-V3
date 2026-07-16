@@ -6,6 +6,11 @@ import type {
   SupervisorDashboardResponse,
   SupervisorPromoterDetailResponse,
 } from '../types';
+import {
+  DIRECT_VISIT_PAYLOAD_MAX_BYTES,
+  getUtf8ByteLength,
+  splitUtf8Text,
+} from './visitPayload';
 
 const APP_CONFIG_CACHE = 'CRIATIVA_APP_CONFIG_CACHE';
 
@@ -86,6 +91,47 @@ const buildVisitName = (prefix: string) => {
 
 const toJsonBody = (data: unknown) => JSON.stringify(data);
 
+const buildUploadId = async (serializedPayload: string) => {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(serializedPayload),
+  );
+  return Array.from(new Uint8Array(digest))
+    .slice(0, 16)
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('');
+};
+
+const createChunkedVisit = async (payload: any, serializedPayload: string) => {
+  const visitId = String(payload.visitId || buildVisitName('VISIT'));
+  const chunks = splitUtf8Text(serializedPayload);
+  const uploadId = await buildUploadId(serializedPayload);
+
+  for (let index = 0; index < chunks.length; index += 1) {
+    await requestJson('/visits/upload', {
+      method: 'POST',
+      body: toJsonBody({
+        action: 'chunk',
+        uploadId,
+        visitId,
+        index,
+        total: chunks.length,
+        chunk: chunks[index],
+      }),
+    });
+  }
+
+  return requestJson<any>('/visits/upload', {
+    method: 'POST',
+    body: toJsonBody({
+      action: 'finalize',
+      uploadId,
+      visitId,
+      total: chunks.length,
+    }),
+  });
+};
+
 export const apiService = {
   getAppConfig: async (force = false) => {
     if (!force) {
@@ -164,9 +210,19 @@ export const apiService = {
   },
 
   createVisit: async (payload: any) => {
+    const payloadWithVisitId = {
+      ...payload,
+      visitId: payload.visitId || buildVisitName('VISIT'),
+    };
+    const serializedPayload = toJsonBody(payloadWithVisitId);
+
+    if (getUtf8ByteLength(serializedPayload) > DIRECT_VISIT_PAYLOAD_MAX_BYTES) {
+      return createChunkedVisit(payloadWithVisitId, serializedPayload);
+    }
+
     return requestJson<any>('/visits', {
       method: 'POST',
-      body: toJsonBody(payload),
+      body: serializedPayload,
     });
   },
 

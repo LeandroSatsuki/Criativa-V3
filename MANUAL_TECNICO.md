@@ -149,6 +149,22 @@ O fluxo real funciona assim:
 4. Na sincronização, o backend transforma a visita em payload operacional.
 5. Os campos de foto são enviados com nomes padronizados.
 
+Quando o JSON completo da visita ultrapassa 4 MB, o frontend nao usa mais uma
+unica requisicao. Ele divide o conteudo em fragmentos de ate 1,5 MB, envia cada
+fragmento para `/api/visits/upload` e solicita a remontagem no backend.
+
+O backend:
+
+1. associa os fragmentos ao usuario autenticado;
+2. limita a quantidade e o tamanho de cada parte;
+3. verifica o SHA-256 do conteudo reconstruido;
+4. salva a visita completa no storage;
+5. remove os fragmentos temporarios;
+6. sincroniza usando a visita ja salva, sem reenviar todo o JSON pelo navegador.
+
+O limite seguro atual de uma visita reconstruida e 64 MB. Visitas pequenas
+continuam usando `/api/visits`, preservando compatibilidade.
+
 Isso significa que, para acessar a foto, você deve olhar:
 
 - o estado local da visita no navegador
@@ -276,3 +292,9 @@ O campo `storeResponsible` e opcional, mas recomendado para testes. Ele permite 
 - O `localStorage` continua sendo importante para continuidade offline, mas não deve ser a única fonte de verdade.
 - O backend deve permanecer como camada de proteção para integrações sensíveis.
 - Alteracoes no `sw.js` devem ser conservadoras para nao cachear respostas autenticadas ou payloads de visita.
+- A Netlify Function sincronica possui limite de corpo bufferizado. Nao volte a
+  enviar a visita completa diretamente para `/api/visits/sync`.
+- O Make deve receber cada arquivo individualmente na Etapa B. Nao agrupe todas
+  as fotos base64 em um unico webhook, pois isso volta a criar limite de tamanho.
+- O cenario Make atual ainda usa uma foto principal por etapa. As demais ficam
+  preservadas no payload da visita ate a rota individual de fotos ser concluida.

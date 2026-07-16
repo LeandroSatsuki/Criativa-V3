@@ -1,10 +1,11 @@
-import { get as getBlob, list as listBlobs, put as putBlob } from '@vercel/blob';
+import { del as deleteBlob, get as getBlob, list as listBlobs, put as putBlob } from '@vercel/blob';
 import { getStore } from '@netlify/blobs';
 
 type JsonStore = {
   get<T = unknown>(key: string): Promise<T | null>;
   set(key: string, value: unknown): Promise<void>;
   list(prefix: string): Promise<string[]>;
+  remove(key: string): Promise<void>;
 };
 
 const isNetlifyRuntime = () => Boolean((globalThis as typeof globalThis & { Netlify?: unknown }).Netlify);
@@ -20,6 +21,9 @@ const netlifyStore = (name: string): JsonStore => {
     list: async (prefix: string) => {
       const { blobs } = await store.list({ prefix });
       return blobs.map((blob) => blob.key);
+    },
+    remove: async (key: string) => {
+      await store.delete(key);
     },
   };
 };
@@ -44,6 +48,11 @@ const vercelStore = (name: string): JsonStore => ({
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
     return blobs.map((blob) => blob.pathname.replace(`${name}/`, ''));
+  },
+  remove: async (key: string) => {
+    await deleteBlob(vercelPath(name, key), {
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+    });
   },
 });
 

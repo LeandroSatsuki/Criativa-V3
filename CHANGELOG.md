@@ -1,5 +1,54 @@
 # CHANGELOG
 
+## [2026-07-16] - Etapa A: payload grande e estrutura de relatorios
+
+### Alterado
+- Visitas acima de 4 MB passaram a ser persistidas em fragmentos de ate 1,5 MB.
+- A sincronizacao passou a usar a visita ja salva no backend, eliminando o segundo envio integral do navegador.
+- O payload de relatorio passou a incluir ID por visita/industria, contagens de fotos e estados de analise, revisao e relatorio.
+- A identidade salva em novos uploads passa a ser obtida da sessao autenticada, e nao do corpo enviado pelo navegador.
+
+### Adicionado
+- Endpoint autenticado `/api/visits/upload` para receber e remontar visitas grandes.
+- Verificacao SHA-256 do payload reconstruido antes da persistencia.
+- Testes automatizados de divisao UTF-8 e remontagem de payload.
+- `DIAGNOSTICO_ENVIO_FOTOS.md` com matriz de testes, causa comprovada e limites operacionais.
+- Abas `FOTOS_VISITA`, `ANALISES_FOTO` e `RELATORIOS_INDUSTRIA` na planilha Sistema Criativa.
+- Novos campos de referencia na aba `INDUSTRIAS` e de resumo na aba `RELATORIO_VISITAS`.
+
+### Corrigido
+- Payloads proximos ou superiores a 6 MB deixam de depender de uma unica requisicao Netlify.
+- Visitas com 20 ou 30 fotos deixam de falhar antes de chegar ao backend.
+- Uploads grandes corrompidos ou incompletos passam a ser rejeitados antes de salvar a visita.
+
+### Seguranca
+- Fragmentos ficam isolados pelo ID do usuario autenticado.
+- Upload, finalizacao e retry continuam exigindo sessao valida.
+- IDs, quantidade de fragmentos e limite total recebem validacao no backend.
+- Nenhum segredo ou webhook foi movido para o frontend.
+
+### Validacao
+- Limite publicado reproduzido com corpos de 1 MB, 4 MB, 5 MB, 5,8 MB, 6 MB, 6,2 MB e 7 MB.
+- `npm.cmd test`: 3 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido, mantendo apenas o warning conhecido de chunk grande do Vite.
+- Netlify Functions compiladas com sucesso usando `npx.cmd netlify functions:build --src netlify/functions`.
+- Teste integrado local com 20 fotos: 6.654.940 bytes, 5 fragmentos e integridade confirmada.
+- Teste integrado local com 30 fotos: 9.982.290 bytes, 7 fragmentos e integridade confirmada.
+- Deploy de preview `6a592566b5288eca18a7ec54`: pagina e healthcheck retornaram `200`.
+- Novo endpoint no preview retornou `401` para fragmento de 1,5 MB sem autenticacao, conforme esperado.
+- Deploy de producao `6a59264eee20c2c93be59837` concluido com sucesso.
+- Producao validada com pagina `200`, healthcheck `ok=true`, Google Sheets, Make e segredo de sessao configurados.
+- Bundle de producao confirmado com a nova rota fracionada e verificacao SHA-256.
+- Novo endpoint em producao rejeitou corretamente um fragmento de 1,5 MB sem autenticacao com `401`.
+- Novas abas e cabecalhos da planilha relidos apos a gravacao e confirmados.
+
+### Pendencias
+- Etapa B: adaptar o Make para enviar cada foto individualmente e gravar `FOTOS_VISITA`.
+- Etapa B: preencher `LINK_FOTO_CHECKIN` com a URL retornada pelo Google Drive.
+- O Make atual ainda processa somente uma foto principal por etapa; as demais ficam preservadas no backend.
+- Os acessos provisorios continuam configurados, mas o healthcheck indica zero acessos validos na data desta entrega; criar ou renovar somente quando houver novo teste autorizado.
+
 ## [2026-07-14] - Analise: automacao de relatorios por industria
 
 ### Alterado
