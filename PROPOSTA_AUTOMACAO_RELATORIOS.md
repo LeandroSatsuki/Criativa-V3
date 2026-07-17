@@ -2,9 +2,9 @@
 
 ## Objetivo
 
-Automatizar a selecao, revisao e montagem dos books enviados as industrias sem
-transformar a aba `RELATORIO_VISITAS` em um deposito de varias fotos dentro de
-uma unica linha.
+Automatizar a selecao, revisao e montagem dos books enviados as industrias,
+mantendo exatamente uma linha por visita em `RELATORIO_VISITAS`. As fotos ficam
+no Google Drive e a linha guarda somente o link da pasta, o check-in e resumos.
 
 O desenho preserva o aplicativo de campo, o Google Drive, a planilha Sistema
 Criativa e o Make durante a transicao. Nenhuma troca de ferramenta deve ocorrer
@@ -46,8 +46,9 @@ relatorio editorial, organizado assim:
 5. Pares `Antes` e `Depois` quando aplicavel.
 6. Link final para a galeria completa no Google Drive.
 
-Portanto, a unidade principal do relatorio nao e apenas a visita. Ela e a foto
-de uma visita, vinculada a industria, loja, etapa, avaliacao e periodo.
+Portanto, a visita e a unidade de registro na planilha. Cada foto continua
+identificavel no manifesto persistido da visita e no Drive, sem gerar novas
+linhas na planilha operacional.
 
 ## Decisao recomendada para as colunas atuais
 
@@ -55,9 +56,9 @@ de uma visita, vinculada a industria, loja, etapa, avaliacao e periodo.
 | --- | --- | --- |
 | `LINK_FOTO_CHECKIN` | Manter e preencher automaticamente | Existe uma foto principal de entrada por visita e o link facilita auditoria. |
 | `LINK_FOTO_ANTES` | Descontinuar para novos registros | Uma unica celula nao representa ate 30 fotos por industria. |
-| `LINK_FOTO_DEPOIS` | Descontinuar para novos registros | Uma unica celula nao representa ate 30 fotos por industria. |
-| `LINK_FOTO_CHECKOUT` | Nao usar como colecao | Se for necessario guardar varias fotos, elas devem ficar na tabela de fotos. |
-| `LINK_FOTO_TROCA` | Nao usar como colecao | Trocas/avarias tambem podem ter varias fotos por industria. |
+| `LINK_FOTO_DEPOIS` | Descontinuar para novos registros | Usar o link da pasta completa da visita. |
+| `LINK_FOTO_CHECKOUT` | Nao usar como colecao | Usar o link da pasta completa da visita. |
+| `LINK_FOTO_TROCA` | Nao usar como colecao | Usar o link da pasta completa da visita. |
 | `LINK_FOTO_ESTOQUE` | Aposentar | A regra informada removeu esse campo do relatorio. |
 | `IA_ORGANIZACAO` | Manter apenas como resumo derivado | A fonte real deve ser a analise individual das fotos. |
 | `IA_STATUS_COMPLIANCE` | Manter apenas como resumo derivado | Uma visita pode conter fotos conformes e nao conformes. |
@@ -71,65 +72,45 @@ para fotos e IA.
 
 ### 1. `RELATORIO_VISITAS`
 
-Continuar como indice resumido de uma visita por industria:
+Continuar como indice resumido, com exatamente uma linha por visita:
 
 - `ID_VISITA`
-- `ID_VISITA_INDUSTRIA`
 - data, promotor, loja, entrada, saida e permanencia
-- industria
-- estoque e devolucoes quando aplicavel
+- industrias da visita
+- estoque e devolucoes agregados por industria
 - `LINK_FOTO_CHECKIN`
+- `PASTA_FOTOS_DRIVE_URL`
 - quantidade de fotos por etapa
 - status da analise
 - status de revisao
 - status do relatorio
 
-### 2. Nova aba `FOTOS_VISITA`
+### 2. Aba `MANIFESTOS_VISITA`
 
-Uma linha por foto, sem colocar o arquivo em base64 na planilha:
+Uma linha por visita com contagens, pasta do Drive, link do check-in e estado do
+upload. Os metadados individuais de cada arquivo ficam no manifesto JSON da
+visita persistida no backend, sem aumentar o numero de linhas da planilha.
 
-- `ID_FOTO`
+### 3. Aba `ANALISES_VISITA`
+
+Uma linha por visita com o resumo das analises individuais:
+
 - `ID_VISITA`
-- `ID_VISITA_INDUSTRIA`
-- `INDUSTRIA`
-- `ETAPA` (`CHECKIN`, `ANTES`, `DEPOIS`, `TROCAS`, `CHECKOUT`)
-- `ORDEM`
-- `DRIVE_FILE_ID`
-- `DRIVE_URL`
-- `CAPTURADA_EM`
-- `NOME_LOJA`
-- `NOME_PROMOTOR`
-- `TAMANHO_BYTES`
-- `HASH_ARQUIVO`
-- `STATUS_UPLOAD`
-
-O Google Drive continua armazenando a imagem. A planilha guarda apenas
-identificadores, links e metadados rastreaveis.
-
-### 3. Nova aba `ANALISES_FOTO`
-
-Uma linha por execucao de IA em uma foto:
-
-- `ID_ANALISE`
-- `ID_FOTO`
-- `INDUSTRIA`
-- `QUALIDADE_UTIL`
-- `INDUSTRIA_IDENTIFICADA`
-- `ORGANIZACAO_NOTA`
-- `ORGANIZACAO_EVIDENCIA`
-- `COMPLIANCE_STATUS`
-- `COMPLIANCE_EVIDENCIA`
-- `RUPTURA_STATUS`
-- `RUPTURA_PRODUTOS`
-- `CONFIANCA`
-- `ELEGIVEL_RELATORIO`
-- `MOTIVO_DECISAO`
+- `INDUSTRIAS_VISITA`
+- `ORGANIZACAO_RESUMO`
+- `COMPLIANCE_RESUMO`
+- `RUPTURA_RESUMO`
+- `CONFIANCA_MEDIA`
+- `FOTOS_ANALISADAS`
+- `FOTOS_ELEGIVEIS_RELATORIO`
+- `STATUS_ANALISE`
 - `STATUS_REVISAO`
 - `REVISADO_POR`
 - `REVISADO_EM`
 - `MODELO_IA`
 - `VERSAO_PROMPT`
-- `VERSAO_REFERENCIA`
+- `VERSOES_REFERENCIA`
+- `DETALHES_JSON_URL`
 - `ANALISADA_EM`
 
 ### 4. Nova aba `RELATORIOS_INDUSTRIA`
@@ -173,12 +154,13 @@ nao exibe todo o portfolio.
 1. O promotor conclui a visita normalmente, inclusive em modo offline.
 2. O backend registra a visita antes de solicitar qualquer integracao externa.
 3. O Make envia cada foto ao Drive e devolve `fileId` e URL do arquivo criado.
-4. Uma linha e criada em `FOTOS_VISITA` para cada upload confirmado.
-5. A foto de check-in atualiza automaticamente `LINK_FOTO_CHECKIN` na linha
-   correspondente de `RELATORIO_VISITAS`.
+4. Cada confirmacao e adicionada ao manifesto persistido da visita, sem gravar
+   uma linha por foto na planilha.
+5. Depois de todos os uploads, o Make cria ou atualiza uma unica linha pelo
+   `ID_VISITA`, incluindo o link de check-in e a pasta completa do Drive.
 6. Fotos de `Antes` e `Depois` entram em uma fila assincrona de analise.
-7. A IA compara a foto com a referencia versionada da industria e grava uma
-   resposta estruturada em `ANALISES_FOTO`.
+7. A IA compara as fotos com a referencia versionada da industria e grava um
+   resumo por visita em `ANALISES_VISITA`; detalhes podem ficar em JSON no Drive.
 8. Fotos com baixa confianca, baixa qualidade ou divergencia vao para revisao
    do supervisor. A falha da IA nunca invalida nem bloqueia a visita.
 9. O supervisor aprova ou rejeita as fotos sugeridas para o book.

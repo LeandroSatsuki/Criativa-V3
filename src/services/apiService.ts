@@ -34,6 +34,10 @@ type SyncResponse = {
   visitId: string;
   syncStatus: string;
   syncError?: string | null;
+  progress?: {
+    sent: number;
+    total: number;
+  };
 };
 
 type SyncQueueResponse = {
@@ -241,6 +245,19 @@ export const apiService = {
     return requestJson<SyncResponse>(`/sync/${visitId}/retry`, {
       method: 'POST',
     });
+  },
+
+  syncSavedVisit: async (visitId: string, onProgress?: (message: string) => void) => {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const result = await apiService.retrySync(visitId);
+      if (result.progress && onProgress) {
+        onProgress(`Enviando fotos ${result.progress.sent}/${result.progress.total}...`);
+      }
+      if (result.syncStatus !== 'enviando') return result;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    throw new Error('A sincronização excedeu o limite seguro de tentativas. A visita permanece na fila.');
   },
 
   getSyncQueue: async () => {

@@ -199,7 +199,7 @@ const App: React.FC = () => {
 
         const draft = await apiService.createVisit({ ...queuedVisit.payload, visitId: queuedVisit.visitId });
         const serverVisitId = draft.visitId || queuedVisit.visitId;
-        const result = await apiService.retrySync(serverVisitId);
+        const result = await apiService.syncSavedVisit(serverVisitId, (message) => setPromptSyncMessage(message));
 
         if (result.syncStatus === 'enviado') {
           await removeQueuedVisit(serverVisitId);

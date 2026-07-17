@@ -121,10 +121,13 @@ Data da ultima auditoria: 2026-06-27
 - [x] Segundo envio integral da visita removido do fluxo de sincronizacao.
 - [x] Teste integrado com 20 fotos e 6.654.940 bytes concluido.
 - [x] Teste integrado com 30 fotos e 9.982.290 bytes concluido.
-- [x] Abas `FOTOS_VISITA`, `ANALISES_FOTO` e `RELATORIOS_INDUSTRIA` criadas.
+- [x] Abas `MANIFESTOS_VISITA`, `ANALISES_VISITA` e `RELATORIOS_INDUSTRIA` preparadas.
 - [x] Novos campos de industria e resumo de visita adicionados sem apagar dados.
-- [ ] Etapa B: adaptar o Make para upload individual e gravacao em `FOTOS_VISITA`.
-- [ ] Etapa B: preencher `LINK_FOTO_CHECKIN` com o `fileId` retornado pelo Drive.
+- [x] Etapa B: contrato de upload individual e fechamento unico implementado no backend.
+- [x] Etapa B: retry idempotente e confirmacao estrita de Drive/planilha testados localmente.
+- [x] Etapa B: modelo da planilha corrigido para uma linha por visita.
+- [ ] Etapa B: configurar e validar o cenario v2 no Make com Google Drive real.
+- [ ] Etapa B: ativar `visit-v2` somente apos o teste controlado no Make.
 
 ## Checklist da fase 0
 

@@ -40,6 +40,7 @@ Se houver migração futura para outro host, o projeto também já tem compatibi
 - [Manual de Uso](./MANUAL_DE_USO.md)
 - [Manual Técnico](./MANUAL_TECNICO.md)
 - [Arquitetura Alvo](./ARQUITETURA_ALVO.md)
+- [Configuracao Make - Etapa B](./CONFIGURACAO_MAKE_ETAPA_B.md)
 
 ## Variáveis de ambiente
 
@@ -52,6 +53,8 @@ Se houver migração futura para outro host, o projeto também já tem compatibi
 - `APP_SESSION_SECRET`
 - `BACKEND_GOOGLE_SHEETS_ID`
 - `BACKEND_MAKE_WEBHOOK_URL`
+- `BACKEND_MAKE_WEBHOOK_V2_URL`
+- `BACKEND_MAKE_SYNC_MODE`
 - `BACKEND_GEMINI_API_KEY`
 - `BACKEND_SUPERVISOR_USERS`
 - `BACKEND_PROVISIONAL_SUPERVISORS`
@@ -78,3 +81,6 @@ Se houver migração futura para outro host, o projeto também já tem compatibi
 - A Fase 7 publicou o projeto no Netlify sem alterar o visual do app.
 - A Fase 8 fecha a documentação operacional e técnica da entrega.
 - O frontend agora fala apenas com `/api/*`.
+- O contrato Make v2 permanece desativado em `legacy` ate a validacao real do
+  novo cenario; depois da ativacao, cada foto vai ao Drive separadamente e a
+  planilha recebe uma unica linha por visita.

@@ -202,6 +202,8 @@ Obrigatórias no backend:
 Opcional:
 
 - `BACKEND_GEMINI_API_KEY`
+- `BACKEND_MAKE_WEBHOOK_V2_URL` (obrigatoria antes de ativar o contrato v2)
+- `BACKEND_MAKE_SYNC_MODE` (`legacy` ou `visit-v2`)
 - `BACKEND_SUPERVISOR_USERS`
 - `BACKEND_PROVISIONAL_SUPERVISORS`
 - `BACKEND_PROVISIONAL_USERS`
@@ -298,3 +300,6 @@ O campo `storeResponsible` e opcional, mas recomendado para testes. Ele permite 
   as fotos base64 em um unico webhook, pois isso volta a criar limite de tamanho.
 - O cenario Make atual ainda usa uma foto principal por etapa. As demais ficam
   preservadas no payload da visita ate a rota individual de fotos ser concluida.
+- O contrato Make v2 envia cada foto separadamente, exige confirmacao real do
+  Drive e so depois faz `UPSERT_BY_ID_VISITA`, mantendo uma linha por visita.
+- A configuracao operacional completa esta em `CONFIGURACAO_MAKE_ETAPA_B.md`.

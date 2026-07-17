@@ -2,6 +2,17 @@
 
 Data da auditoria: 2026-06-27
 
+## Atualizacao operacional - 2026-07-17
+
+- As integracoes sensiveis ja passam pelo backend Netlify e nao pelo frontend.
+- Visitas grandes sao persistidas em fragmentos e permanecem disponiveis para retry.
+- O contrato Make v2 esta implementado e testado localmente, mas permanece
+  desativado ate a configuracao e validacao do novo cenario no Make.
+- O modelo definido e uma linha por visita em `RELATORIO_VISITAS`; fotos ficam
+  no Drive e no manifesto persistido da visita.
+- Pendente critico da Etapa B: configurar o webhook v2, validar uploads reais e
+  somente entao trocar `BACKEND_MAKE_SYNC_MODE` de `legacy` para `visit-v2`.
+
 ## Diagnostico tecnico atual
 
 O projeto esta funcionando como um frontend React + Vite + TypeScript com persistencia local e integracoes diretas no cliente.

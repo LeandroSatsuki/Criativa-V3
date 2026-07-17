@@ -1,5 +1,61 @@
 # CHANGELOG
 
+## [2026-07-17] - Etapa B: contrato seguro para Drive e linha unica por visita
+
+### Alterado
+- O modelo da planilha foi consolidado para uma linha por visita, sem linha por foto.
+- As abas vazias `FOTOS_VISITA` e `ANALISES_FOTO` foram renomeadas para
+  `MANIFESTOS_VISITA` e `ANALISES_VISITA`, com cabecalhos de resumo por visita.
+- Os campos adicionais de `RELATORIO_VISITAS` agora guardam industrias, estoque,
+  trocas, contagens, pasta do Drive e status do upload de forma agregada.
+- O frontend passou a continuar as chamadas de sincronizacao enquanto o backend
+  confirma lotes de fotos, sem alterar o fluxo visual das etapas de campo.
+
+### Adicionado
+- Contrato Make v2 com um evento `PHOTO_UPLOAD` por foto e um unico evento
+  `VISIT_FINALIZE` por visita.
+- IDs deterministicos, nomes de arquivo com hash e manifesto persistente para
+  permitir retry sem repetir fotos ja confirmadas.
+- `BACKEND_MAKE_WEBHOOK_V2_URL`, isolada do webhook legado.
+- Validacao estrita das respostas do Drive e do `UPSERT_BY_ID_VISITA`.
+- `CONFIGURACAO_MAKE_ETAPA_B.md` com mapeamentos, respostas e rollback.
+- Testes automatizados do contrato v2 e da regra de linha unica.
+
+### Corrigido
+- O novo fluxo nao considera mais uma resposta HTTP 200 antecipada como prova de
+  que a foto chegou ao Drive.
+- O fechamento v2 nao envia base64 e so ocorre depois da confirmacao de todas as fotos.
+- Reenvios v2 ignoram fotos ja confirmadas no manifesto e atualizam a mesma linha.
+
+### Seguranca
+- O modo `visit-v2` exige um webhook exclusivo e nao reutiliza silenciosamente o legado.
+- Producao permanece em `legacy` ate o cenario externo estar configurado e validado.
+- Nenhum webhook, token, chave ou credencial foi adicionado ao repositorio ou frontend.
+
+### Validacao
+- `npm.cmd test`: 7 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o warning conhecido de chunk grande.
+- `npx.cmd netlify functions:build --src netlify/functions`: Functions compiladas.
+- Teste integrado local com duas industrias e oito fotos: progresso `3/8`, `6/8`
+  e `8/8`, oito confirmacoes de foto e exatamente um fechamento.
+- Retry apos o sucesso nao emitiu novos eventos, confirmando idempotencia local.
+- Cabecalhos das tres abas alteradas foram relidos depois da gravacao.
+- Deploy de preview `6a5a23207b3bd562858a378a`: pagina e healthcheck `200`,
+  com modo `legacy` e webhook v2 desativado.
+- Deploy de producao `6a5a23754840b269b602867f`: pagina e healthcheck `200`.
+- Producao confirmou Google Sheets e Make legado configurados,
+  `BACKEND_MAKE_SYNC_MODE=legacy` e `makeV2=false`.
+- Endpoint de retry em producao rejeitou requisicao sem sessao com `401`.
+
+### Pendencias
+- Configurar o novo cenario no Make e posicionar `Webhook response` depois do Drive/Sheets.
+- Executar uma visita controlada contra o Google Drive real e comprovar arquivos abrindo.
+- Comprovar exatamente uma linha por `ID_VISITA` e um retry sem duplicacao no ambiente real.
+- Somente depois dessas validacoes ativar `BACKEND_MAKE_SYNC_MODE=visit-v2`.
+- Linhas historicas duplicadas nao foram consolidadas para evitar perda de dados sem
+  uma regra de reconciliacao aprovada.
+
 ## [2026-07-16] - Etapa A: payload grande e estrutura de relatorios
 
 ### Alterado

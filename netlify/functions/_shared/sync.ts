@@ -1,20 +1,29 @@
 import { getEnv } from './env';
 import { buildTransformedPayloads, saveVisit, type VisitRecord } from './visits';
 import { getBrasiliaISO } from './time';
+import { syncVisitRecordV2 } from './make-sync-v2';
 
 export type SyncResult = {
   visitId: string;
   syncStatus: VisitRecord['syncStatus'];
   syncError?: string | null;
+  progress?: {
+    sent: number;
+    total: number;
+  };
 };
 
 export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> => {
-  const webhookUrl = getEnv('BACKEND_MAKE_WEBHOOK_URL');
+  const syncMode = (getEnv('BACKEND_MAKE_SYNC_MODE') || 'legacy').trim().toLowerCase();
+  const webhookVariable = syncMode === 'visit-v2'
+    ? 'BACKEND_MAKE_WEBHOOK_V2_URL'
+    : 'BACKEND_MAKE_WEBHOOK_URL';
+  const webhookUrl = getEnv(webhookVariable);
   if (!webhookUrl) {
     const errored = await saveVisit({
       ...visit,
       syncStatus: 'erro',
-      syncError: 'BACKEND_MAKE_WEBHOOK_URL não configurada.',
+      syncError: `${webhookVariable} não configurada.`,
       updatedAt: getBrasiliaISO(),
     });
 
@@ -23,6 +32,10 @@ export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> =
       syncStatus: errored.syncStatus,
       syncError: errored.syncError,
     };
+  }
+
+  if (syncMode === 'visit-v2') {
+    return syncVisitRecordV2(visit, webhookUrl);
   }
 
   const sending = await saveVisit({
