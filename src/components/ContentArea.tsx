@@ -9,6 +9,10 @@ import { apiService, getBrasiliaISO } from '../services/apiService';
 import { analyzeProductPhoto } from '../services/geminiService';
 import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
 import { generateVisitId } from '../services/visitId';
+import {
+  compressStampedPhoto,
+  PHOTO_INITIAL_MAX_LONG_EDGE,
+} from '../services/imageCompression';
 import SupervisorDashboard from './SupervisorDashboard';
 import CriativaIcon from './CriativaIcon';
 import { 
@@ -298,19 +302,22 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const processPhotoForReport = (file: File) => new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Não foi possível ler a foto.'));
-    reader.onloadend = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('Não foi possível processar a foto.'));
-      img.src = reader.result as string;
-      img.onload = () => {
+    const imageUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => {
+      URL.revokeObjectURL(imageUrl);
+      reject(new Error('Não foi possível processar a foto.'));
+    };
+    img.onload = async () => {
+      URL.revokeObjectURL(imageUrl);
+      try {
         const canvas = document.createElement('canvas');
-        const maxLongEdge = 1280;
-        const jpegQuality = 0.62;
-        const scale = Math.min(1, maxLongEdge / Math.max(img.width, img.height));
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
+        const scale = Math.min(
+          1,
+          PHOTO_INITIAL_MAX_LONG_EDGE / Math.max(img.width, img.height),
+        );
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -339,10 +346,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         y += drawStampLine(ctx, formatPhotoTimestamp(), x, y, maxTextWidth, lineHeight);
         drawStampLine(ctx, visitState.currentStore || 'Loja não informada', x, y, maxTextWidth, lineHeight);
 
-        resolve(canvas.toDataURL('image/jpeg', jpegQuality).split(',')[1]);
-      };
+        const compressed = await compressStampedPhoto(canvas);
+        resolve(compressed.base64);
+      } catch (error) {
+        reject(error);
+      }
     };
-    reader.readAsDataURL(file);
+    img.src = imageUrl;
   });
 
   const handlePhotoCapture = async (section: string, file: File) => {

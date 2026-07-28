@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## [2026-07-28] - Correcao: padronizacao adaptativa das fotos
+
+### Alterado
+- O processamento de fotos passou a buscar a maior qualidade JPEG que atende ao
+  alvo de 100 KB, em vez de depender apenas de uma porcentagem fixa.
+- Fotos complexas agora reduzem progressivamente o lado maior de 1280 ate 800
+  pixels somente quando a reducao de qualidade nao for suficiente.
+- O arquivo original e lido por URL temporaria, reduzindo o pico de memoria em
+  aparelhos com cameras de alta resolucao.
+
+### Adicionado
+- Teto tecnico de 120 KB por foto processada.
+- Servico isolado de compressao de imagens e testes para seus limites.
+- Medicao da amostra real do Drive e projecao para 8.000 fotos por dia no
+  diagnostico tecnico.
+
+### Corrigido
+- Fotos detalhadas de aparelhos como iPhone nao podem mais chegar ao payload com
+  200 a 250 KB apesar da qualidade JPEG configurada.
+- A documentacao da Etapa B agora confirma upload individual das fotos e apenas
+  uma linha agregada por visita na planilha.
+
+### Seguranca
+- Nenhuma credencial, URL de webhook ou regra de autenticacao foi alterada.
+- O teto impede que uma foto excepcional aumente sem controle o payload local e
+  o consumo da sincronizacao.
+
+### Validacao
+- `npm.cmd test`: 12 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o warning conhecido de chunk
+  grande.
+- Smoke test no Chrome com o modulo real: imagem simples em 10.639 bytes a
+  1280x960 e imagem de estresse em 95.478 bytes a 800x600, ambas abaixo do teto.
+- Deploy de preview `6a68204c06bf269602a4fd5d`: pagina e healthcheck `200`;
+  rota de visitas protegida retornou `401`.
+- Deploy de producao `6a682090cbecba85ef76e7c3`: pagina, healthcheck e
+  configuracao publica `200`; Google Sheets e Make legado permaneceram
+  configurados e a rota de visitas sem sessao retornou `401`.
+
+### Pendencias
+- Homologar visualmente fotos reais de iPhone e Android nos relatorios antes de
+  avaliar qualquer reducao adicional.
+- Ativar o contrato Make v2 somente depois do teste real de Drive, planilha,
+  idempotencia e uma linha por visita.
+
 ## [2026-07-27] - Correcao: isolamento e limpeza da fila por usuario
 
 ### Alterado
