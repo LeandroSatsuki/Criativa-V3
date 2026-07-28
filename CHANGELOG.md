@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## [2026-07-27] - Correcao: isolamento e limpeza da fila por usuario
+
+### Alterado
+- A fila local passou a identificar explicitamente o proprietario de cada visita.
+- Contagem, popup, reenvio, atualizacao e remocao agora usam apenas a fila do
+  usuario autenticado.
+- Filas antigas sem `ownerId` usam o ID existente no payload da propria visita;
+  itens sem dono identificavel nao sao exibidos a outro usuario.
+
+### Adicionado
+- Acao `Limpar minha fila` no popup e na tela de sincronizacao, com confirmacao.
+- Regra compartilhada de autorizacao para visitas persistidas no backend.
+- Testes automatizados para dois promotores, fila legada e acesso de supervisor.
+
+### Corrigido
+- Trocar de usuario no mesmo celular nao mostra nem reenvia a fila do usuario anterior.
+- Consultas de fila iniciadas antes da troca de login nao podem reabrir o popup
+  para o novo usuario.
+- Limpar a fila de um usuario preserva as filas dos demais usuarios do aparelho.
+- Promotores nao podem listar, consultar, alterar, sobrescrever ou reenviar
+  visitas pertencentes a outro promotor no backend.
+
+### Seguranca
+- O backend valida propriedade da visita nas rotas de listagem, status, update,
+  upload fracionado, sincronizacao e retry.
+- Tentativas de usar um `visitId` de outro usuario retornam visita nao encontrada.
+- Supervisores mantem acesso geral para acompanhamento e auditoria.
+- Nenhum dado pendente foi apagado automaticamente durante a migracao.
+
+### Validacao
+- `npm.cmd test`: 10 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o warning conhecido de chunk grande.
+- A compilacao isolada das Functions gerou todos os bundles, mas a CLI nao
+  encerrou dentro do limite local.
+- Deploy de preview `6a680a2469b5e71ea9269ed3`: pagina e healthcheck `200`;
+  bundle confirmou o controle de limpeza e cinco rotas protegidas retornaram `401`.
+- Deploy de producao `6a680aa2bc233b87dbe0ac61`: pagina e healthcheck `200`,
+  Google Sheets e Make configurados e sincronizacao preservada em `legacy`.
+- O build das Functions foi validado durante os dois deploys Netlify.
+
+### Pendencias
+- Validar em dois logins reais no mesmo celular depois da publicacao.
+- A limpeza e local ao aparelho e ao usuario autenticado; registros preservados
+  no backend nao sao apagados por essa acao.
+
 ## [2026-07-17] - Etapa B: contrato seguro para Drive e linha unica por visita
 
 ### Alterado

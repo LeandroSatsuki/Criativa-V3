@@ -1,7 +1,8 @@
 import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { authenticate } from './_shared/auth';
-import { generateVisitId, listVisits, saveVisit, upsertVisit } from './_shared/visits';
+import { canAccessVisit } from './_shared/visit-access';
+import { generateVisitId, getVisit, listVisits, saveVisit, upsertVisit } from './_shared/visits';
 
 export default async (request: Request, _context: Context) => {
   const auth = await authenticate(request);
@@ -10,14 +11,23 @@ export default async (request: Request, _context: Context) => {
   }
 
   if (request.method === 'GET') {
-    return json(await listVisits());
+    const visits = await listVisits();
+    return json(auth.role === 'SUPERVISOR'
+      ? visits
+      : visits.filter((visit) => canAccessVisit(visit, auth)));
   }
 
   if (request.method === 'POST') {
     const payload = await request.json().catch(() => ({}));
+    const visitId = payload?.visitId || generateVisitId();
+    const existing = await getVisit(visitId);
+    if (existing && !canAccessVisit(existing, auth)) {
+      return json({ error: 'Visita não encontrada' }, 404);
+    }
+
     const record = await upsertVisit({
       ...payload,
-      visitId: payload?.visitId || generateVisitId(),
+      visitId,
       user: {
         id: auth.sub,
         name: auth.name,

@@ -1,5 +1,15 @@
 # Manual de Uso - Criativa Field Ops
 
+## Fila de envios por usuario
+
+- Cada usuario visualiza somente os envios pendentes criados por ele naquele aparelho.
+- Ao sair e entrar com outro usuario, a fila anterior permanece isolada e nao e reenviada.
+- Para descartar pendencias do usuario atual, use `Limpar minha fila` no aviso de
+  envios pendentes ou na tela final de sincronizacao.
+- A limpeza exige confirmacao e afeta somente o usuario logado no aparelho.
+- Antes de limpar, confirme que a visita pode realmente ser descartada; uma visita
+  que existe apenas na fila local deixara de estar disponivel para reenvio.
+
 Este manual explica como o aplicativo funciona do ponto de vista operacional, etapa por etapa, sem mexer no fluxo visual existente.
 
 ## 1. Visão geral

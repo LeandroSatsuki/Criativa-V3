@@ -129,6 +129,16 @@ Data da ultima auditoria: 2026-06-27
 - [ ] Etapa B: configurar e validar o cenario v2 no Make com Google Drive real.
 - [ ] Etapa B: ativar `visit-v2` somente apos o teste controlado no Make.
 
+## Isolamento da fila por usuario
+
+- [x] Itens locais identificados por proprietario.
+- [x] Filas legadas vinculadas pelo usuario salvo no payload.
+- [x] Contagem, popup e reenvio filtrados pelo usuario autenticado.
+- [x] Limpeza restrita a fila do usuario atual e protegida por confirmacao.
+- [x] Rotas backend por visita protegidas por proprietario ou papel supervisor.
+- [x] Testes automatizados com usuarios distintos.
+- [ ] Validacao manual com dois usuarios reais no mesmo celular publicado.
+
 ## Checklist da fase 0
 
 - [x] Li os arquivos diretamente envolvidos.

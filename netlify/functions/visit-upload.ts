@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto';
 import { authenticate } from './_shared/auth';
 import { json } from './_shared/json';
 import { getJsonStore } from './_shared/storage';
-import { generateVisitId, upsertVisit } from './_shared/visits';
+import { canAccessVisit } from './_shared/visit-access';
+import { generateVisitId, getVisit, upsertVisit } from './_shared/visits';
 import { getUtf8ByteLength, VISIT_PAYLOAD_CHUNK_MAX_BYTES } from '../../src/services/visitPayload';
 
 type UploadRequest = {
@@ -129,6 +130,12 @@ export default async (request: Request, _context: Context) => {
   if (payload?.visitId && String(payload.visitId) !== visitId) {
     await removeUploadChunks(auth.sub, uploadId, total);
     return json({ error: 'O ID da visita não corresponde ao upload.' }, 409);
+  }
+
+  const existing = await getVisit(visitId);
+  if (existing && !canAccessVisit(existing, auth)) {
+    await removeUploadChunks(auth.sub, uploadId, total);
+    return json({ error: 'Visita não encontrada' }, 404);
   }
 
   const record = await upsertVisit({

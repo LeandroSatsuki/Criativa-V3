@@ -1,7 +1,8 @@
 import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { authenticate } from './_shared/auth';
-import { updateVisit } from './_shared/visits';
+import { canAccessVisit } from './_shared/visit-access';
+import { getVisit, updateVisit } from './_shared/visits';
 
 export default async (request: Request, context: Context) => {
   if (request.method !== 'PATCH') {
@@ -18,8 +19,16 @@ export default async (request: Request, context: Context) => {
     return json({ error: 'ID da visita é obrigatório' }, 400);
   }
 
+  const existing = await getVisit(visitId);
+  if (!existing || !canAccessVisit(existing, auth)) {
+    return json({ error: 'Visita não encontrada' }, 404);
+  }
+
   const patch = await request.json().catch(() => ({}));
-  const record = await updateVisit(visitId, patch);
+  const protectedPatch = patch?.payload
+    ? { ...patch, payload: { ...patch.payload, user: existing.payload?.user } }
+    : { ...patch, user: existing.payload?.user };
+  const record = await updateVisit(visitId, protectedPatch);
   return json(record);
 };
 

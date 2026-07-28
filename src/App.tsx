@@ -12,7 +12,7 @@ import { apiService } from './services/apiService';
 import { LogOut, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession } from './services/session';
-import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
+import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
 import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 
 const INITIAL_STATE = {
@@ -155,8 +155,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (loading || !visitState.user) return;
+    let cancelled = false;
+    const ownerId = visitState.user.id;
 
-    getQueuedVisitCount().then((queuedCount) => {
+    setShowPendingSyncPrompt(false);
+    setPromptQueueCount(0);
+    setPromptSyncError(null);
+
+    getQueuedVisitCount(ownerId).then((queuedCount) => {
+      if (cancelled) return;
       if (queuedCount > 0) {
         setPromptQueueCount(queuedCount);
         setPromptSyncMessage(`${queuedCount} envio${queuedCount > 1 ? 's' : ''} pendente${queuedCount > 1 ? 's' : ''} na fila local.`);
@@ -164,6 +171,10 @@ const App: React.FC = () => {
         setShowPendingSyncPrompt(true);
       }
     }).catch((error) => console.error('Erro ao consultar fila local:', error));
+
+    return () => {
+      cancelled = true;
+    };
   }, [loading, visitState.user?.id]);
 
   const formatSyncError = (message: string) => {
@@ -179,7 +190,9 @@ const App: React.FC = () => {
   };
 
   const syncPendingQueueFromPrompt = async () => {
-    const queuedVisits = await listQueuedVisits();
+    const ownerId = visitState.user?.id;
+    if (!ownerId) return;
+    const queuedVisits = await listQueuedVisits(ownerId);
     if (queuedVisits.length === 0) {
       setShowPendingSyncPrompt(false);
       return;
@@ -192,7 +205,7 @@ const App: React.FC = () => {
       for (let index = 0; index < queuedVisits.length; index += 1) {
         const queuedVisit = queuedVisits[index];
         setPromptSyncMessage(`Sincronizando ${index + 1}/${queuedVisits.length}...`);
-        await updateQueuedVisit(queuedVisit.visitId, {
+        await updateQueuedVisit(ownerId, queuedVisit.visitId, {
           status: 'syncing',
           error: null,
         });
@@ -202,15 +215,15 @@ const App: React.FC = () => {
         const result = await apiService.syncSavedVisit(serverVisitId, (message) => setPromptSyncMessage(message));
 
         if (result.syncStatus === 'enviado') {
-          await removeQueuedVisit(serverVisitId);
+          await removeQueuedVisit(ownerId, serverVisitId);
           if (serverVisitId !== queuedVisit.visitId) {
-            await removeQueuedVisit(queuedVisit.visitId);
+            await removeQueuedVisit(ownerId, queuedVisit.visitId);
           }
           notifyQueueChanged();
           continue;
         }
 
-        await updateQueuedVisit(serverVisitId, {
+        await updateQueuedVisit(ownerId, serverVisitId, {
           status: 'error',
           error: result.syncError || 'Falha na sincronização',
           attempts: queuedVisit.attempts + 1,
@@ -223,11 +236,27 @@ const App: React.FC = () => {
       setTimeout(() => setShowPendingSyncPrompt(false), 1200);
     } catch (error: any) {
       setPromptSyncError(formatSyncError(error.message || 'Não foi possível sincronizar a fila agora.'));
-      setPromptQueueCount(await getQueuedVisitCount());
+      setPromptQueueCount(await getQueuedVisitCount(ownerId));
       notifyQueueChanged();
     } finally {
       setPromptSyncing(false);
     }
+  };
+
+  const clearCurrentUserQueue = async () => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || promptSyncing) return;
+    const confirmed = window.confirm(
+      'Limpar os envios pendentes deste usuário neste aparelho? Visitas ainda não enviadas deixarão de aparecer para reenvio local.',
+    );
+    if (!confirmed) return;
+
+    await clearQueuedVisits(ownerId);
+    setPromptQueueCount(0);
+    setPromptSyncError(null);
+    setPromptSyncMessage('Fila local deste usuário limpa.');
+    setShowPendingSyncPrompt(false);
+    notifyQueueChanged();
   };
 
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -370,6 +399,14 @@ const App: React.FC = () => {
                   className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
                 >
                   Depois
+                </button>
+              )}
+              {!promptSyncing && (
+                <button
+                  onClick={clearCurrentUserQueue}
+                  className="flex-1 bg-white border border-slate-200 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
+                >
+                  Limpar minha fila
                 </button>
               )}
             </div>

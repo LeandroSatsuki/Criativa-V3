@@ -2,6 +2,7 @@ export type QueueStatus = 'pending' | 'syncing' | 'error' | 'synced';
 
 export type QueuedVisit = {
   visitId: string;
+  ownerId?: string;
   payload: any;
   status: QueueStatus;
   error: string | null;
@@ -107,21 +108,47 @@ const generateId = () => {
   return `VISIT-${Date.now().toString(36).toUpperCase()}`;
 };
 
-export const listQueuedVisits = async () => {
+const normalizeOwnerId = (value: unknown) => String(value || '').trim();
+
+export const getQueuedVisitOwnerId = (visit: QueuedVisit) => normalizeOwnerId(
+  visit.ownerId || visit.payload?.user?.id || visit.payload?.draftOwnerId,
+);
+
+export const filterQueuedVisitsByOwner = (queue: QueuedVisit[], ownerId: string) => {
+  const normalizedOwnerId = normalizeOwnerId(ownerId);
+  if (!normalizedOwnerId) return [];
+  return queue.filter((visit) => getQueuedVisitOwnerId(visit) === normalizedOwnerId);
+};
+
+const listAllQueuedVisits = async () => {
   await migrateLegacyQueue();
   await writeSequence.catch(() => undefined);
   return readIndexedQueue();
 };
 
-export const getQueuedVisitCount = async () => (await listQueuedVisits()).length;
+export const listQueuedVisits = async (ownerId: string) =>
+  filterQueuedVisitsByOwner(await listAllQueuedVisits(), ownerId);
 
-export const upsertQueuedVisit = async (payload: any, visitId?: string, status: QueueStatus = 'pending') => {
-  const queue = await listQueuedVisits();
+export const getQueuedVisitCount = async (ownerId: string) => (await listQueuedVisits(ownerId)).length;
+
+export const upsertQueuedVisit = async (
+  ownerId: string,
+  payload: any,
+  visitId?: string,
+  status: QueueStatus = 'pending',
+) => {
+  const normalizedOwnerId = normalizeOwnerId(ownerId);
+  if (!normalizedOwnerId) throw new Error('Usuário da fila local não identificado.');
+
+  const queue = await listAllQueuedVisits();
   const now = new Date().toISOString();
   const resolvedVisitId = visitId || payload.visitId || generateId();
-  const existingIndex = queue.findIndex((item) => item.visitId === resolvedVisitId);
+  const existingIndex = queue.findIndex((item) => (
+    item.visitId === resolvedVisitId && getQueuedVisitOwnerId(item) === normalizedOwnerId
+  ));
   const base: QueuedVisit = {
     visitId: resolvedVisitId,
+    ownerId: normalizedOwnerId,
     payload: { ...payload, visitId: resolvedVisitId },
     status,
     error: null,
@@ -140,14 +167,18 @@ export const upsertQueuedVisit = async (payload: any, visitId?: string, status: 
   return base;
 };
 
-export const updateQueuedVisit = async (visitId: string, patch: Partial<QueuedVisit>) => {
-  const queue = await listQueuedVisits();
-  const index = queue.findIndex((item) => item.visitId === visitId);
+export const updateQueuedVisit = async (ownerId: string, visitId: string, patch: Partial<QueuedVisit>) => {
+  const normalizedOwnerId = normalizeOwnerId(ownerId);
+  const queue = await listAllQueuedVisits();
+  const index = queue.findIndex((item) => (
+    item.visitId === visitId && getQueuedVisitOwnerId(item) === normalizedOwnerId
+  ));
   if (index === -1) return null;
 
   queue[index] = {
     ...queue[index],
     ...patch,
+    ownerId: normalizedOwnerId,
     updatedAt: new Date().toISOString(),
   };
 
@@ -155,11 +186,18 @@ export const updateQueuedVisit = async (visitId: string, patch: Partial<QueuedVi
   return queue[index];
 };
 
-export const removeQueuedVisit = async (visitId: string) => {
-  const queue = (await listQueuedVisits()).filter((item) => item.visitId !== visitId);
+export const removeQueuedVisit = async (ownerId: string, visitId: string) => {
+  const normalizedOwnerId = normalizeOwnerId(ownerId);
+  const queue = (await listAllQueuedVisits()).filter((item) => (
+    item.visitId !== visitId || getQueuedVisitOwnerId(item) !== normalizedOwnerId
+  ));
   await writeQueue(queue);
 };
 
-export const clearQueuedVisits = async () => {
-  await writeQueue([]);
+export const clearQueuedVisits = async (ownerId: string) => {
+  const normalizedOwnerId = normalizeOwnerId(ownerId);
+  const queue = (await listAllQueuedVisits()).filter(
+    (item) => getQueuedVisitOwnerId(item) !== normalizedOwnerId,
+  );
+  await writeQueue(queue);
 };

@@ -1,6 +1,7 @@
 import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { authenticate } from './_shared/auth';
+import { canAccessVisit } from './_shared/visit-access';
 import { getVisit } from './_shared/visits';
 
 export default async (request: Request, context: Context) => {
@@ -19,7 +20,7 @@ export default async (request: Request, context: Context) => {
   }
 
   const visit = await getVisit(visitId);
-  if (!visit) {
+  if (!visit || !canAccessVisit(visit, auth)) {
     return json({ error: 'Visita não encontrada' }, 404);
   }
 

@@ -1,6 +1,7 @@
 import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { authenticate } from './_shared/auth';
+import { canAccessVisit } from './_shared/visit-access';
 import { getVisit, upsertVisit } from './_shared/visits';
 import { syncVisitRecord } from './_shared/sync';
 
@@ -23,7 +24,21 @@ export default async (request: Request, context: Context) => {
   }
 
   const existing = await getVisit(resolvedVisitId);
-  const visit = existing || await upsertVisit({ ...payload, visitId: resolvedVisitId });
+  if (existing && !canAccessVisit(existing, auth)) {
+    return json({ error: 'Visita não encontrada' }, 404);
+  }
+
+  const visit = existing || await upsertVisit({
+    ...payload,
+    visitId: resolvedVisitId,
+    user: {
+      id: auth.sub,
+      name: auth.name,
+      role: auth.role,
+      region: auth.region,
+      user: auth.user,
+    },
+  });
   const result = await syncVisitRecord(visit);
   const status = result.syncStatus === 'enviando' ? 202 : 200;
   return json(result, status);

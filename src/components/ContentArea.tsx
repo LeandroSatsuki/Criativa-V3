@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { analyzeProductPhoto } from '../services/geminiService';
-import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
+import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
 import { generateVisitId } from '../services/visitId';
 import SupervisorDashboard from './SupervisorDashboard';
 import CriativaIcon from './CriativaIcon';
@@ -54,10 +54,11 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
   const [stockIndustry, setStockIndustry] = useState('');
+  const queueOwnerId = String(visitState.user?.id || '');
 
   React.useEffect(() => {
     const refreshQueue = () => {
-      getQueuedVisitCount()
+      getQueuedVisitCount(queueOwnerId)
         .then(setQueueCount)
         .catch((error) => console.error('Erro ao consultar fila local:', error));
     };
@@ -68,7 +69,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       window.removeEventListener('storage', refreshQueue);
       window.removeEventListener('criativa-sync-queue-updated', refreshQueue);
     };
-  }, []);
+  }, [queueOwnerId]);
 
   React.useEffect(() => {
     if (sectionId !== SectionId.Sync) return;
@@ -76,8 +77,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     setSyncError(null);
     setIsSyncing(false);
     setSyncMessage('Enviando dados para o servidor central');
-    getQueuedVisitCount().then(setQueueCount).catch((error) => console.error('Erro ao consultar fila local:', error));
-  }, [sectionId]);
+    getQueuedVisitCount(queueOwnerId).then(setQueueCount).catch((error) => console.error('Erro ao consultar fila local:', error));
+  }, [sectionId, queueOwnerId]);
 
   const handleCheckIn = (store: any) => {
     if (!visitState.visitId) {
@@ -452,13 +453,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const syncQueuedVisit = async (payload: any, queueVisitId?: string, useRetryEndpoint = false) => {
-    const queued = await upsertQueuedVisit(payload, queueVisitId || payload.visitId, useRetryEndpoint ? 'syncing' : 'pending');
+    const queued = await upsertQueuedVisit(queueOwnerId, payload, queueVisitId || payload.visitId, useRetryEndpoint ? 'syncing' : 'pending');
     const resolvedVisitId = queued.visitId;
     let activeVisitId = resolvedVisitId;
     updateVisit('visitId', resolvedVisitId);
 
     try {
-      await updateQueuedVisit(resolvedVisitId, {
+      await updateQueuedVisit(queueOwnerId, resolvedVisitId, {
         status: 'syncing',
         error: null,
         payload: { ...payload, visitId: resolvedVisitId },
@@ -470,35 +471,35 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       updateVisit('visitId', serverVisitId);
 
       if (serverVisitId !== resolvedVisitId) {
-        await removeQueuedVisit(resolvedVisitId);
-        await upsertQueuedVisit(payload, serverVisitId, 'pending');
+        await removeQueuedVisit(queueOwnerId, resolvedVisitId);
+        await upsertQueuedVisit(queueOwnerId, payload, serverVisitId, 'pending');
       }
 
       setSyncMessage(useRetryEndpoint ? 'Reenviando visita salva...' : 'Enviando visita salva...');
       const result = await apiService.syncSavedVisit(serverVisitId, (message) => setSyncMessage(message));
 
       if (result.syncStatus === 'enviado') {
-        await removeQueuedVisit(serverVisitId);
-        setQueueCount(await getQueuedVisitCount());
+        await removeQueuedVisit(queueOwnerId, serverVisitId);
+        setQueueCount(await getQueuedVisitCount(queueOwnerId));
         return result;
       }
 
-      await updateQueuedVisit(serverVisitId, {
+      await updateQueuedVisit(queueOwnerId, serverVisitId, {
         status: 'error',
         error: result.syncError || 'Falha na sincronização',
         attempts: queued.attempts + 1,
         payload: { ...payload, visitId: serverVisitId },
       });
-      setQueueCount(await getQueuedVisitCount());
+      setQueueCount(await getQueuedVisitCount(queueOwnerId));
       throw new Error(result.syncError || 'Falha na sincronização');
     } catch (error: any) {
-      await updateQueuedVisit(activeVisitId, {
+      await updateQueuedVisit(queueOwnerId, activeVisitId, {
         status: 'error',
         error: error.message || 'Falha na sincronização',
         attempts: queued.attempts + 1,
         payload: { ...payload, visitId: activeVisitId },
       });
-      setQueueCount(await getQueuedVisitCount());
+      setQueueCount(await getQueuedVisitCount(queueOwnerId));
       throw error;
     }
   };
@@ -530,7 +531,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         timestamp: getBrasiliaISO()
       }, visitState.visitId || undefined);
       setSyncSuccess(true);
-      setQueueCount(await getQueuedVisitCount());
+      setQueueCount(await getQueuedVisitCount(queueOwnerId));
       setTimeout(() => {
         onReset();
       }, 3000);
@@ -542,7 +543,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const handleRetryQueue = async () => {
-    const queuedVisits = await listQueuedVisits();
+    const queuedVisits = await listQueuedVisits(queueOwnerId);
     if (queuedVisits.length === 0) {
       setSyncError('Não há visitas na fila local para reenviar.');
       return;
@@ -559,7 +560,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       }
 
       setSyncSuccess(true);
-      setQueueCount(await getQueuedVisitCount());
+      setQueueCount(await getQueuedVisitCount(queueOwnerId));
       setTimeout(() => {
         onReset();
       }, 3000);
@@ -568,6 +569,19 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const handleClearQueue = async () => {
+    if (!queueOwnerId) return;
+    const confirmed = window.confirm(
+      'Limpar os envios pendentes deste usuário neste aparelho? Visitas ainda não enviadas deixarão de aparecer para reenvio local.',
+    );
+    if (!confirmed) return;
+
+    await clearQueuedVisits(queueOwnerId);
+    setQueueCount(0);
+    setSyncError(null);
+    window.dispatchEvent(new Event('criativa-sync-queue-updated'));
   };
 
   const renderSection = () => {
@@ -1532,12 +1546,20 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 </button>
 
                 {queueCount > 0 && (
-                  <button
-                    onClick={handleRetryQueue}
-                    className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
-                  >
-                    Reenviar Fila Local ({queueCount})
-                  </button>
+                  <>
+                    <button
+                      onClick={handleRetryQueue}
+                      className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
+                    >
+                      Reenviar Fila Local ({queueCount})
+                    </button>
+                    <button
+                      onClick={handleClearQueue}
+                      className="text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-red-500 transition-colors"
+                    >
+                      Limpar minha fila
+                    </button>
+                  </>
                 )}
 
                 <button
