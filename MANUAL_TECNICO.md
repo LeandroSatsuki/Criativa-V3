@@ -131,6 +131,17 @@ Rotas principais:
 
 O deploy de produção está publicado no projeto Netlify do repositório.
 
+- equipe proprietaria: `Criativa` (`philipe-almeida19`)
+- projeto: `criativa-field-ops-574`
+- Project ID: `84267a1b-133d-44c9-b5e8-1a3182c19307`
+- URL: `https://criativa-field-ops-574.netlify.app`
+
+O projeto foi transferido da equipe de desenvolvimento `Zylo` para a equipe do
+cliente em 03/08/2026. A transferencia preservou o mesmo Project ID, URL,
+variaveis, deploys e stores do Netlify Blobs. Novos deploys devem sempre conferir
+que `npx netlify status` mostra este Project ID e que o painel identifica a
+equipe proprietaria como `Criativa` antes de publicar em producao.
+
 Para inspeção operacional:
 
 - use o dashboard do projeto no Netlify

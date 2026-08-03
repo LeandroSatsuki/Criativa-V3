@@ -1,5 +1,48 @@
 # CHANGELOG
 
+## [2026-08-03] - Implantacao: transferencia do Netlify para o cliente
+
+### Alterado
+- A propriedade do projeto Netlify foi transferida da equipe `Zylo` para a
+  equipe `Criativa` (`philipe-almeida19`).
+- A documentacao tecnica passou a registrar equipe, projeto, URL e Project ID
+  oficiais de producao.
+
+### Adicionado
+- Inventario pre e pos-transferencia de configuracao e persistencia.
+- Regra operacional para conferir equipe e Project ID antes de cada deploy.
+
+### Corrigido
+- A infraestrutura de producao deixou de depender da equipe pessoal de
+  desenvolvimento, mantendo o projeto sob propriedade do cliente.
+
+### Seguranca
+- Os valores das oito variaveis de ambiente nao foram exibidos nem gravados no
+  repositorio; somente os nomes foram conferidos.
+- A transferencia manteve o mesmo Project ID, evitando copia manual de segredos
+  e de dados operacionais.
+- Nenhum login real foi usado nos smoke tests, preservando as sessoes ativas.
+
+### Validacao
+- Baseline antes da transferencia: pagina, healthcheck e configuracao `200`;
+  rotas protegidas sem sessao `401`/`403`.
+- `npm.cmd test`: 19 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o warning conhecido de chunk
+  grande.
+- Inventario preservado antes e depois: 8 variaveis, 1 cache, 11 sessoes, 33
+  visitas e 33 uploads em Netlify Blobs.
+- Deploy de preview na equipe `Criativa` `6a70d52fbde11d15bdac3fc0`: pagina,
+  healthcheck e configuracao `200`; rotas protegidas `401`/`403`.
+- Deploy de producao `6a70d565da2e2ccab6413a53`: Google Sheets, Make e segredo
+  de sessao ativos; login inexistente retornou `401`.
+- Producao confirmada na equipe `Criativa`, Project ID
+  `84267a1b-133d-44c9-b5e8-1a3182c19307` e URL original preservada.
+
+### Pendencias
+- Nenhuma pendencia funcional ou de infraestrutura conhecida nesta
+  transferencia.
+
 ## [2026-08-03] - Correcao: atualizacao de cadastros e perfis
 
 ### Alterado

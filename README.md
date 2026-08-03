@@ -26,6 +26,11 @@ O comando usa `netlify dev` por baixo e expõe as rotas em `/api/*`.
 
 O projeto foi publicado no Netlify com o frontend Vite preservado e as rotas backend em `/api/*`.
 
+- equipe proprietaria: `Criativa` (`philipe-almeida19`);
+- projeto: `criativa-field-ops-574`;
+- Project ID: `84267a1b-133d-44c9-b5e8-1a3182c19307`;
+- producao: `https://criativa-field-ops-574.netlify.app`;
+
 - frontend Vite mantido como esta;
 - PWA instalavel para uso no celular dos promotores;
 - rotas backend expostas em `/api/*`;
