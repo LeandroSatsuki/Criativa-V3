@@ -60,7 +60,9 @@ Se houver migração futura para outro host, o projeto também já tem compatibi
 - `BACKEND_PROVISIONAL_SUPERVISORS`
 - `BACKEND_PROVISIONAL_USERS`
 
-`BACKEND_SUPERVISOR_USERS` e opcional quando a planilha ja possui coluna `ROLE` com valor `SUPERVISOR`.
+`BACKEND_SUPERVISOR_USERS` e opcional quando a aba `PROMOTORES` da planilha
+`Sistema Criativa` ja possui coluna `ROLE` com valor `SUPERVISOR`. Cadastros
+sem `ROLE` continuam como `FIELD_OPS`, preservando compatibilidade.
 
 `BACKEND_PROVISIONAL_SUPERVISORS` permite criar acessos temporarios de supervisor sem alterar a planilha. Use JSON ou formato compacto documentado no manual tecnico, sempre com senha em hash SHA-256 e nunca em texto puro.
 

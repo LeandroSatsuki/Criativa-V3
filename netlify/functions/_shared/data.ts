@@ -3,14 +3,15 @@ import { getJsonStore } from './storage';
 import { getBrasiliaDate, getBrasiliaISO } from './time';
 import type { Role, User } from '../../../src/types';
 import { createHash } from 'node:crypto';
-
-type SheetRow = {
-  c?: Array<{ v?: string | number | null } | null>;
-};
-
-type SheetTable = {
-  rows: SheetRow[];
-};
+import {
+  findColumnIndex,
+  getRowValue,
+  mapPromotersTable,
+  normalizeColumnName,
+  normalizeRole,
+  PROMOTER_SHEET_NAMES,
+  type SheetTable,
+} from './promoter-sheet';
 
 export type AppData = {
   schemaVersion?: number;
@@ -43,7 +44,7 @@ type ProvisionalUser = {
   expiresAt?: string;
 };
 
-const CONFIG_SCHEMA_VERSION = 2;
+const CONFIG_SCHEMA_VERSION = 3;
 const defaultIndustries = ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
 const configStore = getJsonStore('criativa-config');
 
@@ -55,13 +56,6 @@ const parseSupervisorUsers = () => {
       .map((value) => value.toLowerCase().trim())
       .filter(Boolean),
   );
-};
-
-const normalizeRole = (value: unknown): Role | undefined => {
-  const normalized = String(value || '').toUpperCase().trim();
-  if (normalized === 'SUPERVISOR') return 'SUPERVISOR';
-  if (normalized === 'FIELD_OPS') return 'FIELD_OPS';
-  return undefined;
 };
 
 const normalizeCredential = (value: string) => value.toLowerCase().trim();
@@ -173,21 +167,6 @@ const parseSheet = (text: string) => {
   return JSON.parse(text.slice(jsonStart, jsonEnd + 1)) as { table?: SheetTable };
 };
 
-const normalizeColumnName = (value: unknown) => String(value || '')
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .toUpperCase()
-  .replace(/[^A-Z0-9]/g, '');
-
-const findColumnIndex = (table: SheetTable | null, aliases: string[], fallback: number) => {
-  const headers = table?.rows?.[0]?.c?.map((cell) => normalizeColumnName(cell?.v)) || [];
-  const normalizedAliases = aliases.map(normalizeColumnName);
-  const index = headers.findIndex((header) => normalizedAliases.includes(header));
-  return index >= 0 ? index : fallback;
-};
-
-const getRowValue = (row: SheetRow, columnIndex: number) => String(row.c?.[columnIndex]?.v || '').trim();
-
 const fetchSheetData = async (sheetName: string) => {
   const spreadsheetId = getEnv('BACKEND_GOOGLE_SHEETS_ID');
   if (!spreadsheetId) return null;
@@ -196,7 +175,7 @@ const fetchSheetData = async (sheetName: string) => {
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
     const response = await fetch(url, { signal: controller.signal });
     const text = await response.text();
     const json = parseSheet(text);
@@ -206,25 +185,28 @@ const fetchSheetData = async (sheetName: string) => {
   }
 };
 
+const fetchFirstAvailableSheetData = async (sheetNames: readonly string[]) => {
+  for (const sheetName of sheetNames) {
+    try {
+      const table = await fetchSheetData(sheetName);
+      if (table?.rows?.length && table.rows.length > 1) return table;
+    } catch {
+      // Continue with the legacy tab name before falling back to cached data.
+    }
+  }
+  return null;
+};
+
 const mapConfig = async (): Promise<AppData> => {
   const industriesTable = await fetchSheetData('INDUSTRIAS');
-  const promotersTable = await fetchSheetData('CADASTRO_PROMOTORES');
+  const promotersTable = await fetchFirstAvailableSheetData(PROMOTER_SHEET_NAMES);
   const storesTable = await fetchSheetData('CADASTRO_LOJAS');
 
   const industries = industriesTable?.rows
     .map((row) => row.c?.[0]?.v)
     .filter((value): value is string => Boolean(value) && value !== 'INDUSTRIAS') ?? [];
 
-  const promoters = promotersTable?.rows
-    .map((row) => ({
-      id: String(row.c?.[0]?.v || ''),
-      name: String(row.c?.[1]?.v || ''),
-      user: String(row.c?.[2]?.v || '').toLowerCase().trim(),
-      pass: String(row.c?.[3]?.v || '').toLowerCase().trim(),
-      region: String(row.c?.[4]?.v || ''),
-      role: normalizeRole(row.c?.[5]?.v),
-    }))
-    .filter((p) => p.user && p.user !== 'usuario') ?? [];
+  const promoters = mapPromotersTable(promotersTable);
 
   const storeIdColumn = findColumnIndex(storesTable, ['ID_LOJA', 'CODIGO_LOJA', 'ID'], 0);
   const storeNameColumn = findColumnIndex(storesTable, [

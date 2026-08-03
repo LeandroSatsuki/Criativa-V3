@@ -224,9 +224,24 @@ Opcional para migração futura:
 
 O backend aceita três formas de identificar supervisor:
 
-- coluna `ROLE` na aba `CADASTRO_PROMOTORES`, com valor `SUPERVISOR`;
+- coluna `ROLE` na aba `PROMOTORES`, com valor `SUPERVISOR`;
 - compatibilidade antiga com coluna de região igual a `SUPERVISOR`;
 - variável `BACKEND_SUPERVISOR_USERS` com usuários ou IDs separados por vírgula.
+
+A planilha operacional e `Sistema Criativa`:
+
+`https://docs.google.com/spreadsheets/d/1KyyEA78ny_5iNh5N9LTbtX5ieyJ6_s5UR-1Mv45bi-Q/edit#gid=0`
+
+A aba `PROMOTORES` usa as colunas `ID_PROMOTOR`, `NOME`, `USUÁRIO`, `SENHA`,
+`REGIONAL` e `ROLE`. Em `ROLE`, use somente:
+
+- `FIELD_OPS` para promotor;
+- `SUPERVISOR` para supervisor.
+
+O backend localiza as colunas pelos cabeçalhos e ainda aceita a aba antiga
+`CADASTRO_PROMOTORES` como fallback. Linhas antigas com `ROLE` em branco
+continuam funcionando e assumem `FIELD_OPS`, salvo as regras de compatibilidade
+de supervisor descritas acima.
 
 Exemplo:
 
@@ -234,7 +249,8 @@ Exemplo:
 BACKEND_SUPERVISOR_USERS="usuario.supervisor,22"
 ```
 
-O uso por variável de ambiente é útil quando o cadastro do Google Sheets ainda não tem coluna própria para perfil.
+O uso por variável de ambiente deve ficar restrito a compatibilidade ou acessos
+temporarios. Para novos cadastros permanentes, prefira a coluna `ROLE`.
 
 Para criar um supervisor temporario sem alterar a planilha, use `BACKEND_PROVISIONAL_SUPERVISORS` com JSON. A senha deve ser salva como SHA-256 do valor normalizado em minusculas.
 

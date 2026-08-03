@@ -131,7 +131,8 @@ Status da fase atual:
 
 ## Integracoes externas
 
-- Google Sheets via endpoint `gviz` para `INDUSTRIAS`, `CADASTRO_PROMOTORES` e `CADASTRO_LOJAS`.
+- Google Sheets via endpoint `gviz` para `INDUSTRIAS`, `PROMOTORES` (com
+  fallback legado para `CADASTRO_PROMOTORES`) e `CADASTRO_LOJAS`.
 - Make.com via webhook hardcoded para recebimento da visita.
 - Gemini via pacote `@google/genai`.
 - Browser APIs para camera, arquivo e canvas.

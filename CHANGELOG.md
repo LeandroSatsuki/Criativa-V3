@@ -1,5 +1,57 @@
 # CHANGELOG
 
+## [2026-08-03] - Correcao: cadastro real de promotores e perfis
+
+### Alterado
+- O backend passou a ler primeiro a aba real `PROMOTORES` e manteve
+  `CADASTRO_PROMOTORES` como fallback legado.
+- O mapeamento de ID, nome, usuario, senha, regional e perfil agora usa os
+  cabecalhos, sem depender rigidamente da ordem das colunas.
+- O cache cadastral passou para o schema 3; se a leitura nova falhar, o cadastro
+  operacional anterior continua sendo usado.
+
+### Adicionado
+- Coluna `ROLE` na aba `PROMOTORES`, com lista restrita a `FIELD_OPS` e
+  `SUPERVISOR`.
+- Testes automatizados para o formato atual, perfis, colunas reordenadas, linhas
+  incompletas e compatibilidade com o nome antigo da aba.
+
+### Corrigido
+- Novos cadastros deixam de depender de um cache criado quando a aba ainda tinha
+  outro nome.
+- O cabecalho acentuado `USUÁRIO` nao pode mais ser interpretado como um login.
+
+### Seguranca
+- Nenhum ID, usuario, senha, regional ou perfil existente foi alterado.
+- Cadastros sem `ROLE` continuam como `FIELD_OPS`, preservando as regras antigas
+  de supervisor por regional e variavel segura.
+- Nao foi realizado login com conta real durante os testes, evitando invalidar
+  sessoes ativas pela regra de usuario unico.
+
+### Validacao
+- Leitura real da aba `PROMOTORES`: 24 cadastros validos, nenhum usuario
+  duplicado e nenhuma linha incompleta.
+- Verificacao da planilha apos a escrita: `ROLE` em `F1` e validacao de lista em
+  `F2:F990`; demais celulas permaneceram inalteradas.
+- `npm.cmd test`: 16 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o warning conhecido de chunk
+  grande.
+- `npx.cmd netlify functions:build --src netlify/functions`: todas as Functions
+  compiladas com sucesso.
+- Deploy de preview `6a70c9e3bbcb06348c7c84a4`: pagina e configuracao
+  publica `200`, lojas sem sessao `401` e painel supervisor `403`.
+- Deploy de producao `6a70ca572b15f2aa93b03275`: pagina, healthcheck e
+  configuracao `200`; Google Sheets e Make permaneceram configurados.
+- O timestamp cadastral de producao foi atualizado para `03/08/2026`,
+  confirmando a reconstrucao do cache v3 pela aba real `PROMOTORES`.
+- Tentativa de login com os textos do cabecalho `USUÁRIO`/`SENHA` retornou
+  `401`, confirmando que o cabecalho nao e mais um cadastro.
+
+### Pendencias
+- Definir `ROLE` explicitamente nos supervisores permanentes. As linhas vazias
+  permanecem como promotor por compatibilidade.
+
 ## [2026-07-28] - Correcao: padronizacao adaptativa das fotos
 
 ### Alterado
