@@ -1,8 +1,9 @@
 import { getEnv } from './env';
 import { getJsonStore } from './storage';
-import { getBrasiliaDate, getBrasiliaISO } from './time';
+import { getBrasiliaDate } from './time';
 import type { Role, User } from '../../../src/types';
 import { createHash } from 'node:crypto';
+import { isConfigCacheFresh } from './config-cache';
 import {
   findColumnIndex,
   getRowValue,
@@ -15,6 +16,7 @@ import {
 
 export type AppData = {
   schemaVersion?: number;
+  cachedAt?: string;
   industries: string[];
   promoters: Array<{
     id: string;
@@ -44,7 +46,7 @@ type ProvisionalUser = {
   expiresAt?: string;
 };
 
-const CONFIG_SCHEMA_VERSION = 3;
+const CONFIG_SCHEMA_VERSION = 4;
 const defaultIndustries = ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
 const configStore = getJsonStore('criativa-config');
 
@@ -155,6 +157,9 @@ const isCompleteConfig = (data: AppData | null | undefined) =>
     data.stores?.length,
   );
 
+const isReusableConfig = (data: AppData | null | undefined) =>
+  isCompleteConfig(data) && isConfigCacheFresh(data?.cachedAt);
+
 const hasOperationalData = (data: AppData | null | undefined) =>
   Boolean(data?.industries?.length && data.promoters?.length && data.stores?.length);
 
@@ -176,7 +181,11 @@ const fetchSheetData = async (sheetName: string) => {
 
   try {
     const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, {
+      signal: controller.signal,
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' },
+    });
     const text = await response.text();
     const json = parseSheet(text);
     return json.table || null;
@@ -231,6 +240,7 @@ const mapConfig = async (): Promise<AppData> => {
 
   return {
     schemaVersion: CONFIG_SCHEMA_VERSION,
+    cachedAt: new Date().toISOString(),
     industries: industries.length > 0 ? industries : defaultIndustries,
     promoters,
     stores,
@@ -240,18 +250,23 @@ const mapConfig = async (): Promise<AppData> => {
 
 export const getAppData = async () => {
   const cached = await configStore.get<AppData>('latest');
-  if (isCompleteConfig(cached)) return cached;
+  if (isReusableConfig(cached)) return cached;
 
-  const fresh = await mapConfig();
-  if (hasOperationalData(fresh)) {
+  try {
+    const fresh = await mapConfig();
+    if (hasOperationalData(fresh)) {
+      await configStore.set('latest', fresh);
+      return fresh;
+    }
+
+    if (hasOperationalData(cached)) return cached;
+
     await configStore.set('latest', fresh);
     return fresh;
+  } catch (error) {
+    if (hasOperationalData(cached)) return cached;
+    throw error;
   }
-
-  if (hasOperationalData(cached)) return cached;
-
-  await configStore.set('latest', fresh);
-  return fresh;
 };
 
 export const refreshAppData = async () => {

@@ -238,6 +238,11 @@ A aba `PROMOTORES` usa as colunas `ID_PROMOTOR`, `NOME`, `USUÁRIO`, `SENHA`,
 - `FIELD_OPS` para promotor;
 - `SUPERVISOR` para supervisor.
 
+O backend renova automaticamente esses cadastros em no maximo dois minutos.
+Depois de alterar `ROLE`, o usuario deve sair e entrar novamente, pois o perfil
+e assinado no token da sessao no momento do login. Nao e necessario fazer novo
+deploy nem limpar dados do aparelho.
+
 O backend localiza as colunas pelos cabeçalhos e ainda aceita a aba antiga
 `CADASTRO_PROMOTORES` como fallback. Linhas antigas com `ROLE` em branco
 continuam funcionando e assumem `FIELD_OPS`, salvo as regras de compatibilidade

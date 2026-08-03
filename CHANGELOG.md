@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## [2026-08-03] - Correcao: atualizacao de cadastros e perfis
+
+### Alterado
+- O cache cadastral do backend passou a ter validade de dois minutos, em vez de
+  permanecer valido indefinidamente.
+- A leitura do Google Sheets passou a solicitar uma resposta sem cache HTTP.
+
+### Adicionado
+- Registro interno de horario do cache, separado do horario exibido no app.
+- Testes automatizados para cache valido, expirado, ausente, invalido e futuro.
+
+### Corrigido
+- Novos usuarios cadastrados na aba `PROMOTORES` passam a ser reconhecidos apos
+  a renovacao automatica do cache.
+- Alteracoes de `ROLE` passam a ser carregadas pelo backend sem exigir novo
+  deploy ou mudanca manual da versao do cache.
+
+### Seguranca
+- Se o Google Sheets estiver temporariamente indisponivel, o ultimo cadastro
+  operacional valido continua sendo usado.
+- O perfil da sessao ativa nao e alterado silenciosamente; uma mudanca de
+  `ROLE` entra em vigor no proximo login.
+
+### Validacao
+- Leitura real da aba `PROMOTORES`: 25 cadastros validos, dois supervisores e
+  nenhum usuario duplicado.
+- `npm.cmd test`: 19 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o warning conhecido de chunk
+  grande.
+- Deploy de preview `6a70d06ac92acc73f0490652`: pagina, healthcheck e
+  configuracao responderam `200`; login inexistente retornou `401`.
+- Deploy de producao `6a70d0adbde11deffdac411d`: Google Sheets, Make e segredo
+  de sessao permaneceram configurados; rotas protegidas sem sessao retornaram
+  `401`/`403`.
+- O timestamp cadastral de producao mudou de `14:06` para `14:33`, confirmando
+  a leitura da planilha e a gravacao do cache schema 4.
+
+### Pendencias
+- Nenhuma pendencia funcional conhecida nesta correcao.
+
 ## [2026-08-03] - Correcao: cadastro real de promotores e perfis
 
 ### Alterado
