@@ -1,6 +1,6 @@
 import type { AppData } from './data';
 import type { VisitRecord } from './visits';
-import { formatBrasiliaTime } from './time';
+import { formatBrasiliaTime } from './time.ts';
 
 export type SupervisorTimelinePoint = {
   time: string;
@@ -82,6 +82,31 @@ const formatDuration = (milliseconds: number) => {
 
 const getTimestamp = (visit: VisitRecord) =>
   visit.payload?.checkInTime || visit.payload?.checkOutTime || visit.updatedAt || visit.createdAt;
+
+const normalizeIdentity = (value: unknown) => String(value || '').toLowerCase().trim();
+
+const getVisitOwnerKeys = (visit: VisitRecord) => [
+  normalizeIdentity(visit.payload?.user?.id),
+  normalizeIdentity(visit.payload?.user?.user),
+].filter(Boolean);
+
+const countVisitPhotos = (visit: VisitRecord) => {
+  const uniquePhotos = new Set<string>();
+  const addPhotos = (photos: unknown) => {
+    if (!Array.isArray(photos)) return;
+    photos.forEach((photo) => {
+      if (typeof photo === 'string' && photo.trim()) uniquePhotos.add(photo);
+    });
+  };
+
+  Object.values(visit.payload?.photos || {}).forEach(addPhotos);
+  Object.values(visit.payload?.industryExecutions || {}).forEach((execution: any) => {
+    Object.values(execution?.photos || {}).forEach(addPhotos);
+  });
+  Object.values(visit.payload?.returnsPhotosByIndustry || {}).forEach(addPhotos);
+
+  return uniquePhotos.size;
+};
 
 const getVisitDuration = (visit: VisitRecord) => {
   const checkIn = visit.payload?.checkInTime ? new Date(visit.payload.checkInTime).getTime() : null;
@@ -201,15 +226,40 @@ const buildAverageDuration = (visits: VisitRecord[]) => getAverageDuration(visit
 
 export const buildSupervisorDashboard = (data: AppData, visits: VisitRecord[]): SupervisorDashboardResponse => {
   const byPromoter = new Map<string, VisitRecord[]>();
+  const promoterByIdentity = new Map<string, AppData['promoters'][number]>();
+  const fieldPromoters = data.promoters.filter((promoter) => promoter.role !== 'SUPERVISOR');
+
+  fieldPromoters.forEach((promoter) => {
+    promoterByIdentity.set(normalizeIdentity(promoter.id), promoter);
+    promoterByIdentity.set(normalizeIdentity(promoter.user), promoter);
+  });
 
   for (const visit of visits) {
-    const promoterId = String(visit.payload?.user?.id || visit.payload?.user?.user || 'unknown');
+    const ownerKeys = getVisitOwnerKeys(visit);
+    const registered = ownerKeys.map((key) => promoterByIdentity.get(key)).find(Boolean);
+    const promoterId = registered?.id || ownerKeys[0] || 'historico-desconhecido';
     const current = byPromoter.get(promoterId) || [];
     current.push(visit);
     byPromoter.set(promoterId, current);
   }
 
-  const promoters = data.promoters.map((promoter) => buildPromoterOverview(promoter, byPromoter.get(promoter.id) || []));
+  const registeredIds = new Set(fieldPromoters.map((promoter) => promoter.id));
+  const historicalPromoters = Array.from(byPromoter.entries())
+    .filter(([id]) => !registeredIds.has(id))
+    .map(([id, promoterVisits]) => {
+      const latest = [...promoterVisits].sort((left, right) => (
+        new Date(getTimestamp(right)).getTime() - new Date(getTimestamp(left)).getTime()
+      ))[0];
+      return {
+        id,
+        name: String(latest?.payload?.user?.name || `Usuario historico ${id}`),
+        user: String(latest?.payload?.user?.user || id),
+        pass: '',
+        region: String(latest?.payload?.user?.region || 'Historico'),
+      };
+    });
+  const promoterSources = [...fieldPromoters, ...historicalPromoters];
+  const promoters = promoterSources.map((promoter) => buildPromoterOverview(promoter, byPromoter.get(promoter.id) || []));
   const totalVisits = visits.length;
   const completedVisits = visits.filter((visit) => visit.syncStatus === 'enviado' && visit.payload?.checkOutTime).length;
   const pendingSyncVisits = visits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
@@ -226,7 +276,10 @@ export const buildSupervisorDashboard = (data: AppData, visits: VisitRecord[]): 
     totalVisits,
     completedVisits,
     averageVisitTime: buildAverageDuration(visits),
-    lastUpdated: data.timestamp || new Date().toISOString(),
+    lastUpdated: visits.reduce((latest, visit) => {
+      const timestamp = visit.updatedAt || visit.createdAt;
+      return timestamp && timestamp > latest ? timestamp : latest;
+    }, data.timestamp || ''),
   };
 
   return {
@@ -266,7 +319,7 @@ export const buildSupervisorPromoterDetail = (visits: VisitRecord[]): Supervisor
       time: formatBrasiliaTime(getTimestamp(visit)),
       status: getRouteVisitStatus(visit),
       tasks: Object.keys(visit.payload?.tasks || {}).length,
-      photos: Object.values(visit.payload?.photos || {}).flat().length,
+      photos: countVisitPhotos(visit),
       syncStatus: visit.syncStatus,
     })),
   };

@@ -46,6 +46,7 @@ Se houver migração futura para outro host, o projeto também já tem compatibi
 - [Manual Técnico](./MANUAL_TECNICO.md)
 - [Arquitetura Alvo](./ARQUITETURA_ALVO.md)
 - [Configuracao Make - Etapa B](./CONFIGURACAO_MAKE_ETAPA_B.md)
+- [Autenticacao Make e Google Drive](./GUIA_AUTENTICACAO_MAKE_GOOGLE.md)
 
 ## Variáveis de ambiente
 

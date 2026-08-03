@@ -43,19 +43,31 @@ const SupervisorDashboard: React.FC = () => {
   const [selectedPromoter, setSelectedPromoter] = useState<SupervisorPromoterOverview | null>(null);
   const [promoterDetail, setPromoterDetail] = useState<SupervisorPromoterDetailResponse | null>(null);
 
-  useEffect(() => { 
-    apiService.getSupervisorDashboard()
-      .then(res => {
-        setDashboard(res);
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDashboard = async () => {
+      try {
+        const response = await apiService.getSupervisorDashboard();
+        if (cancelled) return;
+        setDashboard(response);
         setError(null);
-      })
-      .catch((fetchError: any) => {
+      } catch (fetchError: any) {
+        if (cancelled) return;
         setDashboard(EMPTY_DASHBOARD);
         setError(fetchError?.message || 'Não foi possível carregar o painel do supervisor.');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void loadDashboard();
+    const refreshInterval = window.setInterval(() => void loadDashboard(), 60_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshInterval);
+    };
   }, []);
 
   const handlePromoterClick = async (promoter: SupervisorPromoterOverview) => {

@@ -1,5 +1,54 @@
 # CHANGELOG
 
+## [2026-08-03] - Correcao: dados reais do supervisor e diagnostico de fotos
+
+### Alterado
+- O painel supervisor passa a associar visitas por ID ou usuario e atualiza os
+  dados automaticamente a cada 60 segundos.
+- Contas com `ROLE=SUPERVISOR` deixam de ser contadas como promotores de campo.
+- O horario de atualizacao do painel passa a considerar a visita mais recente.
+
+### Adicionado
+- Promotores historicos continuam visiveis quando possuem visitas, mesmo que o
+  acesso provisorio tenha expirado ou sido removido do cadastro atual.
+- Contagem unica de fotos no payload geral, nos fluxos por industria e nas
+  devolucoes.
+- Guia separado para token da API Make, Google OAuth e ativacao do webhook V2.
+- Testes automatizados para associacao historica, exclusao de supervisores e
+  contagem completa de fotos.
+
+### Corrigido
+- Quatorze visitas do antigo usuario provisorio deixam de ficar sem promotor na
+  lista do supervisor.
+- O detalhe da visita deixa de contar apenas as fotos do formato legado.
+
+### Seguranca
+- Nenhuma credencial real foi lida ou adicionada ao repositorio.
+- O modo de sincronizacao permaneceu `legacy` porque o webhook V2 ainda nao esta
+  configurado; a ativacao prematura bloquearia os envios atuais.
+- O token Make deve ser armazenado em cofre de segredos ou gerenciador de
+  senhas, nunca no Git, frontend ou planilha.
+
+### Validacao
+- Auditoria de 34 visitas reais: 30 enviadas, 3 com erro e 1 pendente; 14 eram
+  do usuario provisorio historico.
+- Auditoria de fotos: 96 referencias no formato geral, 607 nos fluxos por
+  industria e nenhum manifesto V2, confirmando que o V2 nunca foi ativado.
+- `npm.cmd test`: 21 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o warning conhecido de chunk
+  grande.
+- Deploy de preview `6a71248ce4aab4cb4506a9ae`: pagina, healthcheck e
+  configuracao `200`; painel sem sessao `403`.
+- Deploy de producao `6a7124cd2ac43ea1629ff1a5` realizado no Project ID
+  `84267a1b-133d-44c9-b5e8-1a3182c19307` da equipe `Criativa`.
+
+### Pendencias
+- Criar e validar o cenario Make V2 antes de configurar
+  `BACKEND_MAKE_WEBHOOK_V2_URL` e alterar o modo para `visit-v2`.
+- Publicar o cliente OAuth Google usado pelo Make como `In production` e
+  reautorizar a conexao uma vez para remover a expiracao de sete dias.
+
 ## [2026-08-03] - Implantacao: transferencia do Netlify para o cliente
 
 ### Alterado
