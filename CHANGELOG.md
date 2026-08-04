@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2026-08-04] - Navegacao dos cards supervisor em homologacao
+
+### Alterado
+- Ao selecionar um card, o painel agora leva automaticamente o supervisor ate
+  a lista de pessoas correspondente ao indicador.
+- Uma busca anterior e limpa ao trocar de card para nao esconder resultados do
+  novo recorte.
+
+### Adicionado
+- Foco acessivel e aviso dinamico na regiao de resultados do painel.
+
+### Corrigido
+- Corrigida a percepcao de que o card apenas recebia uma borda vermelha em
+  telas moveis, enquanto a lista filtrada permanecia fora da area visivel.
+
+### Seguranca
+- Nenhum contrato de API, dado cadastral, permissao ou regra de acesso foi
+  alterado.
+
+### Validacao
+- `npm.cmd test`: 54 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Chromium movel `390x844`: card de visitas concluidas rolou de `0` para
+  `1450px`, exibiu 1 resultado correto e abriu o popup do promotor.
+- Preview `6a722bb8f1995116663f6cbf` publicado no alias `pwa-offline`.
+
+### Pendencias
+- Validar o comportamento com o login supervisor e os dados reais do cliente.
+- Promover para producao somente depois da aprovacao da homologacao.
+
 ## [2026-08-04] - Indicadores diarios e contato supervisor em homologacao
 
 ### Alterado

@@ -152,6 +152,8 @@ Importante durante a evolucao offline:
 - O painel usa dados reais do backend.
 - Cada card funciona como filtro da equipe. Clique uma vez para aplicar e clique
   novamente no mesmo card para voltar a visao geral.
+- Em telas menores, depois do clique o painel desce automaticamente ate a lista
+  filtrada; nao e necessario procurar o resultado abaixo dos cards.
 - `Promotores Cadastrados` mostra apenas cadastros atuais da aba `PROMOTORES`.
 - `Em Atividade Hoje` mostra quem possui ao menos uma visita registrada hoje;
   esse indicador nao acompanha GPS ou deslocamento.

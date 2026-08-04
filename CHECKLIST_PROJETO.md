@@ -322,3 +322,14 @@ Data da ultima auditoria: 2026-06-27
 - [ ] Telefones reais preenchidos pelo cliente.
 - [ ] Painel validado com login supervisor real.
 - [ ] Preview aprovado para promocao a producao.
+
+## Homologacao - Navegacao dos cards supervisor
+
+- [x] Clique no card limpa uma busca antiga.
+- [x] Lista filtrada recebe foco sem alterar o layout principal.
+- [x] Tela movel rola automaticamente ate os resultados.
+- [x] Estado vazio tambem permanece visivel depois do clique.
+- [x] Clique no resultado continua abrindo o popup do promotor.
+- [x] Testes, lint, build e Chromium movel aprovados.
+- [ ] Comportamento validado com o login supervisor real.
+- [ ] Preview aprovado para promocao a producao.

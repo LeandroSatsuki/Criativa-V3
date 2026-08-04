@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiService } from '../services/apiService';
 import { filterSupervisorPromoters, type SupervisorFilter } from '../services/supervisorFilters';
 import { buildWhatsAppUrl } from '../services/whatsapp';
@@ -89,6 +89,7 @@ const SupervisorDashboard: React.FC = () => {
   const [promoterDetail, setPromoterDetail] = useState<SupervisorPromoterDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,7 +142,15 @@ const SupervisorDashboard: React.FC = () => {
   const filteredData = filterSupervisorPromoters(dashboard.promoters, filter, search);
   const activeFilterInfo = FILTER_INFO[filter];
   const selectFilter = (nextFilter: SupervisorFilter) => {
+    setSearch('');
     setFilter((current) => current === nextFilter ? 'all' : nextFilter);
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        resultsRef.current?.focus({ preventScroll: true });
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
   };
 
   const chartData = dashboard.timeline;
@@ -390,8 +399,8 @@ const SupervisorDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
+        <div ref={resultsRef} tabIndex={-1} className="lg:col-span-2 space-y-4 scroll-mt-6 outline-none">
+          <h3 aria-live="polite" className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
             {filter === 'all' && !search ? 'Desempenho dos Promotores' : `${activeFilterInfo.title} • ${filteredData.length} resultado${filteredData.length === 1 ? '' : 's'}`}
           </h3>
           {filteredData.length === 0 && (
