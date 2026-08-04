@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## [2026-08-04] - Orientacao vertical das fotos em homologacao
+
+### Alterado
+- Novas fotos horizontais passam a ser giradas 90 graus no sentido horario
+  antes da marca d'agua e da compressao.
+- Fotos que ja chegam em formato retrato preservam sua orientacao.
+
+### Adicionado
+- Regra central de layout vertical com dimensoes de desenho independentes das
+  dimensoes finais do canvas.
+- Testes para imagem horizontal, imagem vertical e sequencia de transformacao
+  do canvas.
+
+### Corrigido
+- Corrigido o salvamento de novas capturas em formato paisagem quando o padrao
+  dos relatorios exige retrato.
+
+### Seguranca
+- Resolucao, limite de tamanho, qualidade, marca d'agua e contratos de envio
+  nao foram alterados.
+- Fotos ja processadas e visitas presentes na fila nao sao regravadas.
+
+### Validacao
+- `npm.cmd test`: 44 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Layout horizontal `4032 x 3024` validado com saida vertical `624 x 832`.
+- Layout vertical `3024 x 4032` validado sem rotacao adicional.
+- Preview `6a72149ece193f00d3302e83` publicado no alias `pwa-offline` com o
+  bundle `index-BUNS3CZt.js` confirmado pela URL publica.
+
+### Pendencias
+- Validar uma nova captura real no Android e no iPhone antes de promover para
+  producao.
+
 ## [2026-08-04] - Painel supervisor interativo em homologacao
 
 ### Alterado

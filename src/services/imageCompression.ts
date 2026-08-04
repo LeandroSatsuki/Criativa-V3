@@ -16,9 +16,55 @@ export type CompressedPhoto = {
   quality: number;
 };
 
+export type PortraitPhotoLayout = {
+  canvasWidth: number;
+  canvasHeight: number;
+  drawWidth: number;
+  drawHeight: number;
+  rotateClockwise: boolean;
+};
+
 type EncodedPhoto = {
   blob: Blob;
   quality: number;
+};
+
+export const buildPortraitPhotoLayout = (
+  sourceWidth: number,
+  sourceHeight: number,
+  maxLongEdge = PHOTO_INITIAL_MAX_LONG_EDGE,
+): PortraitPhotoLayout => {
+  const normalizedWidth = Math.max(1, Math.round(sourceWidth));
+  const normalizedHeight = Math.max(1, Math.round(sourceHeight));
+  const scale = Math.min(
+    1,
+    Math.max(1, maxLongEdge) / Math.max(normalizedWidth, normalizedHeight),
+  );
+  const drawWidth = Math.max(1, Math.round(normalizedWidth * scale));
+  const drawHeight = Math.max(1, Math.round(normalizedHeight * scale));
+  const rotateClockwise = drawWidth > drawHeight;
+
+  return {
+    canvasWidth: rotateClockwise ? drawHeight : drawWidth,
+    canvasHeight: rotateClockwise ? drawWidth : drawHeight,
+    drawWidth,
+    drawHeight,
+    rotateClockwise,
+  };
+};
+
+export const drawPhotoInPortrait = (
+  context: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  layout: PortraitPhotoLayout,
+) => {
+  context.save();
+  if (layout.rotateClockwise) {
+    context.translate(layout.canvasWidth, 0);
+    context.rotate(Math.PI / 2);
+  }
+  context.drawImage(source, 0, 0, layout.drawWidth, layout.drawHeight);
+  context.restore();
 };
 
 export const buildPhotoLongEdgeCandidates = (sourceLongEdge: number) => {

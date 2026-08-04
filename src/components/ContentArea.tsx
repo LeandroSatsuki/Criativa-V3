@@ -11,8 +11,9 @@ import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedV
 import { classifyQueuedSyncFailure } from '../services/syncPolicy';
 import { generateVisitId } from '../services/visitId';
 import {
+  buildPortraitPhotoLayout,
   compressStampedPhoto,
-  PHOTO_INITIAL_MAX_LONG_EDGE,
+  drawPhotoInPortrait,
 } from '../services/imageCompression';
 import SupervisorDashboard from './SupervisorDashboard';
 import CriativaIcon from './CriativaIcon';
@@ -313,12 +314,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       URL.revokeObjectURL(imageUrl);
       try {
         const canvas = document.createElement('canvas');
-        const scale = Math.min(
-          1,
-          PHOTO_INITIAL_MAX_LONG_EDGE / Math.max(img.width, img.height),
-        );
-        canvas.width = Math.max(1, Math.round(img.width * scale));
-        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const layout = buildPortraitPhotoLayout(img.width, img.height);
+        canvas.width = layout.canvasWidth;
+        canvas.height = layout.canvasHeight;
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -326,7 +324,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
           return;
         }
 
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        drawPhotoInPortrait(ctx, img, layout);
 
         const padding = Math.max(18, Math.round(canvas.width * 0.035));
         const fontSize = Math.max(18, Math.round(canvas.width * 0.036));

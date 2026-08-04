@@ -160,6 +160,8 @@ Importante durante a evolucao offline:
 ## 5. O que acontece com as fotos
 
 - As fotos não viram arquivos soltos no navegador.
+- Novas capturas sao normalizadas em formato retrato. Se a camera entregar uma
+  imagem horizontal, o app a gira 90 graus antes de adicionar data, hora e loja.
 - O app converte cada foto para base64.
 - Esse conteúdo fica no rascunho e na fila segura do navegador, usando `IndexedDB`.
 - Na sincronização, os campos de foto são enviados ao backend e ao destino operacional.

@@ -282,3 +282,15 @@ Data da ultima auditoria: 2026-06-27
 - [x] Chromium movel validado sem overflow horizontal.
 - [ ] Login supervisor real e indicadores do cliente validados no preview.
 - [ ] Preview aprovado para promocao a producao.
+
+## Homologacao - Orientacao vertical das fotos
+
+- [x] Captura horizontal normalizada para retrato.
+- [x] Captura que ja esta vertical preservada.
+- [x] Marca d'agua desenhada depois da restauracao do canvas.
+- [x] Resolucao e compressao existentes preservadas.
+- [x] Fotos antigas e filas pendentes preservadas sem migracao.
+- [x] Testes e lint aprovados.
+- [ ] Captura real validada no Android.
+- [ ] Captura real validada no iPhone.
+- [ ] Preview aprovado para promocao a producao.
