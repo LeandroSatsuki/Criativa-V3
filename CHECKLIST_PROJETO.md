@@ -345,3 +345,15 @@ Data da ultima auditoria: 2026-06-27
 - [x] Testes, lint, build e Chromium movel aprovados.
 - [ ] Comportamento validado com o login supervisor real.
 - [ ] Preview aprovado para promocao a producao.
+
+## Homologacao - Concorrencia de login
+
+- [x] Evidencia de requisicoes concorrentes confirmada nos logs Netlify.
+- [x] Trava imediata impede novo submit durante a autenticacao.
+- [x] Campos e botao ficam desabilitados ate a resposta.
+- [x] Regra de sessao unica preservada no backend.
+- [x] Motivos de `401` registrados sem credenciais, tokens ou identificadores.
+- [x] Cinco submits simultaneos resultaram em uma unica chamada de login.
+- [x] Testes, lint, build e preview Netlify aprovados.
+- [ ] Login `Philipe.almeida` validado no aparelho real.
+- [ ] Preview aprovado para promocao a producao.

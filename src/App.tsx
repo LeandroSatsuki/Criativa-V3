@@ -38,6 +38,8 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginForm, setLoginForm] = useState(() => ({ user: getLastLoginUser(), pass: '' }));
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
+  const loginRequestInFlight = useRef(false);
   const [visitState, setVisitState] = useState(() => {
     try {
       const saved = readLegacyVisitState(STORAGE_KEY);
@@ -375,6 +377,10 @@ const App: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loginRequestInFlight.current) return;
+
+    loginRequestInFlight.current = true;
+    setLoginSubmitting(true);
     setLoginError(null);
     try {
       const userData = await apiService.login(loginForm);
@@ -393,6 +399,9 @@ const App: React.FC = () => {
       );
     } catch (err: any) { 
       setLoginError(err.message);
+    } finally {
+      loginRequestInFlight.current = false;
+      setLoginSubmitting(false);
     }
   };
 
@@ -456,9 +465,11 @@ const App: React.FC = () => {
               <p className="text-xs font-bold uppercase tracking-tight">{loginError}</p>
             </div>
           )}
-          <input type="text" value={loginForm.user} placeholder="Usuário" className="w-full p-5 bg-slate-50 rounded-2xl font-bold" onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
-          <input type="password" placeholder="Senha" className="w-full p-5 bg-slate-50 rounded-2xl font-bold" onChange={e => setLoginForm({...loginForm, pass: e.target.value})} />
-          <button type="submit" className="w-full bg-[#0F172A] text-white py-6 rounded-[28px] font-black uppercase tracking-widest">Acessar</button>
+          <input disabled={loginSubmitting} type="text" value={loginForm.user} placeholder="Usuário" className="w-full p-5 bg-slate-50 rounded-2xl font-bold disabled:opacity-60" onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
+          <input disabled={loginSubmitting} type="password" placeholder="Senha" className="w-full p-5 bg-slate-50 rounded-2xl font-bold disabled:opacity-60" onChange={e => setLoginForm({...loginForm, pass: e.target.value})} />
+          <button disabled={loginSubmitting} type="submit" className="w-full bg-[#0F172A] text-white py-6 rounded-[28px] font-black uppercase tracking-widest disabled:opacity-60 disabled:cursor-wait">
+            {loginSubmitting ? 'Acessando...' : 'Acessar'}
+          </button>
         </form>
       </div>
     );

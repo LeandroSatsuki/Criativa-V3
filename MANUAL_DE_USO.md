@@ -158,6 +158,8 @@ Importante durante a evolucao offline:
   entrar em outro aparelho ou a sessao expirar, o acesso anterior volta ao
   login e solicita a senha novamente.
 - O ultimo usuario permanece preenchido, mas a senha nunca e reaproveitada.
+- Durante o login, aguarde o botao `Acessando...` concluir. O aplicativo bloqueia
+  novos toques para evitar que uma tentativa substitua a sessao da outra.
 - O painel mostra promotores, visitas, status de sincronização, pendências e produtividade.
 - O painel usa dados reais do backend.
 - Cada card funciona como filtro da equipe. Clique uma vez para aplicar e clique

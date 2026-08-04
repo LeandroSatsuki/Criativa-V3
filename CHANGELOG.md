@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## [2026-08-04] - Concorrencia de login corrigida em homologacao
+
+### Alterado
+- O formulario bloqueia usuario, senha e botao enquanto uma autenticacao esta
+  em andamento.
+- O backend registra somente o motivo tecnico de rejeicoes de sessao para
+  diagnostico, sem registrar usuario, senha ou token.
+
+### Adicionado
+- Trava imediata por referencia, anterior a nova renderizacao do React, para
+  impedir requisicoes duplicadas mesmo em toques muito rapidos.
+- Diagnosticos `missing_token`, `expired_token`, `session_replaced` e demais
+  causas seguras de `401` nos logs das Functions.
+
+### Corrigido
+- Multiplos submits simultaneos deixam de criar sessoes concorrentes nas quais
+  uma requisicao podia invalidar o token retornado por outra.
+
+### Seguranca
+- A regra de uma unica sessao ativa por usuario foi preservada.
+- Nenhuma credencial ou identificador pessoal foi adicionado aos logs.
+
+### Validacao
+- Logs Netlify mostraram tres chamadas de `auth-login` em menos de um segundo.
+- `npm.cmd test`: 58 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Teste controlado disparou cinco submits simultaneos e confirmou apenas uma
+  chamada de login, botao bloqueado e sessao gravada.
+- Preview `6a7237b8be8b87210b585d90` publicado no alias `pwa-offline`.
+
+### Pendencias
+- Repetir o login com `Philipe.almeida` no aparelho real.
+- Promover para producao somente depois da aprovacao da homologacao.
+
 ## [2026-08-04] - Compatibilidade offline do iOS em homologacao
 
 ### Alterado

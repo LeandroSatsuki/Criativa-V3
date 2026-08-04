@@ -19,6 +19,10 @@ const sessionStore = getJsonStore('criativa-sessions');
 
 const getSecret = () => getEnv('APP_SESSION_SECRET');
 const sessionKeyFor = (userId: string) => `users/${userId.toLowerCase().trim()}`;
+const rejectAuthentication = (reason: string) => {
+  console.warn(JSON.stringify({ event: 'auth_rejected', reason }));
+  return null;
+};
 
 const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const decode = <T>(value: string) => JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as T;
@@ -65,28 +69,29 @@ export const createSessionToken = async (user: User) => {
 export const authenticate = async (request: Request) => {
   const authHeader = request.headers.get('authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  if (!token) return null;
+  if (!token) return rejectAuthentication('missing_token');
 
   const secret = getSecret();
-  if (!secret) return null;
+  if (!secret) return rejectAuthentication('missing_session_secret');
 
   const [encoded, signature] = token.split('.');
-  if (!encoded || !signature) return null;
+  if (!encoded || !signature) return rejectAuthentication('malformed_token');
 
   const expected = sign(encoded, secret);
-  if (!safeEqual(signature, expected)) return null;
+  if (!safeEqual(signature, expected)) return rejectAuthentication('invalid_signature');
 
   try {
     const payload = decode<SessionPayload>(encoded);
-    if (payload.exp < Date.now()) return null;
-    if (!payload.sid) return null;
+    if (payload.exp < Date.now()) return rejectAuthentication('expired_token');
+    if (!payload.sid) return rejectAuthentication('missing_session_id');
 
     const active = await sessionStore.get<{ sessionId?: string }>(sessionKeyFor(payload.sub));
-    if (active?.sessionId !== payload.sid) return null;
+    if (!active?.sessionId) return rejectAuthentication('session_not_found');
+    if (active.sessionId !== payload.sid) return rejectAuthentication('session_replaced');
 
     return payload;
   } catch {
-    return null;
+    return rejectAuthentication('token_decode_failed');
   }
 };
 
