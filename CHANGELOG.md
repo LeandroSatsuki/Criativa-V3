@@ -29,7 +29,9 @@
 - `npm.cmd test`: 33 testes aprovados.
 - `npm.cmd run lint`: concluido sem erros.
 - `npx.cmd netlify build`: build e 14 Functions empacotados com sucesso.
-- Preview `6a71f2f2971e976f20f08b71` publicado no alias `pwa-offline`.
+- Preview `6a71f453aad1cc00807215bc` publicado no alias `pwa-offline`.
+- Contexto Netlify `branch-deploy` confirmado com sessao, Google Sheets, Make
+  V2 e modo `visit-v2`; smoke de login retornou `401` sem erro de configuracao.
 - Chromium controlado confirmou app shell, sessao local, promotor e loja
   autorizada restaurados com rede bloqueada e sem tela de erro.
 

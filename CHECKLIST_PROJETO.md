@@ -238,6 +238,7 @@ Data da ultima auditoria: 2026-06-27
 - [x] Cache de outro usuario, supervisor, futuro ou expirado rejeitado.
 - [x] Erro HTTP e `401` nao sao mascarados pelo fallback offline.
 - [x] Preview estavel `pwa-offline` publicado.
+- [x] Contexto Netlify `branch-deploy` validado com sessao, Sheets e Make V2.
 - [x] Chromium offline restaurou promotor e loja autorizada sem erro de conexao.
 - [ ] Login online e reabertura offline validados com promotor real no celular.
 - [ ] Cache renovado depois de recuperar conexao validado no celular.
