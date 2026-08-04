@@ -9,7 +9,7 @@ import ContentArea from './components/ContentArea';
 import CriativaIcon from './components/CriativaIcon';
 import { SectionId, STORAGE_KEY } from './types';
 import { apiService } from './services/apiService';
-import { LogOut, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
+import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X } from 'lucide-react';
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession } from './services/session';
 import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
@@ -20,6 +20,15 @@ const INITIAL_STATE = {
   checkInDone: false, checkInTime: null, checkOutTime: null,
   selectedIndustry: null, tasks: {}, photos: {}, stockQuantities: {}, 
   aiResults: {}, hasReturns: null, returnsPhotosByIndustry: {}, industryExecutions: {}, availableStores: [], industries: []
+};
+
+type PendingSyncView = {
+  visitId: string;
+  store: string;
+  status: string;
+  error: string | null;
+  sent: number;
+  total: number;
 };
 
 const App: React.FC = () => {
@@ -57,6 +66,8 @@ const App: React.FC = () => {
   const [promptSyncMessage, setPromptSyncMessage] = useState('');
   const [promptSyncError, setPromptSyncError] = useState<string | null>(null);
   const [promptQueueCount, setPromptQueueCount] = useState(0);
+  const [pendingSyncs, setPendingSyncs] = useState<PendingSyncView[]>([]);
+  const [showSyncStatus, setShowSyncStatus] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
   const persistenceAlertShown = useRef(false);
 
@@ -189,6 +200,58 @@ const App: React.FC = () => {
     window.dispatchEvent(new Event('criativa-sync-queue-updated'));
   };
 
+  const refreshSyncStatus = async () => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId) {
+      setPendingSyncs([]);
+      return;
+    }
+
+    const queuedVisits = await listQueuedVisits(ownerId);
+    const next: PendingSyncView[] = [];
+    let queueChanged = false;
+
+    for (const queuedVisit of queuedVisits) {
+      try {
+        const remote = await apiService.getSyncStatus(queuedVisit.visitId);
+        if (remote.syncStatus === 'enviado') {
+          await removeQueuedVisit(ownerId, queuedVisit.visitId);
+          queueChanged = true;
+          continue;
+        }
+
+        if (remote.syncStatus === 'erro' && queuedVisit.status !== 'error') {
+          await updateQueuedVisit(ownerId, queuedVisit.visitId, {
+            status: 'error',
+            error: remote.syncError || 'Falha no envio em segundo plano.',
+          });
+          queueChanged = true;
+        }
+
+        next.push({
+          visitId: queuedVisit.visitId,
+          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          status: remote.syncStatus,
+          error: remote.syncError || null,
+          sent: Number(remote.progress?.sent || 0),
+          total: Number(remote.progress?.total || 0),
+        });
+      } catch {
+        next.push({
+          visitId: queuedVisit.visitId,
+          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          status: queuedVisit.status,
+          error: queuedVisit.error,
+          sent: 0,
+          total: 0,
+        });
+      }
+    }
+
+    setPendingSyncs(next);
+    if (queueChanged) notifyQueueChanged();
+  };
+
   const syncPendingQueueFromPrompt = async () => {
     const ownerId = visitState.user?.id;
     if (!ownerId) return;
@@ -245,47 +308,20 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const ownerId = visitState.user?.id;
-    if (!ownerId) return;
+    if (!visitState.user?.id) return;
 
-    let cancelled = false;
-    const reconcileQueue = async () => {
-      const queuedVisits = await listQueuedVisits(ownerId);
-      let changed = false;
-
-      for (const queuedVisit of queuedVisits) {
-        if (cancelled || queuedVisit.status === 'pending') continue;
-        try {
-          const status = await apiService.getSyncStatus(queuedVisit.visitId);
-          if (status.syncStatus === 'enviado') {
-            await removeQueuedVisit(ownerId, queuedVisit.visitId);
-            changed = true;
-          } else if (status.syncStatus === 'erro') {
-            await updateQueuedVisit(ownerId, queuedVisit.visitId, {
-              status: 'error',
-              error: status.syncError || 'Falha no envio em segundo plano.',
-            });
-            changed = true;
-          }
-        } catch {
-          // A fila local continua disponível se o aparelho estiver sem conexão.
-        }
-      }
-
-      if (changed && !cancelled) notifyQueueChanged();
-    };
-
-    const intervalId = window.setInterval(() => void reconcileQueue(), 15000);
-    const handleResume = () => void reconcileQueue();
+    const handleResume = () => void refreshSyncStatus();
+    const intervalId = window.setInterval(handleResume, 5000);
     window.addEventListener('online', handleResume);
     window.addEventListener('focus', handleResume);
-    void reconcileQueue();
+    window.addEventListener('criativa-sync-queue-updated', handleResume);
+    void refreshSyncStatus();
 
     return () => {
-      cancelled = true;
       window.clearInterval(intervalId);
       window.removeEventListener('online', handleResume);
       window.removeEventListener('focus', handleResume);
+      window.removeEventListener('criativa-sync-queue-updated', handleResume);
     };
   }, [visitState.user?.id]);
 
@@ -459,6 +495,76 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+      {showSyncStatus && (
+        <div className="fixed inset-0 z-[85] bg-[#0F172A]/50 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto bg-white rounded-[36px] p-7 shadow-2xl border border-slate-100 space-y-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-500">Sincronização</p>
+                <h2 className="text-2xl font-black uppercase tracking-tighter text-[#0F172A]">Envios pendentes</h2>
+              </div>
+              <button
+                onClick={() => setShowSyncStatus(false)}
+                className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-colors"
+                aria-label="Fechar status dos envios"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {pendingSyncs.length === 0 ? (
+              <div className="py-10 text-center space-y-3">
+                <div className="w-16 h-16 mx-auto rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CloudUpload size={28} />
+                </div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500">Nenhum envio pendente</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pendingSyncs.map((sync) => {
+                  const percentage = sync.total > 0
+                    ? Math.min(100, Math.round((sync.sent / sync.total) * 100))
+                    : 0;
+                  const hasError = sync.status === 'erro' || sync.status === 'error';
+                  return (
+                    <div key={sync.visitId} className="p-5 rounded-3xl border border-slate-100 bg-slate-50/70 space-y-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="font-black text-sm uppercase tracking-tight text-[#0F172A] truncate">{sync.store}</p>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 truncate">{sync.visitId}</p>
+                        </div>
+                        <span className={`shrink-0 text-[10px] font-black ${hasError ? 'text-orange-600' : 'text-blue-600'}`}>
+                          {percentage}%
+                        </span>
+                      </div>
+                      <div className="h-2.5 bg-white rounded-full overflow-hidden border border-slate-100">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${hasError ? 'bg-orange-500' : 'bg-blue-500'}`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-[9px] font-black uppercase tracking-widest">
+                        <span className={hasError ? 'text-orange-600' : 'text-slate-500'}>
+                          {hasError ? 'Erro no envio' : sync.total > 0 ? 'Enviando fotos' : 'Preparando envio'}
+                        </span>
+                        <span className="text-slate-400">{sync.sent}/{sync.total || '--'}</span>
+                      </div>
+                      {sync.error && <p className="text-[10px] font-bold text-orange-700 leading-relaxed">{sync.error}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <button
+              onClick={() => void refreshSyncStatus()}
+              className="w-full bg-[#0F172A] text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
+            >
+              Atualizar status
+            </button>
+          </div>
+        </div>
+      )}
       <Sidebar activeSection={activeSection} onSelect={(id) => setActiveSection(id as SectionId)} onLogout={logout} tasksCompleted={visitState.tasks} isCheckInDone={visitState.checkInDone} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={visitState.user} />
       <main className="flex-1 md:ml-72 flex flex-col min-h-screen">
         <header className="h-20 px-4 md:px-8 flex items-center justify-between gap-3 bg-white border-b border-slate-100 sticky top-0 z-40">
@@ -485,6 +591,22 @@ const App: React.FC = () => {
                 {lastUpdate ? new Date(lastUpdate).toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '--/-- --:--'}
               </p>
             </div>
+            <button
+              onClick={() => {
+                setShowSyncStatus(true);
+                void refreshSyncStatus();
+              }}
+              className={`relative w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-sm ${pendingSyncs.some((sync) => sync.status === 'erro' || sync.status === 'error') ? 'bg-orange-50 text-orange-600' : pendingSyncs.length > 0 ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}
+              aria-label={`Status dos envios: ${pendingSyncs.length} pendente${pendingSyncs.length === 1 ? '' : 's'}`}
+              title="Status dos envios"
+            >
+              <CloudUpload size={18} />
+              {pendingSyncs.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-[#E65C5C] text-white text-[9px] font-black flex items-center justify-center border-2 border-white">
+                  {pendingSyncs.length > 9 ? '9+' : pendingSyncs.length}
+                </span>
+              )}
+            </button>
             <button 
               onClick={() => loadConfig(true)}
               disabled={loading}
@@ -515,9 +637,11 @@ const App: React.FC = () => {
               setVisitState((prev: any) => ({
                 ...INITIAL_STATE,
                 user: prev.user,
-                availableStores: stores
+                draftOwnerId: prev.user?.id || null,
+                availableStores: stores,
+                industries: prev.industries,
               }));
-              setActiveSection(SectionId.Dashboard);
+              setActiveSection(SectionId.CheckIn);
             }} 
           />
         </div>

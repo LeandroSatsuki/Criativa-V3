@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## [2026-08-04] - Correcao: retorno imediato e painel de envios no cabecalho
+
+### Alterado
+- Depois que a visita e persistida e o background e aceito, o promotor retorna
+  imediatamente para `Selecao de Unidade`, sem aguardar o upload das fotos.
+- O reset da visita preserva usuario, industrias e lojas ja carregadas.
+- O acompanhamento da fila passa de 15 para 5 segundos enquanto o aplicativo
+  esta aberto, alem de atualizar ao recuperar foco ou conexao.
+
+### Adicionado
+- Icone de upload no cabecalho com contador de visitas pendentes.
+- Modal de status com loja, ID da visita, fotos confirmadas, total, percentual,
+  barra de progresso e eventual erro de sincronizacao.
+- Botao para atualizar o status sob demanda sem reiniciar o envio.
+
+### Corrigido
+- Removida a navegacao incorreta para o painel de progresso depois de iniciar o
+  envio em segundo plano.
+- O promotor pode iniciar a selecao da proxima loja enquanto o servidor conclui
+  a visita anterior.
+
+### Seguranca
+- O painel consulta apenas visitas da fila local pertencentes ao usuario atual.
+- O percentual vem do manifesto seguro do backend e nao considera uma foto
+  enviada ate existir confirmacao persistida do Drive.
+
+### Validacao
+- `npm.cmd test`: 23 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece somente o aviso conhecido de chunk
+  JavaScript acima de 500 KB.
+
+### Pendencias
+- Validar em um aparelho real o retorno imediato com um envio grande em curso e
+  conferir a progressao do indicador no cabecalho.
+
 ## [2026-08-04] - Correcao: pastas por industria, envio em segundo plano e nome do PDV
 
 ### Alterado

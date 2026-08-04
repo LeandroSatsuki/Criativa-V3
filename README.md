@@ -94,6 +94,8 @@ sem `ROLE` continuam como `FIELD_OPS`, preservando compatibilidade.
   mantem uma unica linha por visita.
 - Depois de salvar a visita no backend, o envio das fotos continua em uma
   Netlify Background Function; o promotor pode seguir usando o aplicativo.
+- Ao aceitar o envio, o aplicativo volta para a selecao de loja. O icone de
+  upload no cabecalho mostra as visitas pendentes e o percentual confirmado.
 - O carimbo usa `NOME_LOJA` da aba `CADASTRO_LOJAS`, e nao `GRUPO_REDE`.
 - O cenario legado permanece disponivel somente para rollback controlado por
   `BACKEND_MAKE_SYNC_MODE=legacy`.

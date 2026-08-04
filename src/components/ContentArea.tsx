@@ -536,9 +536,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       setSyncMessage('Visita salva. As fotos continuarão sendo enviadas em segundo plano.');
       setSyncSuccess(true);
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
-      setTimeout(() => {
-        onReset();
-      }, 1500);
+      onReset();
     } catch (error: any) {
       setSyncError(formatSyncError(error.message || "Erro desconhecido na sincronização"));
     } finally {
@@ -565,9 +563,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
       setSyncSuccess(true);
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
-      setTimeout(() => {
-        onReset();
-      }, 1500);
+      onReset();
     } catch (error: any) {
       setSyncError(formatSyncError(error.message || 'Não foi possível reenviar a fila local.'));
     } finally {

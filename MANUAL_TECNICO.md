@@ -176,6 +176,16 @@ O backend:
 7. atualiza o manifesto depois de cada arquivo confirmado e finaliza uma unica
    linha da visita na planilha.
 
+Depois que o background responde HTTP 202, o estado da visita atual e limpo e o
+promotor volta para `Selecao de Unidade`. A fila permanece no IndexedDB ate o
+backend confirmar `enviado`. O icone de upload no cabecalho consulta
+`/api/sync/:id/status` a cada cinco segundos e calcula o percentual por
+`fotos confirmadas / total de fotos`.
+
+Se o aparelho perder conexao, o indicador conserva a visita na fila. Ao voltar
+para o aplicativo, recuperar foco ou ficar online, a consulta e retomada sem
+reiniciar os arquivos que o Drive ja confirmou.
+
 O limite seguro atual de uma visita reconstruida e 64 MB. Visitas pequenas
 continuam usando `/api/visits`, preservando compatibilidade.
 
