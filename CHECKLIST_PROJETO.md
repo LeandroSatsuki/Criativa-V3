@@ -267,3 +267,18 @@ Data da ultima auditoria: 2026-06-27
 - [ ] Contagem de fotos local, backend, Drive e planilha conferida.
 - [ ] `CHANGELOG.md` e manuais atualizados.
 - [ ] Commit, push, deploy e smoke test registrados.
+
+## Homologacao - Painel supervisor interativo
+
+- [x] Cards conectados aos dados reais retornados pelo backend.
+- [x] Total de visitas concluidas corrigido para `completedVisits`.
+- [x] Busca combinada por promotor, ID, regiao e loja implementada.
+- [x] Filtro ativo identificado e removivel ao clicar novamente.
+- [x] Detalhe do promotor preservado.
+- [x] Sessao restaurada de supervisor abre `Gestao de Equipe`.
+- [x] Rotulo visivel alterado para `Finalizacao da Visita`.
+- [x] Contratos tecnicos de checkout com backend, Make e Sheets preservados.
+- [x] Testes, lint, build e preview Netlify aprovados.
+- [x] Chromium movel validado sem overflow horizontal.
+- [ ] Login supervisor real e indicadores do cliente validados no preview.
+- [ ] Preview aprovado para promocao a producao.

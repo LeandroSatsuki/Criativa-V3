@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { apiService } from '../services/apiService';
+import { filterSupervisorPromoters, type SupervisorFilter } from '../services/supervisorFilters';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp, Users, Clock, MapPin, CheckCircle2, Loader2, Route, Play, ClipboardList, SignalLow } from 'lucide-react';
+import { TrendingUp, Users, Clock, MapPin, CheckCircle2, Loader2, Route, Play, ClipboardList, SignalLow, Search } from 'lucide-react';
 import type { SupervisorDashboardResponse, SupervisorPromoterDetailResponse, SupervisorPromoterOverview, SupervisorTimelinePoint } from '../types';
 
 const EMPTY_TIMELINE: SupervisorTimelinePoint[] = [
@@ -35,11 +36,51 @@ const EMPTY_DASHBOARD: SupervisorDashboardResponse = {
   lastUpdated: '',
 };
 
+const FILTER_INFO: Record<SupervisorFilter, { title: string; description: string }> = {
+  all: {
+    title: 'Visão Geral',
+    description: 'Todos os promotores presentes nos dados operacionais.',
+  },
+  active: {
+    title: 'Promotores Cadastrados',
+    description: 'Equipe de campo presente no cadastro ou no histórico operacional, sem incluir supervisores.',
+  },
+  offline: {
+    title: 'Sem Atualização Recente',
+    description: 'Promotores sem atualização registrada nos últimos 15 minutos.',
+  },
+  sync_pending: {
+    title: 'Pendências de Sincronização',
+    description: 'Promotores com pelo menos uma visita aguardando confirmação de envio.',
+  },
+  on_route: {
+    title: 'Promotores em Rota',
+    description: 'Promotores cuja situação operacional mais recente está em rota.',
+  },
+  in_progress: {
+    title: 'Visitas em Andamento',
+    description: 'Promotores com uma visita em processamento no momento.',
+  },
+  completed: {
+    title: 'Visitas Concluídas',
+    description: 'Promotores que contribuíram para o total real de visitas concluídas.',
+  },
+  pending: {
+    title: 'Visitas Pendentes',
+    description: 'Promotores cuja situação operacional mais recente está pendente.',
+  },
+  duration: {
+    title: 'Tempo Médio',
+    description: 'Promotores com visitas concluídas consideradas no cálculo de duração.',
+  },
+};
+
 const SupervisorDashboard: React.FC = () => {
   const [dashboard, setDashboard] = useState<SupervisorDashboardResponse>(EMPTY_DASHBOARD);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'sync_pending' | 'on_route' | 'in_progress' | 'pending' | 'offline'>('all');
+  const [filter, setFilter] = useState<SupervisorFilter>('all');
+  const [search, setSearch] = useState('');
   const [selectedPromoter, setSelectedPromoter] = useState<SupervisorPromoterOverview | null>(null);
   const [promoterDetail, setPromoterDetail] = useState<SupervisorPromoterDetailResponse | null>(null);
 
@@ -85,16 +126,11 @@ const SupervisorDashboard: React.FC = () => {
     }
   };
 
-  const filteredData = dashboard.promoters.filter(p => {
-    if (filter === 'active') return true;
-    if (filter === 'completed') return p.status === 'CONCLUÍDO';
-    if (filter === 'sync_pending') return p.pendingSyncVisits > 0;
-    if (filter === 'on_route') return p.status === 'EM ROTA';
-    if (filter === 'in_progress') return p.status === 'EM ANDAMENTO';
-    if (filter === 'pending') return p.status === 'PENDENTE';
-    if (filter === 'offline') return !p.online;
-    return true;
-  });
+  const filteredData = filterSupervisorPromoters(dashboard.promoters, filter, search);
+  const activeFilterInfo = FILTER_INFO[filter];
+  const selectFilter = (nextFilter: SupervisorFilter) => {
+    setFilter((current) => current === nextFilter ? 'all' : nextFilter);
+  };
 
   const chartData = dashboard.timeline;
 
@@ -206,12 +242,12 @@ const SupervisorDashboard: React.FC = () => {
         <div>
           <h2 className="text-4xl font-black uppercase tracking-tighter text-[#0F172A]">Gestão de Equipe</h2>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-2">
-            {filter === 'all' ? 'Visão Geral' : filter === 'active' ? 'Promotores Cadastrados' : 'Visitas Concluídas'}
+            {activeFilterInfo.title}
           </p>
         </div>
         {filter !== 'all' && (
           <button 
-            onClick={() => setFilter('all')}
+            onClick={() => { setFilter('all'); setSearch(''); }}
             className="text-[10px] font-black uppercase tracking-widest text-[#E65C5C] hover:underline"
           >
             ← Voltar para Geral
@@ -221,7 +257,8 @@ const SupervisorDashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <button 
-          onClick={() => setFilter('active')}
+          onClick={() => selectFilter('active')}
+          aria-pressed={filter === 'active'}
           className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'active' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
         >
           <div className="flex items-center gap-3 mb-2">
@@ -234,20 +271,22 @@ const SupervisorDashboard: React.FC = () => {
         </button>
 
         <button 
-          onClick={() => setFilter('offline')}
+          onClick={() => selectFilter('offline')}
+          aria-pressed={filter === 'offline'}
           className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'offline' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
         >
           <div className="flex items-center gap-3 mb-2">
             <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center">
               <SignalLow className="text-slate-600" size={16} />
             </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores Off Line</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sem Atualização Recente</p>
           </div>
           <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.offlinePromoters}</h4>
         </button>
 
         <button 
-          onClick={() => setFilter('sync_pending')}
+          onClick={() => selectFilter('sync_pending')}
+          aria-pressed={filter === 'sync_pending'}
           className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'sync_pending' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
         >
           <div className="flex items-center gap-3 mb-2">
@@ -260,7 +299,8 @@ const SupervisorDashboard: React.FC = () => {
         </button>
 
         <button 
-          onClick={() => setFilter('on_route')}
+          onClick={() => selectFilter('on_route')}
+          aria-pressed={filter === 'on_route'}
           className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'on_route' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
         >
           <div className="flex items-center gap-3 mb-2">
@@ -273,7 +313,8 @@ const SupervisorDashboard: React.FC = () => {
         </button>
 
         <button 
-          onClick={() => setFilter('in_progress')}
+          onClick={() => selectFilter('in_progress')}
+          aria-pressed={filter === 'in_progress'}
           className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'in_progress' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
         >
           <div className="flex items-center gap-3 mb-2">
@@ -286,7 +327,8 @@ const SupervisorDashboard: React.FC = () => {
         </button>
 
         <button 
-          onClick={() => setFilter('completed')}
+          onClick={() => selectFilter('completed')}
+          aria-pressed={filter === 'completed'}
           className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'completed' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
         >
           <div className="flex items-center gap-3 mb-2">
@@ -295,11 +337,12 @@ const SupervisorDashboard: React.FC = () => {
             </div>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Concluídas</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.completedPromoters}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.completedVisits}</h4>
         </button>
 
         <button 
-          onClick={() => setFilter('pending')}
+          onClick={() => selectFilter('pending')}
+          aria-pressed={filter === 'pending'}
           className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'pending' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
         >
           <div className="flex items-center gap-3 mb-2">
@@ -311,7 +354,11 @@ const SupervisorDashboard: React.FC = () => {
           <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.pendingPromoters}</h4>
         </button>
 
-        <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm">
+        <button
+          onClick={() => selectFilter('duration')}
+          aria-pressed={filter === 'duration'}
+          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'duration' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
+        >
           <div className="flex items-center gap-3 mb-2">
             <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center">
               <Clock className="text-slate-600" size={16} />
@@ -319,14 +366,43 @@ const SupervisorDashboard: React.FC = () => {
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Média de Tempo</p>
           </div>
           <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.averageVisitTime}</h4>
+        </button>
+      </div>
+
+      <div className="bg-slate-50 border border-slate-100 rounded-[28px] p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <p className="text-[9px] font-black text-[#E65C5C] uppercase tracking-[0.2em]">Indicador selecionado</p>
+          <p className="text-sm font-black uppercase tracking-tight text-[#0F172A] mt-1">{activeFilterInfo.title}</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">{activeFilterInfo.description}</p>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="text-right min-w-24">
+            <p className="text-2xl font-black text-[#0F172A]">{filteredData.length}</p>
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Promotores no recorte</p>
+          </div>
+          <label className="relative block min-w-[240px]">
+            <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar promotor, loja ou região"
+              className="w-full bg-white border border-slate-100 rounded-2xl py-3 pl-10 pr-4 text-[10px] font-bold uppercase tracking-wider outline-none focus:border-[#E65C5C]"
+            />
+          </label>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">
           <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
-            {filter === 'all' ? 'Desempenho dos Promotores' : 'Filtro Ativo'}
+            {filter === 'all' && !search ? 'Desempenho dos Promotores' : `${activeFilterInfo.title} • ${filteredData.length} resultado${filteredData.length === 1 ? '' : 's'}`}
           </h3>
+          {filteredData.length === 0 && (
+            <div className="bg-white p-8 rounded-3xl border border-slate-100 text-center">
+              <p className="text-xs font-black uppercase tracking-widest text-[#0F172A]">Nenhum promotor neste recorte</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-2">Altere o indicador ou limpe a busca para ampliar a análise.</p>
+            </div>
+          )}
           {filteredData.map(promoter => (
             <button 
               key={promoter.id} 

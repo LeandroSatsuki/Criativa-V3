@@ -23,7 +23,7 @@ O Criativa Field Ops organiza uma visita de campo em etapas controladas:
 5. Estoque
 6. Depois
 7. Trocas / avarias
-8. Check-out
+8. Finalização da visita
 9. Sincronização
 
 O promotor só consegue avançar quando a etapa anterior estiver concluída. O supervisor entra em um painel próprio com dados reais do backend.
@@ -122,7 +122,7 @@ Importante durante a evolucao offline:
 - Se a resposta for negativa, o fluxo segue sem fotos adicionais nessa etapa.
 - Quando houver trocas, cada empresa aceita ate 30 fotos.
 
-### 3.8 Check-out
+### 3.8 Finalização da visita
 
 - O promotor registra a foto de saída.
 - O sistema grava o horário de saída.
@@ -130,7 +130,7 @@ Importante durante a evolucao offline:
 
 ### 3.9 Sincronização
 
-- Depois do check-out, a visita pode ser sincronizada.
+- Depois da finalização da visita, o registro pode ser sincronizado.
 - O app envia os dados para o backend.
 - O backend repassa os dados para o destino operacional configurado.
 - Se houver erro, a visita entra em fila local para reenvio.
@@ -144,13 +144,18 @@ Importante durante a evolucao offline:
 ## 4. Fluxo do supervisor
 
 - O supervisor faz login com o mesmo mecanismo, mas recebe o papel de supervisão.
-- O painel mostra:
-  - promotores
-  - visitas
-  - status de sincronização
-  - pendências
-  - produtividade
+- O painel mostra promotores, visitas, status de sincronização, pendências e produtividade.
 - O painel usa dados reais do backend.
+- Cada card funciona como filtro da equipe. Clique uma vez para aplicar e clique
+  novamente no mesmo card para voltar a visao geral.
+- O bloco `Indicador selecionado` explica o recorte e informa quantos promotores
+  correspondem a ele.
+- A busca aceita nome, identificador, regiao ou loja e pode ser combinada com o
+  card selecionado.
+- Clique em um promotor para consultar metricas e o roteiro de execucao.
+- `Sem Atualizacao Recente` significa que o backend nao recebeu atualizacao
+  daquele promotor nos ultimos 15 minutos; nao significa necessariamente que o
+  aparelho esteja desligado.
 
 ## 5. O que acontece com as fotos
 

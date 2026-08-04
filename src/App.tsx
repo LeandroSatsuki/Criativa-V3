@@ -14,6 +14,7 @@ import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession } from './services/session';
 import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
 import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
+import { resolveSessionSection } from './services/navigationPolicy';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -57,7 +58,9 @@ const App: React.FC = () => {
     return INITIAL_STATE;
   });
 
-  const [activeSection, setActiveSection] = useState<SectionId>(visitState.step || SectionId.Dashboard);
+  const [activeSection, setActiveSection] = useState<SectionId>(() =>
+    resolveSessionSection(visitState.user?.role, visitState.step),
+  );
 
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [loadingError, setLoadingError] = useState<string | null>(null);
@@ -89,7 +92,12 @@ const App: React.FC = () => {
           user: session?.user || null,
           draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
         });
-        setActiveSection(sessionMatchesDraft && saved.step ? saved.step : SectionId.Dashboard);
+        setActiveSection(resolveSessionSection(
+          session?.user.role,
+          sessionMatchesDraft ? saved.step : SectionId.Dashboard,
+        ));
+      } else if (session?.user) {
+        setActiveSection(resolveSessionSection(session.user.role));
       }
 
       await requestPersistentVisitStorage();

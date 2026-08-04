@@ -699,7 +699,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 </div>
                 {pendingIndustryExecutions.length > 0 && (
                   <p className="text-[10px] font-bold text-orange-600 uppercase tracking-widest bg-orange-50 p-4 rounded-2xl">
-                    Check-out bloqueado até concluir: {pendingIndustryExecutions.map(execution => execution.industry).join(', ')}.
+                    Finalização bloqueada até concluir: {pendingIndustryExecutions.map(execution => execution.industry).join(', ')}.
                   </p>
                 )}
               </div>
@@ -773,18 +773,18 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   />
                   <DashboardCard 
                     icon={<Send className={tasks[SectionId.CheckOut] ? "text-emerald-500" : "text-slate-500"} />} 
-                    title="5. Check-out" 
+                    title="5. Finalização da Visita"
                     status={tasks[SectionId.CheckOut] ? "Concluído" : "Pendente"}
                     isCompleted={tasks[SectionId.CheckOut]}
                     isDisabled={!canCheckOut}
                     onClick={() => {
                       if (!canCheckOut) {
                         if (activeIndustryExecutions.length === 0) {
-                          alert("Abra pelo menos uma empresa na etapa 'ANTES' antes do check-out.");
+                          alert("Abra pelo menos uma empresa na etapa 'ANTES' antes da finalização da visita.");
                           navigateTo(SectionId.Antes);
                           return;
                         }
-                        alert(`Finalize os fluxos em aberto antes do check-out: ${pendingIndustryExecutions.map(execution => execution.industry).join(', ')}.`);
+                        alert(`Finalize os fluxos em aberto antes da finalização da visita: ${pendingIndustryExecutions.map(execution => execution.industry).join(', ')}.`);
                         return;
                       }
                       navigateTo(SectionId.CheckOut);
@@ -893,7 +893,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   )})}
                 </div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  Voce pode abrir outra industria antes do check-out. Cada uma precisa concluir Antes, Depois e Trocas.
+                  Voce pode abrir outra industria antes da finalização da visita. Cada uma precisa concluir Antes, Depois e Trocas.
                 </p>
               </div>
             )}
@@ -1452,7 +1452,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               </div>
               <h2 className="text-3xl font-black uppercase tracking-tighter">Finalizar Visita</h2>
               <div className="bg-orange-50 p-8 rounded-[32px] border border-orange-100 text-orange-700 space-y-4">
-                <p className="font-black uppercase tracking-widest text-xs">Check-out bloqueado</p>
+                <p className="font-black uppercase tracking-widest text-xs">Finalização bloqueada</p>
                 <p className="text-sm font-bold leading-relaxed">
                   Conclua todos os fluxos de empresas abertos antes de registrar a saída.
                 </p>

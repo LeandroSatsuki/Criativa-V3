@@ -265,6 +265,16 @@ Opcional para migração futura:
 
 ## 9. Acesso supervisor
 
+Os cards do painel filtram localmente somente o conjunto autorizado retornado
+por `GET /api/supervisor/dashboard`. O card de visitas concluidas exibe
+`summary.completedVisits`; a lista correspondente inclui promotores com pelo
+menos uma visita concluida. Busca e filtro podem ser combinados, sem gerar
+novas consultas ou ampliar permissoes.
+
+O nome apresentado ao usuario para a etapa final e `Finalizacao da Visita`.
+Por compatibilidade, continuam inalterados o enum `CHECKOUT`, `checkOutTime`,
+`FOTO_CHECKOUT`, `NOME_CHECKOUT` e os mapeamentos da Make e do Google Sheets.
+
 O backend aceita três formas de identificar supervisor:
 
 - coluna `ROLE` na aba `PROMOTORES`, com valor `SUPERVISOR`;

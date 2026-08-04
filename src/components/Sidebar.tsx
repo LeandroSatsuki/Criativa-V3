@@ -12,7 +12,7 @@ const Sidebar: React.FC<any> = ({ activeSection, onSelect, onLogout, tasksComple
     { id: SectionId.Estoque, title: 'Estoque', icon: Boxes, disabled: !isCheckInDone },
     { id: SectionId.Depois, title: 'Depois', icon: Camera, disabled: !isCheckInDone },
     { id: SectionId.Trocas, title: 'Trocas', icon: PackageOpen, disabled: !isCheckInDone },
-    { id: SectionId.CheckOut, title: 'Check-out', icon: Send, disabled: !isCheckInDone },
+    { id: SectionId.CheckOut, title: 'Finalização', icon: Send, disabled: !isCheckInDone },
     { id: SectionId.Sync, title: 'Sincronizar', icon: CloudUpload, disabled: !tasksCompleted[SectionId.CheckOut] },
   ];
 

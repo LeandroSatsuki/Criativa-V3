@@ -1,5 +1,48 @@
 # CHANGELOG
 
+## [2026-08-04] - Painel supervisor interativo em homologacao
+
+### Alterado
+- Os oito indicadores do painel supervisor passaram a atuar como filtros da
+  lista de promotores; selecionar novamente o mesmo card limpa o recorte.
+- O painel passou a exibir o indicador selecionado, sua regra, a quantidade de
+  promotores no recorte e uma busca por nome, identificador, regiao ou loja.
+- O nome visivel da etapa `Check-out` passou a ser `Finalizacao da Visita` e o
+  item lateral foi abreviado para `Finalizacao`.
+
+### Adicionado
+- Politica testavel para restaurar a tela correta de acordo com o papel da
+  sessao.
+- Testes de filtros do painel, busca sem acentos e restauracao da navegacao.
+- Estado vazio quando nenhum promotor corresponde ao indicador e a busca.
+
+### Corrigido
+- O card `Visitas Concluidas` agora mostra `completedVisits`, em vez de contar
+  somente promotores cujo ultimo status era concluido.
+- Uma sessao restaurada de supervisor volta diretamente para `Gestao de
+  Equipe`, sem abrir incorretamente o painel operacional do promotor.
+- O rotulo `Promotores Off Line` foi substituido por `Sem Atualizacao Recente`,
+  refletindo a regra real de ausencia de atualizacao por 15 minutos.
+
+### Seguranca
+- Os filtros sao aplicados apenas aos dados autorizados retornados pelo backend.
+- Identificadores tecnicos `CHECKOUT`, `checkOutTime`, `FOTO_CHECKOUT` e os
+  contratos existentes com Make e Sheets foram preservados.
+- Nenhuma credencial, permissao ou regra de autenticacao foi alterada.
+
+### Validacao
+- `npm.cmd test`: 41 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Chromium movel controlado confirmou oito cards, filtro de concluidas, busca
+  por regiao, detalhe do promotor, restauracao da sessao e ausencia de overflow.
+- Preview `6a72106362a54cb62aa86414` publicado no alias `pwa-offline`.
+
+### Pendencias
+- Validar os indicadores com o login supervisor e os dados reais do cliente.
+- Promover para producao somente depois da aprovacao da homologacao.
+- O build mantem o aviso conhecido de chunk JavaScript acima de `500 KB`.
+
 ## [2026-08-04] - PWA-4 em homologacao: liberacao segura apos envio offline
 
 ### Alterado
