@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { apiService } from '../services/apiService';
 import { filterSupervisorPromoters, type SupervisorFilter } from '../services/supervisorFilters';
+import { buildWhatsAppUrl } from '../services/whatsapp';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp, Users, Clock, MapPin, CheckCircle2, Loader2, Route, Play, ClipboardList, SignalLow, Search } from 'lucide-react';
+import { TrendingUp, Users, Clock, MapPin, CheckCircle2, Loader2, Route, Play, ClipboardList, SignalLow, Search, X, MessageCircle, Phone } from 'lucide-react';
 import type { SupervisorDashboardResponse, SupervisorPromoterDetailResponse, SupervisorPromoterOverview, SupervisorTimelinePoint } from '../types';
 
 const EMPTY_TIMELINE: SupervisorTimelinePoint[] = [
@@ -19,12 +20,15 @@ const EMPTY_SUMMARY = {
   onlinePromoters: 0,
   offlinePromoters: 0,
   onRoutePromoters: 0,
+  activeTodayPromoters: 0,
   inProgressPromoters: 0,
   completedPromoters: 0,
   pendingPromoters: 0,
   pendingSyncVisits: 0,
+  pendingSyncPromoters: 0,
   totalVisits: 0,
   completedVisits: 0,
+  pendingVisits: 0,
   averageVisitTime: '--:--',
   lastUpdated: '',
 };
@@ -39,11 +43,11 @@ const EMPTY_DASHBOARD: SupervisorDashboardResponse = {
 const FILTER_INFO: Record<SupervisorFilter, { title: string; description: string }> = {
   all: {
     title: 'Visão Geral',
-    description: 'Todos os promotores presentes nos dados operacionais.',
+    description: 'Cadastros atuais e usuários históricos que ainda possuem registros operacionais.',
   },
   active: {
     title: 'Promotores Cadastrados',
-    description: 'Equipe de campo presente no cadastro ou no histórico operacional, sem incluir supervisores.',
+    description: 'Somente promotores presentes atualmente na aba PROMOTORES, sem incluir supervisores ou cadastros históricos.',
   },
   offline: {
     title: 'Sem Atualização Recente',
@@ -51,27 +55,27 @@ const FILTER_INFO: Record<SupervisorFilter, { title: string; description: string
   },
   sync_pending: {
     title: 'Pendências de Sincronização',
-    description: 'Promotores com pelo menos uma visita aguardando confirmação de envio.',
+    description: 'Pessoas com ao menos um envio ainda não confirmado, inclusive pendências de dias anteriores.',
   },
   on_route: {
-    title: 'Promotores em Rota',
-    description: 'Promotores cuja situação operacional mais recente está em rota.',
+    title: 'Em Atividade Hoje',
+    description: 'Promotores com pelo menos uma visita registrada hoje. Este indicador não representa localização por GPS.',
   },
   in_progress: {
-    title: 'Visitas em Andamento',
-    description: 'Promotores com uma visita em processamento no momento.',
+    title: 'Envios em Processamento',
+    description: 'Pessoas com sincronização sendo processada pelo backend neste momento.',
   },
   completed: {
-    title: 'Visitas Concluídas',
-    description: 'Promotores que contribuíram para o total real de visitas concluídas.',
+    title: 'Visitas Concluídas Hoje',
+    description: 'Pessoas que concluíram uma ou mais visitas hoje, considerando o fuso de Brasília.',
   },
   pending: {
-    title: 'Visitas Pendentes',
-    description: 'Promotores cuja situação operacional mais recente está pendente.',
+    title: 'Visitas Pendentes Hoje',
+    description: 'Pessoas com uma ou mais visitas de hoje ainda sem confirmação de envio.',
   },
   duration: {
-    title: 'Tempo Médio',
-    description: 'Promotores com visitas concluídas consideradas no cálculo de duração.',
+    title: 'Tempo Médio Hoje',
+    description: 'Promotores com visitas concluídas hoje consideradas no cálculo de duração.',
   },
 };
 
@@ -83,6 +87,8 @@ const SupervisorDashboard: React.FC = () => {
   const [search, setSearch] = useState('');
   const [selectedPromoter, setSelectedPromoter] = useState<SupervisorPromoterOverview | null>(null);
   const [promoterDetail, setPromoterDetail] = useState<SupervisorPromoterDetailResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,18 +118,24 @@ const SupervisorDashboard: React.FC = () => {
   }, []);
 
   const handlePromoterClick = async (promoter: SupervisorPromoterOverview) => {
-    setSelectedPromoter(null);
+    setSelectedPromoter(promoter);
     setPromoterDetail(null);
-    setLoading(true);
+    setDetailError(null);
+    setDetailLoading(true);
     try {
       const detail = await apiService.getPromoterExecution(promoter.id);
       setPromoterDetail(detail);
-      setSelectedPromoter(promoter);
-    } catch (error) {
-      console.error("Erro ao carregar detalhes:", error);
+    } catch (fetchError: any) {
+      setDetailError(fetchError?.message || 'Não foi possível carregar os dados do promotor.');
     } finally {
-      setLoading(false);
+      setDetailLoading(false);
     }
+  };
+
+  const closePromoterDetail = () => {
+    setSelectedPromoter(null);
+    setPromoterDetail(null);
+    setDetailError(null);
   };
 
   const filteredData = filterSupervisorPromoters(dashboard.promoters, filter, search);
@@ -133,6 +145,7 @@ const SupervisorDashboard: React.FC = () => {
   };
 
   const chartData = dashboard.timeline;
+  const whatsappUrl = selectedPromoter ? buildWhatsAppUrl(selectedPromoter.phone) : null;
 
   if (loading) return (
     <div className="h-64 flex items-center justify-center">
@@ -151,93 +164,76 @@ const SupervisorDashboard: React.FC = () => {
     );
   }
 
-  // Detailed View for a Single Promoter
-  if (selectedPromoter && promoterDetail) {
-    return (
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between">
-          <button 
-            onClick={() => { setSelectedPromoter(null); setPromoterDetail(null); }}
-            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-[#E65C5C] transition-colors"
-          >
-            ← Voltar para Gestão
-          </button>
-          <div className="text-right">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status Atual</p>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-              selectedPromoter.online ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
-            }`}>
-              {selectedPromoter.online ? 'Online' : 'Offline'}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6">
-          <div className="w-20 h-20 bg-slate-100 rounded-[32px] flex items-center justify-center text-2xl font-black text-slate-400">
-            {selectedPromoter.name.split(' ').map((n:any) => n[0]).join('').slice(0,2)}
-          </div>
-          <div>
-            <h2 className="text-4xl font-black uppercase tracking-tighter text-[#0F172A]">{selectedPromoter.name}</h2>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">ID: {selectedPromoter.id} • Regional: {selectedPromoter.region || 'ES'}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Eficiência</p>
-            <h4 className="text-3xl font-black text-emerald-600">{promoterDetail.metrics.efficiency}</h4>
-          </div>
-          <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tempo de Jornada</p>
-            <h4 className="text-3xl font-black text-[#0F172A]">{promoterDetail.metrics.workingTime}</h4>
-          </div>
-          <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Progresso Total</p>
-            <h4 className="text-3xl font-black text-[#E65C5C]">{selectedPromoter.progress}%</h4>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Roteiro e Execução</h3>
-          <div className="space-y-3">
-            {promoterDetail.route.map((stop: any) => (
-              <div key={stop.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    stop.status === 'CONCLUÍDO' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
-                  }`}>
-                    {stop.status === 'CONCLUÍDO' ? <CheckCircle2 size={20} /> : <Play size={20} />}
-                  </div>
-                  <div>
-                    <p className="font-black uppercase text-sm text-[#0F172A]">{stop.name}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">{stop.time}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-8">
-                  <div className="text-center">
-                    <p className="text-[8px] font-black text-slate-400 uppercase">Tarefas</p>
-                    <p className="text-xs font-black text-[#0F172A]">{stop.tasks}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[8px] font-black text-slate-400 uppercase">Fotos</p>
-                    <p className="text-xs font-black text-[#0F172A]">{stop.photos}</p>
-                  </div>
-                  <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${
-                    stop.status === 'CONCLUÍDO' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
-                  }`}>
-                    {stop.status}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8 animate-in">
+      {selectedPromoter && (
+        <div className="fixed inset-0 z-[90] bg-[#0F172A]/55 backdrop-blur-sm flex items-center justify-center p-4 md:p-8" onClick={closePromoterDetail}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="promoter-detail-title"
+            className="w-full max-w-3xl max-h-[88vh] overflow-y-auto bg-white rounded-[32px] md:rounded-[40px] shadow-2xl border border-slate-100"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-6 py-5 md:px-8 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E65C5C]">Dados do promotor</p>
+                <h2 id="promoter-detail-title" className="text-2xl font-black uppercase tracking-tight text-[#0F172A] truncate">{selectedPromoter.name}</h2>
+              </div>
+              <button onClick={closePromoterDetail} aria-label="Fechar dados do promotor" className="w-10 h-10 shrink-0 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 md:p-8 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-slate-50 rounded-3xl p-5 space-y-3">
+                  <div><p className="text-[8px] font-black uppercase tracking-widest text-slate-400">ID</p><p className="text-sm font-black text-[#0F172A]">{selectedPromoter.id}</p></div>
+                  <div><p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Usuário</p><p className="text-sm font-black text-[#0F172A]">{selectedPromoter.user || 'Não informado'}</p></div>
+                  <div><p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Regional</p><p className="text-sm font-black text-[#0F172A]">{selectedPromoter.region || 'Não informada'}</p></div>
+                </div>
+                <div className="bg-slate-50 rounded-3xl p-5 space-y-4">
+                  <div>
+                    <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Telefone</p>
+                    <p className="text-sm font-black text-[#0F172A] flex items-center gap-2"><Phone size={14} /> {selectedPromoter.phone || 'Não cadastrado'}</p>
+                  </div>
+                  {whatsappUrl ? (
+                    <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="w-full bg-emerald-500 text-white rounded-2xl py-3 px-4 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                      <MessageCircle size={16} /> Abrir WhatsApp
+                    </a>
+                  ) : (
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Cadastre um telefone válido na planilha para habilitar o WhatsApp.</p>
+                  )}
+                </div>
+              </div>
+
+              {detailLoading && <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-[#E65C5C]" size={28} /></div>}
+              {detailError && <div className="bg-red-50 text-red-600 rounded-2xl p-4 text-[10px] font-black uppercase tracking-wider">{detailError}</div>}
+              {promoterDetail && (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-white border border-slate-100 rounded-2xl p-4"><p className="text-[8px] font-black uppercase text-slate-400">Visitas hoje</p><p className="text-xl font-black">{promoterDetail.metrics.totalVisits}</p></div>
+                    <div className="bg-white border border-slate-100 rounded-2xl p-4"><p className="text-[8px] font-black uppercase text-slate-400">Concluídas</p><p className="text-xl font-black text-emerald-600">{promoterDetail.metrics.completedVisits}</p></div>
+                    <div className="bg-white border border-slate-100 rounded-2xl p-4"><p className="text-[8px] font-black uppercase text-slate-400">Pendentes</p><p className="text-xl font-black text-orange-600">{promoterDetail.metrics.pendingSyncVisits}</p></div>
+                    <div className="bg-white border border-slate-100 rounded-2xl p-4"><p className="text-[8px] font-black uppercase text-slate-400">Tempo médio</p><p className="text-xl font-black">{promoterDetail.metrics.averageDuration}</p></div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Visitas recentes</h3>
+                    {promoterDetail.route.length === 0 && <p className="bg-slate-50 rounded-2xl p-5 text-[10px] font-bold uppercase text-slate-400">Nenhuma visita registrada.</p>}
+                    {promoterDetail.route.map((stop) => (
+                      <div key={stop.id} className="border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div><p className="text-sm font-black uppercase text-[#0F172A]">{stop.name}</p><p className="text-[9px] font-bold uppercase text-slate-400">{stop.date} às {stop.time} • {stop.photos} fotos</p></div>
+                        <span className={`self-start sm:self-auto px-3 py-1 rounded-full text-[8px] font-black uppercase ${stop.status === 'CONCLUÍDO' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>{stop.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-end justify-between">
         <div>
           <h2 className="text-4xl font-black uppercase tracking-tighter text-[#0F172A]">Gestão de Equipe</h2>
@@ -295,7 +291,8 @@ const SupervisorDashboard: React.FC = () => {
             </div>
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pendências de Sync</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.pendingSyncVisits}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.pendingSyncPromoters}</h4>
+          <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-1">{dashboard.summary.pendingSyncVisits} envio(s)</p>
         </button>
 
         <button 
@@ -307,9 +304,9 @@ const SupervisorDashboard: React.FC = () => {
             <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
               <Route className="text-blue-600" size={16} />
             </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores em Rota</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Em Atividade Hoje</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.onRoutePromoters}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.activeTodayPromoters}</h4>
         </button>
 
         <button 
@@ -321,7 +318,7 @@ const SupervisorDashboard: React.FC = () => {
             <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
               <Play className="text-amber-600" size={16} />
             </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas em Andamento</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Envios em Processamento</p>
           </div>
           <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.inProgressPromoters}</h4>
         </button>
@@ -335,7 +332,7 @@ const SupervisorDashboard: React.FC = () => {
             <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
               <CheckCircle2 className="text-emerald-700" size={16} />
             </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Concluídas</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Concluídas Hoje</p>
           </div>
           <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.completedVisits}</h4>
         </button>
@@ -349,9 +346,9 @@ const SupervisorDashboard: React.FC = () => {
             <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center">
               <ClipboardList className="text-orange-600" size={16} />
             </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Pendentes</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Pendentes Hoje</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.pendingPromoters}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.pendingVisits}</h4>
         </button>
 
         <button
@@ -363,7 +360,7 @@ const SupervisorDashboard: React.FC = () => {
             <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center">
               <Clock className="text-slate-600" size={16} />
             </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Média de Tempo</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Média de Tempo Hoje</p>
           </div>
           <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.averageVisitTime}</h4>
         </button>
@@ -385,7 +382,7 @@ const SupervisorDashboard: React.FC = () => {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar promotor, loja ou região"
+              placeholder="Buscar nome, telefone, loja ou região"
               className="w-full bg-white border border-slate-100 rounded-2xl py-3 pl-10 pr-4 text-[10px] font-bold uppercase tracking-wider outline-none focus:border-[#E65C5C]"
             />
           </label>
@@ -423,7 +420,6 @@ const SupervisorDashboard: React.FC = () => {
                     <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${
                       promoter.status === 'CONCLUÍDO' ? 'bg-emerald-50 text-emerald-600' : 
                       promoter.status === 'EM ANDAMENTO' ? 'bg-amber-50 text-amber-600' :
-                      promoter.status === 'EM ROTA' ? 'bg-blue-50 text-blue-600' :
                       promoter.status === 'PENDENTE' ? 'bg-orange-50 text-orange-600' :
                       'bg-slate-50 text-slate-600'
                     }`}>
@@ -434,8 +430,8 @@ const SupervisorDashboard: React.FC = () => {
               </div>
               <div className="flex items-center gap-8">
                 <div className="text-right hidden md:block">
-                  <p className="text-[9px] font-black text-slate-400 uppercase">Visitas</p>
-                  <p className="text-sm font-black text-[#0F172A]">{promoter.visits?.completed || 0} / {promoter.visits?.total || 0}</p>
+                  <p className="text-[9px] font-black text-slate-400 uppercase">Visitas hoje</p>
+                  <p className="text-sm font-black text-[#0F172A]">{promoter.todayVisits?.completed || 0} / {promoter.todayVisits?.total || 0}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black text-[#0F172A]">{promoter.progress}%</p>
@@ -451,7 +447,7 @@ const SupervisorDashboard: React.FC = () => {
 
         <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm h-fit">
           <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
-            <TrendingUp className="text-[#E65C5C]" size={16}/> Curva de Execução
+            <TrendingUp className="text-[#E65C5C]" size={16}/> Curva de Execução Hoje
           </h3>
           <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">

@@ -1,6 +1,6 @@
 import type { AppData } from './data';
 import type { VisitRecord } from './visits';
-import { formatBrasiliaTime } from './time.ts';
+import { formatBrasiliaDate, formatBrasiliaTime } from './time.ts';
 
 export type SupervisorTimelinePoint = {
   time: string;
@@ -12,14 +12,23 @@ export type SupervisorTimelinePoint = {
 export type SupervisorPromoterOverview = {
   id: string;
   name: string;
+  user: string;
   region: string;
-  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'EM ROTA';
+  phone: string;
+  registered: boolean;
+  activeToday: boolean;
+  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'SEM ATIVIDADE';
   online: boolean;
   progress: number;
   store: string;
   lastSync: string;
   visits: {
     completed: number;
+    total: number;
+  };
+  todayVisits: {
+    completed: number;
+    pending: number;
     total: number;
   };
   pendingSyncVisits: number;
@@ -31,12 +40,15 @@ export type SupervisorDashboardSummary = {
   onlinePromoters: number;
   offlinePromoters: number;
   onRoutePromoters: number;
+  activeTodayPromoters: number;
   inProgressPromoters: number;
   completedPromoters: number;
   pendingPromoters: number;
   pendingSyncVisits: number;
+  pendingSyncPromoters: number;
   totalVisits: number;
   completedVisits: number;
+  pendingVisits: number;
   averageVisitTime: string;
   lastUpdated: string;
 };
@@ -53,6 +65,7 @@ export type SupervisorPromoterDetailRouteItem = {
   visitId: string;
   name: string;
   time: string;
+  date: string;
   status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE';
   tasks: number;
   photos: number;
@@ -60,6 +73,14 @@ export type SupervisorPromoterDetailRouteItem = {
 };
 
 export type SupervisorPromoterDetailResponse = {
+  profile: {
+    id: string;
+    name: string;
+    user: string;
+    region: string;
+    phone: string;
+    registered: boolean;
+  };
   metrics: {
     efficiency: string;
     workingTime: string;
@@ -82,6 +103,18 @@ const formatDuration = (milliseconds: number) => {
 
 const getTimestamp = (visit: VisitRecord) =>
   visit.payload?.checkInTime || visit.payload?.checkOutTime || visit.updatedAt || visit.createdAt;
+
+const getBrasiliaDateKey = (value: string | Date) => new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'America/Sao_Paulo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+}).format(typeof value === 'string' ? new Date(value) : value);
+
+const isVisitFromDate = (visit: VisitRecord, dateKey: string) => {
+  const timestamp = getTimestamp(visit);
+  return Boolean(timestamp && getBrasiliaDateKey(timestamp) === dateKey);
+};
 
 const normalizeIdentity = (value: unknown) => String(value || '').toLowerCase().trim();
 
@@ -127,11 +160,10 @@ const getBrasiliaHour = (value: string) => {
   return Number(hour);
 };
 
-const getVisitStatus = (visit: VisitRecord, isOnline: boolean) => {
+const getVisitStatus = (visit: VisitRecord) => {
   if (visit.syncStatus === 'enviado' && visit.payload?.checkOutTime) return 'CONCLUÍDO';
   if (visit.syncStatus === 'enviando') return 'EM ANDAMENTO';
-  if (pendingSyncStatuses.has(visit.syncStatus)) return 'PENDENTE';
-  return isOnline ? 'EM ROTA' : 'PENDENTE';
+  return 'PENDENTE';
 };
 
 const getRouteVisitStatus = (visit: VisitRecord) => {
@@ -155,32 +187,46 @@ const getLastVisitTime = (visit: VisitRecord | undefined) => {
   return visit.updatedAt || visit.createdAt || null;
 };
 
-const buildPromoterOverview = (promoter: AppData['promoters'][number], promoterVisits: VisitRecord[]) => {
+const buildPromoterOverview = (
+  promoter: AppData['promoters'][number],
+  promoterVisits: VisitRecord[],
+  dateKey: string,
+  registered: boolean,
+  nowMs: number,
+) => {
   const orderedVisits = [...promoterVisits].sort((left, right) => {
     const leftTime = new Date(getTimestamp(left)).getTime();
     const rightTime = new Date(getTimestamp(right)).getTime();
     return leftTime - rightTime;
   });
 
-  const latest = orderedVisits.at(-1);
+  const todayVisits = orderedVisits.filter((visit) => isVisitFromDate(visit, dateKey));
+  const latestToday = todayVisits.at(-1);
+  const latest = latestToday || orderedVisits.at(-1);
   const latestTime = getLastVisitTime(latest);
   const completed = orderedVisits.filter((visit) => visit.syncStatus === 'enviado' && visit.payload?.checkOutTime).length;
   const pendingSyncVisits = orderedVisits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
-  const online = Boolean(latestTime && (Date.now() - new Date(latestTime).getTime()) < 15 * 60 * 1000);
+  const completedToday = todayVisits.filter((visit) => visit.syncStatus === 'enviado' && visit.payload?.checkOutTime).length;
+  const pendingToday = todayVisits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
+  const online = Boolean(latestTime && (nowMs - new Date(latestTime).getTime()) < 15 * 60 * 1000);
 
   const status: SupervisorPromoterOverview['status'] = latest
-    ? getVisitStatus(latest, online)
-    : online
-      ? 'EM ROTA'
-      : 'PENDENTE';
+    ? latestToday
+      ? getVisitStatus(latestToday)
+      : 'SEM ATIVIDADE'
+    : 'SEM ATIVIDADE';
 
   return {
     id: promoter.id,
     name: promoter.name,
+    user: promoter.user,
     region: promoter.region,
+    phone: promoter.phone || '',
+    registered,
+    activeToday: todayVisits.length > 0,
     status,
     online,
-    progress: orderedVisits.length === 0 ? 0 : Math.min(100, Math.round((completed / orderedVisits.length) * 100)),
+    progress: todayVisits.length === 0 ? 0 : Math.min(100, Math.round((completedToday / todayVisits.length) * 100)),
     store: latest?.payload?.currentStore || 'Sem loja recente',
     lastSync: latestTime
       ? formatBrasiliaTime(latestTime)
@@ -188,6 +234,11 @@ const buildPromoterOverview = (promoter: AppData['promoters'][number], promoterV
     visits: {
       completed,
       total: orderedVisits.length,
+    },
+    todayVisits: {
+      completed: completedToday,
+      pending: pendingToday,
+      total: todayVisits.length,
     },
     pendingSyncVisits,
     lastVisitId: latest?.visitId || null,
@@ -224,7 +275,13 @@ const buildTimeline = (visits: VisitRecord[]) => {
 
 const buildAverageDuration = (visits: VisitRecord[]) => getAverageDuration(visits.filter((visit) => visit.syncStatus === 'enviado'));
 
-export const buildSupervisorDashboard = (data: AppData, visits: VisitRecord[]): SupervisorDashboardResponse => {
+export const buildSupervisorDashboard = (
+  data: AppData,
+  visits: VisitRecord[],
+  now = new Date(),
+): SupervisorDashboardResponse => {
+  const dateKey = getBrasiliaDateKey(now);
+  const todayVisits = visits.filter((visit) => isVisitFromDate(visit, dateKey));
   const byPromoter = new Map<string, VisitRecord[]>();
   const promoterByIdentity = new Map<string, AppData['promoters'][number]>();
   const fieldPromoters = data.promoters.filter((promoter) => promoter.role !== 'SUPERVISOR');
@@ -256,26 +313,39 @@ export const buildSupervisorDashboard = (data: AppData, visits: VisitRecord[]): 
         user: String(latest?.payload?.user?.user || id),
         pass: '',
         region: String(latest?.payload?.user?.region || 'Historico'),
+        phone: '',
       };
     });
   const promoterSources = [...fieldPromoters, ...historicalPromoters];
-  const promoters = promoterSources.map((promoter) => buildPromoterOverview(promoter, byPromoter.get(promoter.id) || []));
-  const totalVisits = visits.length;
-  const completedVisits = visits.filter((visit) => visit.syncStatus === 'enviado' && visit.payload?.checkOutTime).length;
+  const promoters = promoterSources.map((promoter) => buildPromoterOverview(
+    promoter,
+    byPromoter.get(promoter.id) || [],
+    dateKey,
+    registeredIds.has(promoter.id),
+    now.getTime(),
+  ));
+  const totalVisits = todayVisits.length;
+  const completedVisits = todayVisits.filter((visit) => visit.syncStatus === 'enviado' && visit.payload?.checkOutTime).length;
+  const pendingVisits = todayVisits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
   const pendingSyncVisits = visits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
-  const onlinePromoters = promoters.filter((promoter) => promoter.online).length;
+  const registeredPromoters = promoters.filter((promoter) => promoter.registered);
+  const onlinePromoters = registeredPromoters.filter((promoter) => promoter.online).length;
+  const activeTodayPromoters = promoters.filter((promoter) => promoter.activeToday).length;
   const summary: SupervisorDashboardSummary = {
-    totalPromoters: promoters.length,
+    totalPromoters: registeredPromoters.length,
     onlinePromoters,
-    offlinePromoters: promoters.length - onlinePromoters,
-    onRoutePromoters: promoters.filter((promoter) => promoter.status === 'EM ROTA').length,
+    offlinePromoters: registeredPromoters.length - onlinePromoters,
+    onRoutePromoters: activeTodayPromoters,
+    activeTodayPromoters,
     inProgressPromoters: promoters.filter((promoter) => promoter.status === 'EM ANDAMENTO').length,
-    completedPromoters: promoters.filter((promoter) => promoter.status === 'CONCLUÍDO').length,
-    pendingPromoters: promoters.filter((promoter) => promoter.status === 'PENDENTE').length,
+    completedPromoters: promoters.filter((promoter) => promoter.todayVisits.completed > 0).length,
+    pendingPromoters: promoters.filter((promoter) => promoter.todayVisits.pending > 0).length,
     pendingSyncVisits,
+    pendingSyncPromoters: promoters.filter((promoter) => promoter.pendingSyncVisits > 0).length,
     totalVisits,
     completedVisits,
-    averageVisitTime: buildAverageDuration(visits),
+    pendingVisits,
+    averageVisitTime: buildAverageDuration(todayVisits),
     lastUpdated: visits.reduce((latest, visit) => {
       const timestamp = visit.updatedAt || visit.createdAt;
       return timestamp && timestamp > latest ? timestamp : latest;
@@ -284,31 +354,46 @@ export const buildSupervisorDashboard = (data: AppData, visits: VisitRecord[]): 
 
   return {
     summary,
-    timeline: buildTimeline(visits),
+    timeline: buildTimeline(todayVisits),
     promoters,
     lastUpdated: summary.lastUpdated,
   };
 };
 
-export const buildSupervisorPromoterDetail = (visits: VisitRecord[]): SupervisorPromoterDetailResponse => {
+export const buildSupervisorPromoterDetail = (
+  visits: VisitRecord[],
+  profile?: Partial<AppData['promoters'][number]> & { registered?: boolean },
+  now = new Date(),
+): SupervisorPromoterDetailResponse => {
   const orderedVisits = [...visits].sort((left, right) => {
     const leftTime = new Date(getTimestamp(left)).getTime();
     const rightTime = new Date(getTimestamp(right)).getTime();
     return leftTime - rightTime;
   });
+  const dateKey = getBrasiliaDateKey(now);
+  const todayVisits = orderedVisits.filter((visit) => isVisitFromDate(visit, dateKey));
+  const latestUser = orderedVisits.at(-1)?.payload?.user || {};
 
-  const completedVisits = orderedVisits.filter((visit) => visit.syncStatus === 'enviado' && visit.payload?.checkOutTime).length;
-  const pendingSyncVisits = orderedVisits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
-  const averageDuration = getAverageDuration(orderedVisits);
+  const completedVisits = todayVisits.filter((visit) => visit.syncStatus === 'enviado' && visit.payload?.checkOutTime).length;
+  const pendingSyncVisits = todayVisits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
+  const averageDuration = getAverageDuration(todayVisits);
 
   return {
+    profile: {
+      id: String(profile?.id || latestUser.id || ''),
+      name: String(profile?.name || latestUser.name || 'Promotor'),
+      user: String(profile?.user || latestUser.user || ''),
+      region: String(profile?.region || latestUser.region || ''),
+      phone: String(profile?.phone || ''),
+      registered: profile?.registered !== false,
+    },
     metrics: {
-      efficiency: orderedVisits.length
-        ? `${Math.min(100, Math.round((completedVisits / orderedVisits.length) * 100))}%`
+      efficiency: todayVisits.length
+        ? `${Math.min(100, Math.round((completedVisits / todayVisits.length) * 100))}%`
         : '0%',
       workingTime: averageDuration,
       completedVisits,
-      totalVisits: orderedVisits.length,
+      totalVisits: todayVisits.length,
       pendingSyncVisits,
       averageDuration,
     },
@@ -317,6 +402,7 @@ export const buildSupervisorPromoterDetail = (visits: VisitRecord[]): Supervisor
       visitId: visit.visitId,
       name: visit.payload?.currentStore || 'Loja sem nome',
       time: formatBrasiliaTime(getTimestamp(visit)),
+      date: formatBrasiliaDate(getTimestamp(visit)),
       status: getRouteVisitStatus(visit),
       tasks: Object.keys(visit.payload?.tasks || {}).length,
       photos: countVisitPhotos(visit),

@@ -266,10 +266,18 @@ Opcional para migração futura:
 ## 9. Acesso supervisor
 
 Os cards do painel filtram localmente somente o conjunto autorizado retornado
-por `GET /api/supervisor/dashboard`. O card de visitas concluidas exibe
-`summary.completedVisits`; a lista correspondente inclui promotores com pelo
-menos uma visita concluida. Busca e filtro podem ser combinados, sem gerar
-novas consultas ou ampliar permissoes.
+por `GET /api/supervisor/dashboard`. Concluidas, pendentes, atividade, curva e
+tempo medio usam o dia corrente em `America/Sao_Paulo`. Pendencias de sync nao
+sao limitadas ao dia para preservar alertas antigos. Busca e filtro podem ser
+combinados, sem gerar novas consultas ou ampliar permissoes.
+
+`Em Atividade Hoje` significa ao menos uma visita persistida no backend no dia;
+nao e geolocalizacao. Operacoes totalmente offline so aparecem para o supervisor
+depois que o aparelho consegue registrar a visita no backend.
+
+O cadastro aceita telefone pelos cabecalhos `TELEFONE`, `CELULAR`, `WHATSAPP`
+ou `CONTATO`. O popup normaliza celulares brasileiros para `55 + DDD + numero`
+ao construir `https://wa.me/`; valores incompletos nao geram link.
 
 O nome apresentado ao usuario para a etapa final e `Finalizacao da Visita`.
 Por compatibilidade, continuam inalterados o enum `CHECKOUT`, `checkOutTime`,
@@ -291,7 +299,7 @@ A planilha operacional e `Sistema Criativa`:
 `https://docs.google.com/spreadsheets/d/1KyyEA78ny_5iNh5N9LTbtX5ieyJ6_s5UR-1Mv45bi-Q/edit#gid=0`
 
 A aba `PROMOTORES` usa as colunas `ID_PROMOTOR`, `NOME`, `USUÁRIO`, `SENHA`,
-`REGIONAL` e `ROLE`. Em `ROLE`, use somente:
+`REGIONAL`, `ROLE` e `TELEFONE`. Em `ROLE`, use somente:
 
 - `FIELD_OPS` para promotor;
 - `SUPERVISOR` para supervisor.

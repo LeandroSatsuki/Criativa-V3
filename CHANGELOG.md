@@ -1,5 +1,52 @@
 # CHANGELOG
 
+## [2026-08-04] - Indicadores diarios e contato supervisor em homologacao
+
+### Alterado
+- `Promotores Cadastrados` passa a contar e listar somente linhas atuais da aba
+  `PROMOTORES`, sem misturar usuarios historicos.
+- `Promotores em Rota` foi substituido por `Em Atividade Hoje`, definido como
+  pessoas com ao menos uma visita registrada no dia; nao representa GPS.
+- Visitas concluidas, pendentes, tempo medio, curva e totais passam a considerar
+  somente o dia atual no fuso `America/Sao_Paulo`.
+- Pendencias de sincronizacao continuam abrangendo qualquer data para nao
+  ocultar envios antigos e mostram pessoas e quantidade de envios.
+- `Visitas em Andamento` foi renomeado para `Envios em Processamento`, refletindo
+  o dado que o backend realmente consegue observar.
+
+### Adicionado
+- Popup do promotor com ID, login, regional, telefone, indicadores do dia e
+  visitas recentes.
+- Link direto para WhatsApp quando o telefone cadastrado e valido.
+- Suporte aos cabecalhos `TELEFONE`, `CELULAR`, `WHATSAPP` e `CONTATO`.
+- Coluna `TELEFONE` criada em `PROMOTORES!G:G`, como texto e integrada a tabela.
+- Testes de cadastro versus historico, recortes diarios e telefone brasileiro.
+
+### Corrigido
+- O detalhe agora associa visitas por ID ou login, preservando historico quando
+  o identificador cadastral muda.
+- Cards diarios deixam de exibir acumulados de todos os dias.
+
+### Seguranca
+- Telefone e retornado somente pelas rotas autenticadas de supervisor.
+- Link externo usa `wa.me`, numero normalizado e `noopener noreferrer`.
+- Nenhum campo existente da planilha foi movido ou sobrescrito.
+
+### Validacao
+- `npm.cmd test`: 54 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Planilha `Sistema Criativa`, aba `PROMOTORES`, intervalo `F1:G4` relido apos
+  a escrita; tabela e filtro confirmados ate a coluna `G`.
+- Chromium movel confirmou os cinco recortes de pessoas, popup, WhatsApp,
+  visitas recentes e ausencia de overflow.
+- Preview `6a722a11d10e8f0c5c342485` publicado no alias `pwa-offline`.
+
+### Pendencias
+- Preencher os telefones reais em `PROMOTORES!G2:G`.
+- Validar o painel com o login supervisor e dados reais do cliente.
+- Promover para producao somente depois da aprovacao da homologacao.
+
 ## [2026-08-04] - Sessao supervisor consistente em homologacao
 
 ### Alterado

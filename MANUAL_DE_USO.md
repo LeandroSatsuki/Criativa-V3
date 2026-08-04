@@ -152,11 +152,18 @@ Importante durante a evolucao offline:
 - O painel usa dados reais do backend.
 - Cada card funciona como filtro da equipe. Clique uma vez para aplicar e clique
   novamente no mesmo card para voltar a visao geral.
+- `Promotores Cadastrados` mostra apenas cadastros atuais da aba `PROMOTORES`.
+- `Em Atividade Hoje` mostra quem possui ao menos uma visita registrada hoje;
+  esse indicador nao acompanha GPS ou deslocamento.
+- `Visitas Concluidas Hoje` e `Visitas Pendentes Hoje` usam o dia de Brasilia.
+- `Pendencias de Sync` inclui envios antigos ainda nao confirmados.
 - O bloco `Indicador selecionado` explica o recorte e informa quantos promotores
   correspondem a ele.
 - A busca aceita nome, identificador, regiao ou loja e pode ser combinada com o
   card selecionado.
-- Clique em um promotor para consultar metricas e o roteiro de execucao.
+- Clique em um promotor para abrir o popup com cadastro, metricas do dia e
+  visitas recentes.
+- Quando houver telefone valido, use `Abrir WhatsApp` para iniciar a conversa.
 - `Sem Atualizacao Recente` significa que o backend nao recebeu atualizacao
   daquele promotor nos ultimos 15 minutos; nao significa necessariamente que o
   aparelho esteja desligado.

@@ -45,6 +45,7 @@ test('mapeia o cadastro atual sem transformar o cabeçalho em login', () => {
     user: 'promotora.atual',
     pass: 'senhaatual',
     region: 'Vitória',
+    phone: '',
     role: undefined,
   }]);
 });
@@ -60,6 +61,15 @@ test('reconhece ROLE por cabeçalho mesmo com colunas reordenadas', () => {
   assert.equal(promoters[0].id, '900');
   assert.equal(promoters[1].role, 'FIELD_OPS');
   assert.equal(promoters[1].region, 'Serra');
+});
+
+test('mapeia telefone por cabecalho sem depender da ordem das colunas', () => {
+  const promoters = mapPromotersTable(table([
+    ['NOME', 'TELEFONE', 'USUARIO', 'SENHA', 'REGIONAL', 'ID_PROMOTOR', 'ROLE'],
+    ['Promotora', '(27) 99999-1234', 'promotora', 'senha', 'Vitoria', 10, 'FIELD_OPS'],
+  ]));
+
+  assert.equal(promoters[0].phone, '(27) 99999-1234');
 });
 
 test('ignora linhas incompletas sem afetar cadastros válidos', () => {

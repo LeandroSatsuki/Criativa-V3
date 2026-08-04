@@ -25,6 +25,7 @@ export type AppData = {
     user: string;
     pass: string;
     region: string;
+    phone?: string;
     role?: Role;
   }>;
   stores: Array<{
@@ -43,11 +44,12 @@ type ProvisionalUser = {
   passHash?: string;
   region?: string;
   storeResponsible?: string;
+  phone?: string;
   role?: Role;
   expiresAt?: string;
 };
 
-const CONFIG_SCHEMA_VERSION = 5;
+const CONFIG_SCHEMA_VERSION = 6;
 const defaultIndustries = ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
 const configStore = getJsonStore('criativa-config');
 
@@ -75,6 +77,7 @@ const normalizeProvisionalUsers = (users: ProvisionalUser[], defaultRole: Role) 
       passHash: String(user.passHash || '').toLowerCase().trim(),
       region: String(user.region || (defaultRole === 'SUPERVISOR' ? 'SUPERVISOR' : '')).trim(),
       storeResponsible: String(user.storeResponsible || '').trim(),
+      phone: String(user.phone || '').trim(),
       role: normalizeRole(user.role) || defaultRole,
       expiresAt: user.expiresAt ? String(user.expiresAt).trim() : '',
     }))
@@ -93,7 +96,7 @@ const parseDelimitedProvisionalUsers = (raw: string): ProvisionalUser[] =>
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const [id, name, user, passHash, region, roleOrExpiresAt, expiresAt, storeResponsible] = line
+      const [id, name, user, passHash, region, roleOrExpiresAt, expiresAt, storeResponsible, phone] = line
         .split('|')
         .map((value) => value?.trim() || '');
       const role = normalizeRole(roleOrExpiresAt);
@@ -106,6 +109,7 @@ const parseDelimitedProvisionalUsers = (raw: string): ProvisionalUser[] =>
         role,
         expiresAt: role ? expiresAt : roleOrExpiresAt,
         storeResponsible,
+        phone,
       };
     });
 

@@ -70,6 +70,10 @@ Se houver migração futura para outro host, o projeto também já tem compatibi
 `Sistema Criativa` ja possui coluna `ROLE` com valor `SUPERVISOR`. Cadastros
 sem `ROLE` continuam como `FIELD_OPS`, preservando compatibilidade.
 
+A coluna opcional `TELEFONE` da aba `PROMOTORES` alimenta exclusivamente o
+popup autenticado do supervisor e habilita o atalho para WhatsApp quando o
+numero possui DDD valido.
+
 `BACKEND_PROVISIONAL_SUPERVISORS` permite criar acessos temporarios de supervisor sem alterar a planilha. Use JSON ou formato compacto documentado no manual tecnico, sempre com senha em hash SHA-256 e nunca em texto puro.
 
 `BACKEND_PROVISIONAL_USERS` permite criar acessos temporarios de teste com papel controlado, como `FIELD_OPS`, sem alterar a planilha.

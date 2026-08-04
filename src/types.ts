@@ -72,14 +72,23 @@ export interface SupervisorTimelinePoint {
 export interface SupervisorPromoterOverview {
   id: string;
   name: string;
+  user: string;
   region: string;
-  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'EM ROTA';
+  phone: string;
+  registered: boolean;
+  activeToday: boolean;
+  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'SEM ATIVIDADE';
   online: boolean;
   progress: number;
   store: string;
   lastSync: string;
   visits: {
     completed: number;
+    total: number;
+  };
+  todayVisits: {
+    completed: number;
+    pending: number;
     total: number;
   };
   pendingSyncVisits: number;
@@ -91,12 +100,15 @@ export interface SupervisorDashboardSummary {
   onlinePromoters: number;
   offlinePromoters: number;
   onRoutePromoters: number;
+  activeTodayPromoters: number;
   inProgressPromoters: number;
   completedPromoters: number;
   pendingPromoters: number;
   pendingSyncVisits: number;
+  pendingSyncPromoters: number;
   totalVisits: number;
   completedVisits: number;
+  pendingVisits: number;
   averageVisitTime: string;
   lastUpdated: string;
 }
@@ -113,6 +125,7 @@ export interface SupervisorPromoterDetailRouteItem {
   visitId: string;
   name: string;
   time: string;
+  date: string;
   status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE';
   tasks: number;
   photos: number;
@@ -120,6 +133,14 @@ export interface SupervisorPromoterDetailRouteItem {
 }
 
 export interface SupervisorPromoterDetailResponse {
+  profile: {
+    id: string;
+    name: string;
+    user: string;
+    region: string;
+    phone: string;
+    registered: boolean;
+  };
   metrics: {
     efficiency: string;
     workingTime: string;

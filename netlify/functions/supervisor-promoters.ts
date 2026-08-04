@@ -4,6 +4,7 @@ import { json } from './_shared/json';
 import { listVisits } from './_shared/visits';
 import { buildSupervisorPromoterDetail } from './_shared/supervisor';
 import { getSupervisorAccessError } from './_shared/supervisor-access';
+import { getAppData } from './_shared/data';
 
 export default async (request: Request, context: Context) => {
   if (request.method !== 'GET') {
@@ -21,10 +22,21 @@ export default async (request: Request, context: Context) => {
     return json({ error: 'ID do promotor é obrigatório' }, 400);
   }
 
-  const visits = await listVisits();
-  const promoterVisits = visits.filter((visit) => String(visit.payload?.user?.id || '') === promoterId);
+  const [visits, data] = await Promise.all([listVisits(), getAppData()]);
+  const promoter = data.promoters.find((item) => item.id === promoterId);
+  const identities = new Set(
+    [promoterId, promoter?.user]
+      .map((value) => String(value || '').toLowerCase().trim())
+      .filter(Boolean),
+  );
+  const promoterVisits = visits.filter((visit) => (
+    identities.has(String(visit.payload?.user?.id || '').toLowerCase().trim()) ||
+    identities.has(String(visit.payload?.user?.user || '').toLowerCase().trim())
+  ));
 
-  return json(buildSupervisorPromoterDetail(promoterVisits));
+  return json(buildSupervisorPromoterDetail(promoterVisits, promoter
+    ? { ...promoter, registered: true }
+    : { id: promoterId, registered: false }));
 };
 
 export const config: Config = {

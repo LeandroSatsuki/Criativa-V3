@@ -306,3 +306,19 @@ Data da ultima auditoria: 2026-06-27
 - [x] Testes, lint e Chromium controlado aprovados.
 - [ ] Sessao unica validada com dois aparelhos reais.
 - [ ] Preview aprovado para promocao a producao.
+
+## Homologacao - Indicadores diarios e contato supervisor
+
+- [x] Cadastrados separados de usuarios historicos.
+- [x] Pendencias de sync listam as pessoas envolvidas e envios acumulados.
+- [x] `Em Atividade Hoje` definido sem alegar GPS.
+- [x] Concluidas e pendentes limitadas ao dia de Brasilia.
+- [x] Clique no promotor abre popup sem sair do painel.
+- [x] Popup mostra cadastro, metricas do dia e visitas recentes.
+- [x] Telefone normalizado e WhatsApp habilitado somente quando valido.
+- [x] Coluna `PROMOTORES!G:G` criada sem mover campos existentes.
+- [x] Tabela, filtro, formato texto e cabecalho da planilha validados.
+- [x] Testes, lint, build e Chromium movel aprovados.
+- [ ] Telefones reais preenchidos pelo cliente.
+- [ ] Painel validado com login supervisor real.
+- [ ] Preview aprovado para promocao a producao.

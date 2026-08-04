@@ -15,6 +15,7 @@ export type SheetPromoter = {
   user: string;
   pass: string;
   region: string;
+  phone: string;
   role?: PromoterRole;
 };
 
@@ -65,6 +66,7 @@ export const mapPromotersTable = (table: SheetTable | null): SheetPromoter[] => 
   const passwordColumn = findColumnIndex(table, ['SENHA', 'PASSWORD'], 3);
   const regionColumn = findColumnIndex(table, ['REGIONAL', 'REGIAO', 'UF'], 4);
   const roleColumn = findColumnIndex(table, ['ROLE', 'PERFIL', 'TIPO_USUARIO'], 5);
+  const phoneColumn = findColumnIndex(table, ['TELEFONE', 'CELULAR', 'WHATSAPP', 'CONTATO'], 6);
 
   return getTableDataRows(table)
     .map((row) => ({
@@ -73,6 +75,7 @@ export const mapPromotersTable = (table: SheetTable | null): SheetPromoter[] => 
       user: getRowValue(row, userColumn).toLowerCase(),
       pass: getRowValue(row, passwordColumn).toLowerCase(),
       region: getRowValue(row, regionColumn),
+      phone: getRowValue(row, phoneColumn),
       role: normalizeRole(getRowValue(row, roleColumn)),
     }))
     .filter((promoter) => promoter.id && promoter.name && promoter.user && promoter.pass);
