@@ -213,6 +213,20 @@ Data da ultima auditoria: 2026-06-27
 - [ ] PWA-5: retries automaticos e fallback para iOS validados.
 - [ ] PWA-6: homologacao concluida em iPhone e Android reais.
 
+### PWA-1 em homologacao
+
+- [x] `skipWaiting` removido para nao interromper visita aberta.
+- [x] App shell inclui os arquivos JS e CSS versionados do Vite.
+- [x] Cache isolado pelo hash de cada bundle.
+- [x] `/api/*` e `/.netlify/functions/*` excluidos do cache.
+- [x] Headers de revalidacao do service worker configurados no Netlify.
+- [x] Preview `6a71eac34582b027c6de2134` publicado e validado.
+- [x] Perda de rede simulada em Chromium com app shell restaurado do cache.
+- [x] Atualizacao simulada manteve a versao atual ativa e a nova em `waiting`.
+- [ ] Instalacao e reabertura sem rede validadas em Android real.
+- [ ] Instalacao e reabertura sem rede validadas em iPhone real.
+- [ ] Preview aprovado para promocao a producao.
+
 ### Gates obrigatorios por subfase PWA
 
 - [ ] Escopo e arquivos envolvidos registrados antes da edicao.

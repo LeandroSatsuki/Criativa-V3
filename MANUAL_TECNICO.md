@@ -68,9 +68,19 @@ Este documento resume a arquitetura real do projeto, o fluxo de dados e onde cad
 
 - O app possui `manifest.webmanifest`, icones e `sw.js`.
 - O service worker registra somente em build de producao.
-- Chamadas `/api/*` nao sao cacheadas pelo service worker.
-- O cache da PWA e limitado ao shell e assets estaticos.
+- Chamadas `/api/*` e `/.netlify/functions/*` nao sao interceptadas nem
+  cacheadas pelo service worker.
+- O cache da PWA e limitado ao HTML do app shell, manifesto, icones e assets
+  versionados de `/assets/*`.
+- O nome do cache deriva do hash do bundle Vite. Uma versao em espera nao
+  sobrescreve os arquivos da versao que controla uma visita aberta.
+- O service worker nao usa `skipWaiting`; atualizacoes aguardam o fechamento
+  seguro das telas controladas.
+- `sw.js` e servido com `no-cache, no-store, must-revalidate`, e o registro usa
+  `updateViaCache: none` para sempre verificar a versao publicada.
 - A continuidade de visita offline continua dependendo do estado local e da fila de sincronizacao.
+- A PWA-1 garante apenas a abertura do app shell offline. Perfil operacional,
+  sessao offline e finalizacao offline sao entregas separadas.
 
 ## 3. Onde os dados ficam
 

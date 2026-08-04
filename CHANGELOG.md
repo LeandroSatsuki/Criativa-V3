@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## [2026-08-04] - PWA-1 em homologacao: app shell offline seguro
+
+### Alterado
+- O service worker descobre e armazena os arquivos JS e CSS versionados que o
+  Vite referencia no HTML de cada deploy.
+- O registro inclui o hash do bundle na URL do worker e ignora caches HTTP ao
+  procurar atualizacoes.
+- O manifesto passa a declarar identificador estavel e idioma `pt-BR`.
+
+### Adicionado
+- Cache separado por versao do bundle, mantendo simultaneamente os arquivos da
+  versao ativa e de uma atualizacao em espera.
+- Headers Netlify de revalidacao para `sw.js` e `manifest.webmanifest`.
+- Quatro testes automatizados para ciclo seguro, rotas sensiveis, politica de
+  assets e descoberta dos hashes do Vite.
+
+### Corrigido
+- Removido `skipWaiting()`, que poderia trocar o aplicativo durante uma visita.
+- Corrigido o app shell incompleto, que nao incluia o JavaScript e CSS do build.
+- Ampliada a exclusao de cache para cobrir tambem `/.netlify/functions/*`.
+- A limpeza agora remove somente caches antigos do proprio Criativa.
+
+### Seguranca
+- Login, APIs, Functions e respostas operacionais permanecem sempre fora do
+  cache do service worker.
+- Atualizacoes usam caches imutaveis separados e so assumem depois que a versao
+  anterior deixa de controlar telas abertas.
+
+### Validacao
+- `npm.cmd test`: 27 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido com sucesso.
+- `npx.cmd netlify build`: build e 14 Functions empacotados com sucesso.
+- Preview Netlify `6a71eac34582b027c6de2134` respondeu `200` para app shell,
+  manifesto, service worker, CSS e JavaScript.
+- Chromium controlado confirmou worker `activated`, tela carregada offline e
+  sete recursos presentes no cache versionado.
+- Simulacao de atualizacao confirmou worker atual em `active`, novo worker em
+  `waiting` e caches separados.
+
+### Pendencias
+- Validar instalacao e reabertura offline em um Android real.
+- Validar instalacao e reabertura offline em um iPhone real.
+- Promover para producao somente depois desses dois testes.
+- O build mantem o aviso conhecido de chunk JavaScript acima de `500 KB`.
+
 ## [2026-08-04] - PWA-0: metodologia segura e baseline offline
 
 ### Alterado

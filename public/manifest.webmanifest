@@ -1,6 +1,8 @@
 {
   "name": "Criativa Field Ops",
   "short_name": "Criativa",
+  "id": "/",
+  "lang": "pt-BR",
   "description": "Operacao de campo para promotores da Criativa.",
   "start_url": "/",
   "scope": "/",

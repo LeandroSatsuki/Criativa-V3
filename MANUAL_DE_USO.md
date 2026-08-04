@@ -55,6 +55,17 @@ No iPhone/Safari:
 
 A instalação não muda o fluxo do promotor. Ela apenas deixa o acesso mais parecido com aplicativo e ajuda o navegador a manter os arquivos principais carregados.
 
+Importante durante a evolucao offline:
+
+- O primeiro acesso e a instalacao devem ser feitos com internet.
+- Na PWA-1, a estrutura visual e a tela de login conseguem abrir sem rede depois
+  de uma carga online completa.
+- Login offline, cadastro operacional offline e finalizacao offline ainda nao
+  estao liberados. Eles pertencem as proximas subfases e nao devem ser
+  considerados prontos antes do respectivo registro no `CHANGELOG.md`.
+- Quando existir uma atualizacao, a versao aberta continua funcionando. A nova
+  versao assume somente depois que as janelas anteriores forem fechadas.
+
 ## 3. Fluxo do promotor
 
 ### 3.1 Login
