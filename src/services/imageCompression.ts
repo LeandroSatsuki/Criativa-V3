@@ -1,12 +1,12 @@
 export const PHOTO_TARGET_BYTES = 100 * 1024;
 export const PHOTO_MAX_BYTES = 120 * 1024;
-export const PHOTO_INITIAL_MAX_LONG_EDGE = 1280;
+export const PHOTO_INITIAL_MAX_LONG_EDGE = 832;
 
 const MAX_QUALITY = 0.62;
 const MIN_QUALITY = 0.38;
 const EMERGENCY_QUALITIES = [0.28, 0.18];
 const QUALITY_SEARCH_STEPS = 5;
-const FALLBACK_LONG_EDGES = [1152, 1024, 960, 896, 800];
+const FALLBACK_LONG_EDGES = [749, 666, 624, 582, 520];
 
 export type CompressedPhoto = {
   base64: string;

@@ -7,18 +7,18 @@ import {
   PHOTO_TARGET_BYTES,
 } from '../src/services/imageCompression.ts';
 
-test('define alvo menor que o teto e preserva resolução inicial de relatório', () => {
+test('define alvo menor que o teto e reduz a resolução inicial em 35 por cento', () => {
   assert.equal(PHOTO_TARGET_BYTES, 100 * 1024);
   assert.equal(PHOTO_MAX_BYTES, 120 * 1024);
-  assert.equal(PHOTO_INITIAL_MAX_LONG_EDGE, 1280);
+  assert.equal(PHOTO_INITIAL_MAX_LONG_EDGE, 832);
   assert.ok(PHOTO_TARGET_BYTES < PHOTO_MAX_BYTES);
 });
 
 test('reduz resolução de forma progressiva somente quando necessário', () => {
   assert.deepEqual(
-    buildPhotoLongEdgeCandidates(1280),
-    [1280, 1152, 1024, 960, 896, 800],
+    buildPhotoLongEdgeCandidates(832),
+    [832, 749, 666, 624, 582, 520],
   );
-  assert.deepEqual(buildPhotoLongEdgeCandidates(900), [900, 896, 800]);
-  assert.deepEqual(buildPhotoLongEdgeCandidates(720), [720]);
+  assert.deepEqual(buildPhotoLongEdgeCandidates(700), [700, 666, 624, 582, 520]);
+  assert.deepEqual(buildPhotoLongEdgeCandidates(500), [500]);
 });

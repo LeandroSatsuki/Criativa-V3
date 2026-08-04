@@ -100,5 +100,6 @@ sem `ROLE` continuam como `FIELD_OPS`, preservando compatibilidade.
 - O cenario legado permanece disponivel somente para rollback controlado por
   `BACKEND_MAKE_SYNC_MODE=legacy`.
 - As fotos recebem o carimbo no aparelho e sao convertidas para JPEG com alvo
-  de 100 KB, teto de 120 KB e resolucao adaptativa entre 1280 e 800 pixels no
-  lado maior. O limite reduz consumo e evita depender da resolucao da camera.
+  de 100 KB, teto de 120 KB e resolucao adaptativa entre 832 e 520 pixels no
+  lado maior. Isso representa reducao de 35% na resolucao linear configurada e
+  evita depender da resolucao original da camera.

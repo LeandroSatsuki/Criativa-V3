@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [2026-08-04] - Ajuste: reducao de 35% na resolucao das fotos
+
+### Alterado
+- O lado maior padrao das fotos passa de `1280 px` para `832 px`.
+- Os fallbacks foram reduzidos proporcionalmente para `749`, `666`, `624`,
+  `582` e `520 px`, preservando a proporcao original da captura.
+
+### Adicionado
+- Teste de regressao para garantir a reducao linear exata de 35% e os novos
+  degraus de resolucao.
+
+### Corrigido
+- Reduzido o volume potencial de dados e armazenamento para aparelhos com
+  cameras de alta resolucao, sem alterar o formato JPEG ou o carimbo.
+
+### Seguranca
+- O alvo de `100 KB` e o teto obrigatorio de `120 KB` continuam ativos.
+
+### Validacao
+- `npm.cmd test`: 23 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o aviso conhecido de chunk
+  JavaScript acima de 500 KB.
+
+### Pendencias
+- Conferir legibilidade do carimbo e dos produtos em uma captura feita por
+  iPhone e outra por aparelho Android.
+
 ## [2026-08-04] - Correcao: retorno imediato e painel de envios no cabecalho
 
 ### Alterado
