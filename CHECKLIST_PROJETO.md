@@ -220,7 +220,10 @@ Data da ultima auditoria: 2026-06-27
 - [x] Cache isolado pelo hash de cada bundle.
 - [x] `/api/*` e `/.netlify/functions/*` excluidos do cache.
 - [x] Headers de revalidacao do service worker configurados no Netlify.
-- [x] Preview `6a71eac34582b027c6de2134` publicado e validado.
+- [x] Preview `6a71f05972b672208276f792` publicado e validado.
+- [x] `APP_SESSION_SECRET` e Google Sheets habilitados no contexto de preview.
+- [x] Smoke test do login retornou `401` para credencial invalida, sem erro de
+  configuracao do backend.
 - [x] Perda de rede simulada em Chromium com app shell restaurado do cache.
 - [x] Atualizacao simulada manteve a versao atual ativa e a nova em `waiting`.
 - [ ] Instalacao e reabertura sem rede validadas em Android real.

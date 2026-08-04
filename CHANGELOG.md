@@ -21,20 +21,29 @@
 - Corrigido o app shell incompleto, que nao incluia o JavaScript e CSS do build.
 - Ampliada a exclusao de cache para cobrir tambem `/.netlify/functions/*`.
 - A limpeza agora remove somente caches antigos do proprio Criativa.
+- Corrigido o escopo Netlify de `APP_SESSION_SECRET` e
+  `BACKEND_GOOGLE_SHEETS_ID`, que estavam disponiveis em producao, mas ausentes
+  no primeiro deploy de homologacao.
 
 ### Seguranca
 - Login, APIs, Functions e respostas operacionais permanecem sempre fora do
   cache do service worker.
 - Atualizacoes usam caches imutaveis separados e so assumem depois que a versao
   anterior deixa de controlar telas abertas.
+- O preview reutiliza os mesmos valores seguros de producao para sessao e ID da
+  planilha, sem imprimir, regenerar ou colocar segredos no repositorio.
 
 ### Validacao
 - `npm.cmd test`: 27 testes aprovados.
 - `npm.cmd run lint`: concluido sem erros.
 - `npm.cmd run build`: concluido com sucesso.
 - `npx.cmd netlify build`: build e 14 Functions empacotados com sucesso.
-- Preview Netlify `6a71eac34582b027c6de2134` respondeu `200` para app shell,
+- Preview Netlify `6a71f05972b672208276f792` respondeu `200` para app shell,
   manifesto, service worker, CSS e JavaScript.
+- Healthcheck do novo preview confirmou sessao, Google Sheets e Make V2
+  configurados.
+- Smoke test de login com credencial deliberadamente invalida retornou `401`
+  por credencial, sem erro de configuracao do backend.
 - Chromium controlado confirmou worker `activated`, tela carregada offline e
   sete recursos presentes no cache versionado.
 - Simulacao de atualizacao confirmou worker atual em `active`, novo worker em
