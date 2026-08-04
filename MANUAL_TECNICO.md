@@ -81,6 +81,10 @@ Este documento resume a arquitetura real do projeto, o fluxo de dados e onde cad
 - A continuidade de visita offline continua dependendo do estado local e da fila de sincronizacao.
 - A PWA-1 garante apenas a abertura do app shell offline. Perfil operacional,
   sessao offline e finalizacao offline sao entregas separadas.
+- A PWA-2 salva lojas e industrias por `user.id` depois de uma consulta online
+  autenticada. O cache e aceito por sete dias apenas para `FIELD_OPS`.
+- Erros HTTP, especialmente `401`, nao ativam o fallback local. O cache e usado
+  somente em falha de rede, e supervisores continuam dependentes de dados online.
 
 ## 3. Onde os dados ficam
 

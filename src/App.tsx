@@ -122,10 +122,17 @@ const App: React.FC = () => {
           industries: config.industries || []
         }));
         
-        // If user is logged in, update stores from the new config
+        // If user is logged in, update stores from the network or its isolated offline cache.
         if (visitState.user) {
-          const data = await apiService.getStores(visitState.user.id);
-          setStores(data);
+          const operationalData = await apiService.getOperationalData(
+            visitState.user,
+            config.industries || [],
+          );
+          setStores(operationalData.stores);
+          setVisitState((prev: any) => ({
+            ...prev,
+            industries: operationalData.industries,
+          }));
         }
       }
     } catch (e: any) {

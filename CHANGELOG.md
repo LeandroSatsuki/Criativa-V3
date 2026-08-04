@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## [2026-08-04] - PWA-2 em homologacao: cadastro operacional offline
+
+### Alterado
+- A carga inicial do promotor usa a rede como fonte principal e, somente em
+  falha de conexao, consulta o cadastro operacional salvo no aparelho.
+- O preview passa a usar o alias estavel `pwa-offline`, evitando perder sessao
+  e cache a cada novo deploy de homologacao.
+
+### Adicionado
+- Cache de lojas e industrias isolado por `user.id`, com versao, proprietario,
+  papel, data de gravacao e validade maxima de sete dias.
+- Seis testes para chave por usuario, validade, rejeicao de dados indevidos,
+  preservacao do cadastro, classificacao de falha e persistencia local.
+
+### Corrigido
+- Corrigida a tela `Erro de Conexao` depois que um promotor ja autenticado
+  reabria o aplicativo sem internet.
+
+### Seguranca
+- O fallback e exclusivo de `FIELD_OPS` e rejeita cache de outro usuario,
+  supervisor, data futura ou registro expirado.
+- Respostas HTTP e erros de autorizacao nao usam dados locais como alternativa;
+  um `401` continua exigindo nova autenticacao.
+- Nenhuma senha ou token novo e armazenado no cache operacional.
+
+### Validacao
+- `npm.cmd test`: 33 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 14 Functions empacotados com sucesso.
+- Preview `6a71f2f2971e976f20f08b71` publicado no alias `pwa-offline`.
+- Chromium controlado confirmou app shell, sessao local, promotor e loja
+  autorizada restaurados com rede bloqueada e sem tela de erro.
+
+### Pendencias
+- Repetir o ciclo online/offline com um promotor real no celular.
+- Finalizacao de visita totalmente offline pertence a PWA-4 e ainda nao esta
+  liberada.
+- O build mantem o aviso conhecido de chunk JavaScript acima de `500 KB`.
+
 ## [2026-08-04] - PWA-1 em homologacao: app shell offline seguro
 
 ### Alterado

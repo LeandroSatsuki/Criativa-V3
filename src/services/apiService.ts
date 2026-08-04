@@ -5,7 +5,13 @@ import type {
   Role,
   SupervisorDashboardResponse,
   SupervisorPromoterDetailResponse,
+  User,
 } from '../types';
+import {
+  isOfflineRequestFailure,
+  readOperationalCache,
+  writeOperationalCache,
+} from './operationalCache';
 import {
   DIRECT_VISIT_PAYLOAD_MAX_BYTES,
   getUtf8ByteLength,
@@ -182,6 +188,28 @@ export const apiService = {
   getStores: async (promoterId: string) => {
     const query = new URLSearchParams({ userId: promoterId });
     return requestJson<any[]>(`/stores?${query.toString()}`);
+  },
+
+  getOperationalData: async (user: User, industries: string[]) => {
+    try {
+      const query = new URLSearchParams({ userId: user.id });
+      const stores = await requestJson<any[]>(`/stores?${query.toString()}`);
+      writeOperationalCache(user.id, user.role, stores, industries);
+      return { stores, industries, source: 'network' as const };
+    } catch (error) {
+      if (user.role !== 'FIELD_OPS' || !isOfflineRequestFailure(error)) {
+        throw error;
+      }
+
+      const cached = readOperationalCache(user.id);
+      if (!cached) throw error;
+
+      return {
+        stores: cached.stores,
+        industries: cached.industries,
+        source: 'cache' as const,
+      };
+    }
   },
 
   syncVisit: async (payload: any, onProgress?: (msg: string) => void) => {

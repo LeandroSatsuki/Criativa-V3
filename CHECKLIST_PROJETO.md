@@ -230,6 +230,18 @@ Data da ultima auditoria: 2026-06-27
 - [ ] Instalacao e reabertura sem rede validadas em iPhone real.
 - [ ] Preview aprovado para promocao a producao.
 
+### PWA-2 em homologacao
+
+- [x] Causa do erro offline localizada na consulta exclusivamente remota de lojas.
+- [x] Lojas e industrias persistidas por usuario depois da consulta autenticada.
+- [x] Cache limitado a sete dias e ao papel `FIELD_OPS`.
+- [x] Cache de outro usuario, supervisor, futuro ou expirado rejeitado.
+- [x] Erro HTTP e `401` nao sao mascarados pelo fallback offline.
+- [x] Preview estavel `pwa-offline` publicado.
+- [x] Chromium offline restaurou promotor e loja autorizada sem erro de conexao.
+- [ ] Login online e reabertura offline validados com promotor real no celular.
+- [ ] Cache renovado depois de recuperar conexao validado no celular.
+
 ### Gates obrigatorios por subfase PWA
 
 - [ ] Escopo e arquivos envolvidos registrados antes da edicao.
