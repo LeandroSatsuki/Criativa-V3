@@ -1,5 +1,54 @@
 # CHANGELOG
 
+## [2026-08-03] - Etapa B concluida: envio integral de fotos
+
+### Alterado
+- A producao passa a usar `BACKEND_MAKE_SYNC_MODE=visit-v2` com webhook exclusivo.
+- Cada foto e enviada em uma requisicao confirmada pelo Google Drive e a visita
+  somente e finalizada depois de todas as confirmacoes.
+- A aba `RELATORIO_VISITAS` permanece com uma linha por visita e agora usa
+  `ID_VISITA` para criar ou atualizar o mesmo registro.
+
+### Adicionado
+- Cenario Make `Criativa Field Ops - Upload V2`, separado do cenario legado.
+- Busca idempotente de pasta e arquivo antes do upload.
+- Busca da visita na planilha antes de adicionar ou atualizar a linha.
+- Manifesto persistente com IDs e links de cada arquivo confirmado.
+
+### Corrigido
+- Removida da operacao nova a limitacao que enviava somente a primeira foto de
+  cada etapa.
+- Reenvios da mesma foto deixam de gerar arquivos duplicados.
+- Reenvios da finalizacao deixam de gerar linhas duplicadas na planilha.
+- O painel supervisor exibe o total de promotores cadastrados no primeiro
+  indicador, sem confundir cadastro com atividade nos ultimos 15 minutos.
+
+### Seguranca
+- O webhook V2 foi configurado somente nas variaveis protegidas do Netlify.
+- O token administrativo do Make permanece criptografado localmente e ignorado
+  pelo Git.
+- O cenario legado foi preservado para rollback por variavel, sem edicao ou
+  desativacao.
+
+### Validacao
+- Teste de contrato: 90 fotos preservadas, incluindo 30 imagens identicas.
+- Upload real: HTTP 200 com `PHOTO_UPLOADED`, `fileId` e `folderId`.
+- Reenvio real: o mesmo arquivo foi localizado e reutilizado em 4 operacoes.
+- Planilha real: primeira finalizacao criou a linha 59 e a segunda atualizou a
+  mesma linha pelo `ID_VISITA`; os 30 campos e acentos foram conferidos.
+- A linha tecnica criada para validacao foi removida apos a conferencia.
+- Preview Netlify `6a713a9188d577e6159d2cd4`: healthcheck com
+  `makeV2=true` e `makeSyncMode=visit-v2`.
+- `npm.cmd test`: 22 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o warning conhecido de chunk
+  grande.
+
+### Pendencias
+- Remover manualmente do Drive as seis pastas `_TESTE_TECNICO_V2_*`; a conexao
+  usada pela auditoria nao possui permissao para excluir arquivos criados pela
+  conexao do Make. Elas nao participam do fluxo de producao.
+
 ## [2026-08-03] - Correcao emergencial: fotos completas e cadastro no supervisor
 
 ### Alterado

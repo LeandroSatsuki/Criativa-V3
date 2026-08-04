@@ -130,8 +130,8 @@ arquivo final gravado no Drive volta a ser binario e nao carrega esse aumento.
 
 ### Riscos remanescentes
 
-- o modo Make v2 ainda precisa ser validado e ativado para eliminar duplicacoes
-  do check-in e check-out entre pastas de industrias;
+- o modo Make v2 foi validado e ativado em 03/08/2026, com confirmacao por foto,
+  reutilizacao idempotente de arquivo e uma linha por visita;
 - a qualidade deve ser homologada em um piloto com iPhone e Android, incluindo
   leitura de rotulos e uso nos relatorios;
 - armazenamento, creditos e transferencia devem ser monitorados mensalmente;

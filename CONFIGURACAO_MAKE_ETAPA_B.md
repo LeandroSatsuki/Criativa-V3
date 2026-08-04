@@ -1,5 +1,19 @@
 # Configuracao do Make - Etapa B
 
+## Estado de producao
+
+Ativada em 03/08/2026 no cenario separado `Criativa Field Ops - Upload V2`.
+
+- `BACKEND_MAKE_SYNC_MODE=visit-v2`
+- webhook V2 armazenado somente no Netlify;
+- cenario legado preservado e ativo para rollback;
+- foto confirmada por `fileId` antes de avancar;
+- finalizacao idempotente por `ID_VISITA`;
+- uma linha por visita em `RELATORIO_VISITAS`.
+
+Rollback emergencial: alterar somente `BACKEND_MAKE_SYNC_MODE` para `legacy` e
+fazer um novo deploy. Nao excluir nem editar os webhooks durante o rollback.
+
 ## Objetivo
 
 Enviar cada foto separadamente ao Google Drive para evitar o limite de tamanho,
@@ -136,4 +150,3 @@ etapa, industria, ordem e data de sincronizacao de cada foto.
    duplicadas.
 9. Se falhar, voltar apenas `BACKEND_MAKE_SYNC_MODE` para `legacy`; a visita
    permanece salva e pode ser reenviada.
-

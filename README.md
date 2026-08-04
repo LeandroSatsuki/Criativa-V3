@@ -89,9 +89,10 @@ sem `ROLE` continuam como `FIELD_OPS`, preservando compatibilidade.
 - A Fase 7 publicou o projeto no Netlify sem alterar o visual do app.
 - A Fase 8 fecha a documentação operacional e técnica da entrega.
 - O frontend agora fala apenas com `/api/*`.
-- O contrato Make v2 permanece desativado em `legacy` ate a validacao real do
-  novo cenario; depois da ativacao, cada foto vai ao Drive separadamente e a
-  planilha recebe uma unica linha por visita.
+- O contrato Make v2 esta ativo: cada foto vai ao Drive separadamente, recebe
+  confirmacao individual e a planilha mantem uma unica linha por visita.
+- O cenario legado permanece disponivel somente para rollback controlado por
+  `BACKEND_MAKE_SYNC_MODE=legacy`.
 - As fotos recebem o carimbo no aparelho e sao convertidas para JPEG com alvo
   de 100 KB, teto de 120 KB e resolucao adaptativa entre 1280 e 800 pixels no
   lado maior. O limite reduz consumo e evita depender da resolucao da camera.
