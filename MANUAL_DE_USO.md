@@ -144,6 +144,10 @@ Importante durante a evolucao offline:
 ## 4. Fluxo do supervisor
 
 - O supervisor faz login com o mesmo mecanismo, mas recebe o papel de supervisão.
+- Apenas uma sessao pode permanecer ativa por usuario. Se o mesmo supervisor
+  entrar em outro aparelho ou a sessao expirar, o acesso anterior volta ao
+  login e solicita a senha novamente.
+- O ultimo usuario permanece preenchido, mas a senha nunca e reaproveitada.
 - O painel mostra promotores, visitas, status de sincronização, pendências e produtividade.
 - O painel usa dados reais do backend.
 - Cada card funciona como filtro da equipe. Clique uma vez para aplicar e clique

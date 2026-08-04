@@ -4,6 +4,7 @@ import { json } from './_shared/json';
 import { getAppData } from './_shared/data';
 import { listVisits } from './_shared/visits';
 import { buildSupervisorDashboard } from './_shared/supervisor';
+import { getSupervisorAccessError } from './_shared/supervisor-access';
 
 export default async (request: Request, _context: Context) => {
   if (request.method !== 'GET') {
@@ -11,8 +12,9 @@ export default async (request: Request, _context: Context) => {
   }
 
   const auth = await authenticate(request);
-  if (!auth || auth.role !== 'SUPERVISOR') {
-    return json({ error: 'Acesso restrito ao supervisor' }, 403);
+  const accessError = getSupervisorAccessError(auth);
+  if (accessError) {
+    return json({ error: accessError.message }, accessError.status);
   }
 
   const [data, visits] = await Promise.all([getAppData(), listVisits()]);

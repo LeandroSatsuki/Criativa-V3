@@ -11,7 +11,7 @@ import { SectionId, STORAGE_KEY } from './types';
 import { apiService } from './services/apiService';
 import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X } from 'lucide-react';
 import { appConfig } from './config/appConfig';
-import { clearSession, getLastLoginUser, getSession } from './services/session';
+import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT } from './services/session';
 import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
 import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
@@ -36,6 +36,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [loginForm, setLoginForm] = useState(() => ({ user: getLastLoginUser(), pass: '' }));
   const [visitState, setVisitState] = useState(() => {
     try {
@@ -117,6 +118,22 @@ const App: React.FC = () => {
   useEffect(() => {
     document.title = appConfig.title;
   }, []);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setVisitState((prev: any) => ({
+        ...prev,
+        draftOwnerId: prev.draftOwnerId || prev.user?.id || null,
+        user: null,
+        step: activeSection,
+      }));
+      setLoadingError(null);
+      setLoginError('Sua sessão expirou ou foi encerrada por outro acesso. Faça login novamente.');
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, [activeSection]);
 
   const loadConfig = async (force = false) => {
     setLoading(true);
@@ -356,13 +373,12 @@ const App: React.FC = () => {
     notifyQueueChanged();
   };
 
-  const [loginError, setLoginError] = useState<string | null>(null);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
     try {
       const userData = await apiService.login(loginForm);
+      setLoginForm({ user: userData.user, pass: '' });
       const sameDraftOwner = !visitState.draftOwnerId || visitState.draftOwnerId === userData.id;
       const hasActiveVisit = sameDraftOwner && Boolean(visitState.visitId || visitState.checkInDone || visitState.currentStoreId);
       setVisitState((prev: any) => sameDraftOwner
@@ -440,7 +456,7 @@ const App: React.FC = () => {
               <p className="text-xs font-bold uppercase tracking-tight">{loginError}</p>
             </div>
           )}
-          <input type="text" placeholder="Usuário" className="w-full p-5 bg-slate-50 rounded-2xl font-bold" onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
+          <input type="text" value={loginForm.user} placeholder="Usuário" className="w-full p-5 bg-slate-50 rounded-2xl font-bold" onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
           <input type="password" placeholder="Senha" className="w-full p-5 bg-slate-50 rounded-2xl font-bold" onChange={e => setLoginForm({...loginForm, pass: e.target.value})} />
           <button type="submit" className="w-full bg-[#0F172A] text-white py-6 rounded-[28px] font-black uppercase tracking-widest">Acessar</button>
         </form>

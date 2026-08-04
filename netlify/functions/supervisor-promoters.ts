@@ -3,6 +3,7 @@ import { authenticate } from './_shared/auth';
 import { json } from './_shared/json';
 import { listVisits } from './_shared/visits';
 import { buildSupervisorPromoterDetail } from './_shared/supervisor';
+import { getSupervisorAccessError } from './_shared/supervisor-access';
 
 export default async (request: Request, context: Context) => {
   if (request.method !== 'GET') {
@@ -10,8 +11,9 @@ export default async (request: Request, context: Context) => {
   }
 
   const auth = await authenticate(request);
-  if (!auth || auth.role !== 'SUPERVISOR') {
-    return json({ error: 'Acesso restrito ao supervisor' }, 403);
+  const accessError = getSupervisorAccessError(auth);
+  if (accessError) {
+    return json({ error: accessError.message }, accessError.status);
   }
 
   const promoterId = context.params.id as string | undefined;

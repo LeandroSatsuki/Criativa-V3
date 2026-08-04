@@ -294,3 +294,15 @@ Data da ultima auditoria: 2026-06-27
 - [ ] Captura real validada no Android.
 - [ ] Captura real validada no iPhone.
 - [ ] Preview aprovado para promocao a producao.
+
+## Homologacao - Sessao supervisor consistente
+
+- [x] Sessao invalida retorna `401`.
+- [x] Promotor autenticado em rota supervisor retorna `403`.
+- [x] Supervisor valido permanece autorizado.
+- [x] Token invalido removido automaticamente do aparelho.
+- [x] Ultimo usuario preservado e senha limpa depois do login.
+- [x] Rascunho e fila local preservados.
+- [x] Testes, lint e Chromium controlado aprovados.
+- [ ] Sessao unica validada com dois aparelhos reais.
+- [ ] Preview aprovado para promocao a producao.

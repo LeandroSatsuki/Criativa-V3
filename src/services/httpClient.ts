@@ -1,9 +1,16 @@
 import { appConfig } from '../config/appConfig';
-import { getSessionToken } from './session';
+import { expireSession, getSessionToken } from './session';
 
 type RequestOptions = RequestInit & {
   auth?: boolean;
 };
+
+export class HttpRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'HttpRequestError';
+  }
+}
 
 const joinUrl = (base: string, path: string) => {
   const normalizedBase = base.replace(/\/+$/, '');
@@ -53,7 +60,9 @@ export const requestJson = async <T>(
   });
 
   if (!response.ok) {
-    throw new Error(await extractErrorMessage(response));
+    const message = await extractErrorMessage(response);
+    if (auth && response.status === 401) expireSession();
+    throw new HttpRequestError(message, response.status);
   }
 
   const contentType = response.headers.get('content-type') || '';

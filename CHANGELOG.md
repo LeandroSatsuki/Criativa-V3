@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## [2026-08-04] - Sessao supervisor consistente em homologacao
+
+### Alterado
+- Respostas das rotas supervisor agora distinguem sessao invalida (`401`) de
+  usuario autenticado sem papel supervisor (`403`).
+- Ao receber `401` em uma chamada autenticada, o app encerra somente a sessao
+  invalida e retorna ao login com uma explicacao objetiva.
+
+### Adicionado
+- Politica compartilhada de autorizacao das rotas supervisor.
+- Evento interno para comunicar expiracao ou substituicao de sessao ao app.
+- Tres testes para sessao ausente, promotor autenticado e supervisor valido.
+
+### Corrigido
+- Corrigida a mensagem intermitente `Acesso restrito ao supervisor` quando o
+  perfil local ainda era supervisor, mas o token havia expirado ou sido
+  invalidado por um novo login.
+- O ultimo usuario passa a aparecer preenchido ao retornar ao login.
+
+### Seguranca
+- A regra de apenas uma sessao ativa por usuario foi preservada.
+- A senha e removida do estado do formulario depois do login bem-sucedido.
+- Rascunhos e filas locais nao sao apagados quando a sessao e encerrada.
+
+### Validacao
+- `npm.cmd test`: 47 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Chromium controlado com perfil supervisor e token invalido confirmou retorno
+  ao login, remocao do token, usuario preenchido, senha vazia e ausencia da
+  mensagem incorreta de permissao.
+- Preview `6a721d18692cdc15d364884a` publicado no alias `pwa-offline`.
+
+### Pendencias
+- Repetir no preview o login do mesmo supervisor em dois aparelhos antes da
+  promocao para producao.
+
 ## [2026-08-04] - Orientacao vertical das fotos em homologacao
 
 ### Alterado

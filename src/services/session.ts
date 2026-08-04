@@ -8,6 +8,7 @@ export type SessionData = {
 
 const SESSION_KEY = 'criativa_session';
 const LAST_LOGIN_USER_KEY = 'criativa_last_login_user';
+export const SESSION_EXPIRED_EVENT = 'criativa-session-expired';
 
 export const getSession = (): SessionData | null => {
   try {
@@ -27,6 +28,11 @@ export const setSession = (session: SessionData) => {
 
 export const clearSession = () => {
   localStorage.removeItem(SESSION_KEY);
+};
+
+export const expireSession = () => {
+  clearSession();
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
 };
 
 export const getLastLoginUser = () => localStorage.getItem(LAST_LOGIN_USER_KEY) || '';

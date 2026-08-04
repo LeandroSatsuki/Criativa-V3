@@ -275,6 +275,11 @@ O nome apresentado ao usuario para a etapa final e `Finalizacao da Visita`.
 Por compatibilidade, continuam inalterados o enum `CHECKOUT`, `checkOutTime`,
 `FOTO_CHECKOUT`, `NOME_CHECKOUT` e os mapeamentos da Make e do Google Sheets.
 
+As rotas supervisor retornam `401` quando o token esta ausente, expirado ou foi
+substituido por uma nova sessao, e `403` somente quando o token e valido mas o
+papel nao e `SUPERVISOR`. No frontend, um `401` autenticado limpa o token e
+retorna ao login sem apagar rascunho ou fila local.
+
 O backend aceita três formas de identificar supervisor:
 
 - coluna `ROLE` na aba `PROMOTORES`, com valor `SUPERVISOR`;
