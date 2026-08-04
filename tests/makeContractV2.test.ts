@@ -59,6 +59,29 @@ test('gera um evento por foto, sem duplicar devolução e com IDs estáveis', ()
   assert.ok(first.every((event) => event.ROW_WRITE === false));
 });
 
+test('preserva 90 fotos, inclusive capturas com conteúdo idêntico', () => {
+  const repeatedPhoto = photo('repetida');
+  const manyPhotosPayload = structuredClone(payload);
+  manyPhotosPayload.industryExecutions.VENEZA.photos = {
+    ANTES: Array.from({ length: 30 }, () => repeatedPhoto),
+    DEPOIS: Array.from({ length: 30 }, (_, index) => photo(`depois-${index}`)),
+    TROCAS: Array.from({ length: 30 }, (_, index) => photo(`troca-${index}`)),
+  };
+  manyPhotosPayload.industryExecutions.IDEALPAN.photos = {} as typeof payload.industryExecutions.IDEALPAN.photos;
+  manyPhotosPayload.returnsPhotosByIndustry = {} as typeof payload.returnsPhotosByIndustry;
+
+  const events = buildMakePhotoEvents(manyPhotosPayload);
+
+  assert.equal(events.length, 92);
+  assert.equal(events.filter((event) => event.INDUSTRIA === 'VENEZA').length, 90);
+  assert.equal(events.filter((event) => event.ETAPA === 'ANTES').length, 30);
+  assert.equal(new Set(events.map((event) => event.ID_FOTO)).size, 92);
+  assert.deepEqual(
+    events.filter((event) => event.ETAPA === 'ANTES').map((event) => event.ORDEM),
+    Array.from({ length: 30 }, (_, index) => index + 1),
+  );
+});
+
 test('gera um único fechamento por visita, sem base64 e com dados agregados', () => {
   const events = buildMakePhotoEvents(payload);
   const manifest: DriveSyncManifest = {
@@ -123,4 +146,3 @@ test('valida confirmações vinculadas ao evento e à visita', () => {
   }), finalize);
   assert.equal(confirmation.rowAction, 'updated');
 });
-

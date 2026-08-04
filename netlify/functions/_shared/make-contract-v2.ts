@@ -167,12 +167,9 @@ const collectPhotoCandidates = (payload: any) => {
     }
   });
 
-  const unique = new Map<string, PhotoCandidate>();
-  candidates.forEach((candidate) => {
-    const key = `${candidate.stage}|${safeName(candidate.industry, 'GERAL')}|${hashPhoto(candidate.base64)}`;
-    if (!unique.has(key)) unique.set(key, candidate);
-  });
-  return Array.from(unique.values());
+  // Preserve repeated captures. Retries remain idempotent because each photo ID
+  // includes its stage, industry, position and content hash.
+  return candidates;
 };
 
 export const buildMakePhotoEvents = (payload: any): MakePhotoEvent[] => {

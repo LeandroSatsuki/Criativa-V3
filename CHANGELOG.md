@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## [2026-08-03] - Correcao emergencial: fotos completas e cadastro no supervisor
+
+### Alterado
+- O contrato Make V2 preserva todas as capturas na ordem registrada, inclusive
+  quando duas fotos possuem conteudo identico.
+- O primeiro indicador do painel supervisor passa a exibir promotores
+  cadastrados, em vez de apresentar como "ativos" somente usuarios com visita
+  atualizada nos ultimos 15 minutos.
+
+### Adicionado
+- Teste de regressao com 90 fotos de uma industria, incluindo 30 capturas
+  identicas, garantindo IDs distintos e nenhuma perda por deduplicacao.
+
+### Corrigido
+- Removida a deduplicacao por conteudo que poderia descartar uma captura valida
+  no envio individual V2.
+- Corrigida a interpretacao incorreta de promotor cadastrado como promotor
+  online no resumo supervisor.
+
+### Seguranca
+- O modo de producao permanece `legacy` ate o webhook V2 ser criado e validado
+  no Make; ativar o contrato sem o cenario correspondente interromperia os
+  envios existentes.
+- Nenhuma credencial foi adicionada ao codigo.
+
+### Validacao
+- `npm.cmd test`: 22 testes aprovados, incluindo 90 fotos preservadas.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido; permanece apenas o warning conhecido de chunk
+  grande.
+
+### Pendencias
+- Configurar e testar o cenario Make V2, definir
+  `BACKEND_MAKE_WEBHOOK_V2_URL` e somente entao alterar
+  `BACKEND_MAKE_SYNC_MODE` para `visit-v2`.
+
 ## [2026-08-03] - Correcao: dados reais do supervisor e diagnostico de fotos
 
 ### Alterado

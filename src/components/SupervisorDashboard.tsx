@@ -86,7 +86,7 @@ const SupervisorDashboard: React.FC = () => {
   };
 
   const filteredData = dashboard.promoters.filter(p => {
-    if (filter === 'active') return p.online;
+    if (filter === 'active') return true;
     if (filter === 'completed') return p.status === 'CONCLUÍDO';
     if (filter === 'sync_pending') return p.pendingSyncVisits > 0;
     if (filter === 'on_route') return p.status === 'EM ROTA';
@@ -206,7 +206,7 @@ const SupervisorDashboard: React.FC = () => {
         <div>
           <h2 className="text-4xl font-black uppercase tracking-tighter text-[#0F172A]">Gestão de Equipe</h2>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-2">
-            {filter === 'all' ? 'Visão Geral' : filter === 'active' ? 'Promotores Ativos' : 'Visitas Concluídas'}
+            {filter === 'all' ? 'Visão Geral' : filter === 'active' ? 'Promotores Cadastrados' : 'Visitas Concluídas'}
           </p>
         </div>
         {filter !== 'all' && (
@@ -228,9 +228,9 @@ const SupervisorDashboard: React.FC = () => {
             <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
               <Users className="text-emerald-600" size={16} />
             </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores Ativos</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores Cadastrados</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.onlinePromoters}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.totalPromoters}</h4>
         </button>
 
         <button 
