@@ -5,6 +5,7 @@ export type SheetRow = {
 };
 
 export type SheetTable = {
+  cols?: Array<{ label?: string | null } | null>;
   rows: SheetRow[];
 };
 
@@ -37,11 +38,20 @@ export const findColumnIndex = (
   aliases: string[],
   fallback: number,
 ) => {
-  const headers = table?.rows?.[0]?.c?.map((cell) => normalizeColumnName(cell?.v)) || [];
+  const columnLabels = table?.cols?.map((column) => normalizeColumnName(column?.label)) || [];
+  const headers = columnLabels.some(Boolean)
+    ? columnLabels
+    : table?.rows?.[0]?.c?.map((cell) => normalizeColumnName(cell?.v)) || [];
   const normalizedAliases = aliases.map(normalizeColumnName);
   const index = headers.findIndex((header) => normalizedAliases.includes(header));
   return index >= 0 ? index : fallback;
 };
+
+export const getTableDataRows = (table: SheetTable) => (
+  table.cols?.some((column) => normalizeColumnName(column?.label))
+    ? table.rows
+    : table.rows.slice(1)
+);
 
 export const getRowValue = (row: SheetRow, columnIndex: number) =>
   String(row.c?.[columnIndex]?.v || '').trim();
@@ -56,8 +66,7 @@ export const mapPromotersTable = (table: SheetTable | null): SheetPromoter[] => 
   const regionColumn = findColumnIndex(table, ['REGIONAL', 'REGIAO', 'UF'], 4);
   const roleColumn = findColumnIndex(table, ['ROLE', 'PERFIL', 'TIPO_USUARIO'], 5);
 
-  return table.rows
-    .slice(1)
+  return getTableDataRows(table)
     .map((row) => ({
       id: getRowValue(row, idColumn),
       name: getRowValue(row, nameColumn),

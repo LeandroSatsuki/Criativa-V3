@@ -126,7 +126,7 @@ Data da ultima auditoria: 2026-06-27
 - [x] Etapa B: contrato de upload individual e fechamento unico implementado no backend.
 - [x] Etapa B: retry idempotente e confirmacao estrita de Drive/planilha testados localmente.
 - [x] Etapa B: modelo da planilha corrigido para uma linha por visita.
-- [ ] Etapa B: configurar e validar o cenario v2 no Make com Google Drive real.
+- [x] Etapa B: configurar e validar o cenario v2 no Make com Google Drive real.
 - [ ] Etapa B: ativar `visit-v2` somente apos o teste controlado no Make.
 
 ## Isolamento da fila por usuario

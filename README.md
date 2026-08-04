@@ -90,7 +90,11 @@ sem `ROLE` continuam como `FIELD_OPS`, preservando compatibilidade.
 - A Fase 8 fecha a documentação operacional e técnica da entrega.
 - O frontend agora fala apenas com `/api/*`.
 - O contrato Make v2 esta ativo: cada foto vai ao Drive separadamente, recebe
-  confirmacao individual e a planilha mantem uma unica linha por visita.
+  confirmacao individual, fica organizada em `Industria/Data` e a planilha
+  mantem uma unica linha por visita.
+- Depois de salvar a visita no backend, o envio das fotos continua em uma
+  Netlify Background Function; o promotor pode seguir usando o aplicativo.
+- O carimbo usa `NOME_LOJA` da aba `CADASTRO_LOJAS`, e nao `GRUPO_REDE`.
 - O cenario legado permanece disponivel somente para rollback controlado por
   `BACKEND_MAKE_SYNC_MODE=legacy`.
 - As fotos recebem o carimbo no aparelho e sao convertidas para JPEG com alvo

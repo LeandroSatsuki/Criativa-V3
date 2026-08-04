@@ -1,10 +1,29 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  findColumnIndex,
+  getTableDataRows,
   mapPromotersTable,
   PROMOTER_SHEET_NAMES,
   type SheetTable,
 } from '../netlify/functions/_shared/promoter-sheet.ts';
+
+test('usa os rotulos do GViz e preserva a primeira linha de dados', () => {
+  const gvizTable = {
+    cols: [
+      { label: 'ID_LOJA' },
+      { label: 'GRUPO_REDE' },
+      { label: 'NOME_LOJA' },
+    ],
+    rows: [
+      { c: [{ v: '1' }, { v: 'EXTRABOM' }, { v: 'EXTRABOM SUPERMERCADOS - JD AMERICA' }] },
+    ],
+  } satisfies SheetTable;
+
+  assert.equal(findColumnIndex(gvizTable, ['NOME_LOJA'], 1), 2);
+  assert.equal(getTableDataRows(gvizTable).length, 1);
+  assert.equal(getTableDataRows(gvizTable)[0].c?.[2]?.v, 'EXTRABOM SUPERMERCADOS - JD AMERICA');
+});
 
 const table = (rows: Array<Array<string | number>>) => ({
   rows: rows.map((values) => ({ c: values.map((value) => ({ v: value })) })),

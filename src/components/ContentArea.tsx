@@ -485,23 +485,16 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         await upsertQueuedVisit(queueOwnerId, payload, serverVisitId, 'pending');
       }
 
-      setSyncMessage(useRetryEndpoint ? 'Reenviando visita salva...' : 'Enviando visita salva...');
-      const result = await apiService.syncSavedVisit(serverVisitId, (message) => setSyncMessage(message));
-
-      if (result.syncStatus === 'enviado') {
-        await removeQueuedVisit(queueOwnerId, serverVisitId);
-        setQueueCount(await getQueuedVisitCount(queueOwnerId));
-        return result;
-      }
-
+      setSyncMessage(useRetryEndpoint ? 'Reenvio iniciado em segundo plano.' : 'Envio iniciado em segundo plano.');
+      const result = await apiService.startBackgroundSync(serverVisitId);
       await updateQueuedVisit(queueOwnerId, serverVisitId, {
-        status: 'error',
-        error: result.syncError || 'Falha na sincronização',
-        attempts: queued.attempts + 1,
+        status: 'syncing',
+        error: null,
         payload: { ...payload, visitId: serverVisitId },
       });
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
-      throw new Error(result.syncError || 'Falha na sincronização');
+      window.dispatchEvent(new Event('criativa-sync-queue-updated'));
+      return result;
     } catch (error: any) {
       await updateQueuedVisit(queueOwnerId, activeVisitId, {
         status: 'error',
@@ -540,11 +533,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         ...visitState,
         timestamp: getBrasiliaISO()
       }, visitState.visitId || undefined);
+      setSyncMessage('Visita salva. As fotos continuarão sendo enviadas em segundo plano.');
       setSyncSuccess(true);
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
       setTimeout(() => {
         onReset();
-      }, 3000);
+      }, 1500);
     } catch (error: any) {
       setSyncError(formatSyncError(error.message || "Erro desconhecido na sincronização"));
     } finally {
@@ -573,7 +567,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
       setTimeout(() => {
         onReset();
-      }, 3000);
+      }, 1500);
     } catch (error: any) {
       setSyncError(formatSyncError(error.message || 'Não foi possível reenviar a fila local.'));
     } finally {
@@ -1518,10 +1512,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             </div>
             <div className="text-center">
               <h2 className="text-3xl font-black uppercase tracking-tighter">
-                {syncSuccess ? 'Sucesso!' : isSyncing ? 'Sincronizando...' : 'Pronto para Enviar'}
+                {syncSuccess ? 'Envio iniciado' : isSyncing ? 'Salvando visita...' : 'Pronto para Enviar'}
               </h2>
               <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">
-                {syncSuccess ? 'Dados enviados com sucesso para o servidor' : syncMessage}
+                {syncMessage}
               </p>
             </div>
 

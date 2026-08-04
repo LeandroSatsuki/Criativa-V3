@@ -43,11 +43,14 @@ desative o cenario legado antes do teste controlado do cenario v2.
 
 ## Rota PHOTO_UPLOAD
 
-### Pasta da visita
+### Pastas da industria e da data
 
-Pesquisar uma pasta pelo valor exato de `1.PASTA_VISITA_NOME`, limitada a pasta
-raiz de fotos do Criativa. Se nao existir, criar a pasta com esse nome dentro da
-pasta raiz. Se existir, reutilizar o `File ID` retornado pela busca.
+Pesquisar `1.PASTA_INDUSTRIA_NOME` na pasta raiz de fotos do Criativa. Se nao
+existir, criar a industria. Dentro dela, pesquisar `1.PASTA_VISITA_NOME`, que
+corresponde a data da visita. Criar somente quando nao existir.
+
+A estrutura final e `RAIZ/INDUSTRIA/DD-MM-AAAA`. Para visitas que estavam na
+fila antes do contrato 2.1, o cenario usa `INDUSTRIA` como fallback.
 
 O campo `Folder ID` dos modulos seguintes deve conter apenas um token de ID:
 o ID retornado pela pasta encontrada ou criada. Nao mapear o bundle completo.
@@ -144,7 +147,7 @@ etapa, industria, ordem e data de sincronizacao de cada foto.
 3. Manter `BACKEND_MAKE_SYNC_MODE=legacy` e fazer deploy.
 4. Alterar para `BACKEND_MAKE_SYNC_MODE=visit-v2` somente na janela de teste.
 5. Registrar uma visita controlada com duas industrias e varias fotos.
-6. Confirmar todas as fotos na pasta unica do Drive.
+6. Confirmar todas as fotos nas pastas `Industria/Data` do Drive.
 7. Confirmar exatamente uma linha para o `ID_VISITA` na planilha.
 8. Reenviar a mesma visita e confirmar que nao surgiram arquivos nem linhas
    duplicadas.

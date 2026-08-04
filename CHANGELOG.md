@@ -1,5 +1,52 @@
 # CHANGELOG
 
+## [2026-08-04] - Correcao: pastas por industria, envio em segundo plano e nome do PDV
+
+### Alterado
+- O cenario Make V2 organiza fotos em `INDUSTRIA/DATA_DA_VISITA`, como no fluxo
+  operacional anterior, e reutiliza pastas e arquivos existentes.
+- Fachada e checkout sao arquivados em cada industria com evidencia na visita.
+- A sincronizacao passa a ser iniciada por Netlify Background Function e deixa
+  a interface livre depois que a visita completa foi salva no backend.
+- A fila local consulta o status do backend e remove automaticamente visitas
+  confirmadas como enviadas.
+
+### Adicionado
+- Funcao `visit-sync-background` com limite operacional de 100 lotes e duracao
+  maxima gerenciada pelo runtime de background do Netlify.
+- Contrato Make `2.1` com `PASTA_INDUSTRIA_NOME` e links das pastas por industria
+  no fechamento agregado da visita.
+- Teste do formato GViz usado pela planilha real.
+
+### Corrigido
+- O carimbo da foto e a visita deixam de usar `GRUPO_REDE` como nome do PDV.
+  O leitor agora usa o rotulo real `NOME_LOJA`, preservando nomes como
+  `EXTRABOM SUPERMERCADOS - JD AMERICA`.
+- A primeira linha de promotores retornada pelo GViz deixa de ser descartada.
+- Corrigidos tambem os mapeamentos de `REGIONAL_LOJA` e
+  `ID_PROMOTOR_RESPONSAVEL`.
+
+### Seguranca
+- A funcao de background recebe somente o ID da visita ja persistida e exige a
+  mesma autenticacao e regra de acesso do promotor ou supervisor.
+- Base64, webhook e credenciais continuam fora da URL e do frontend.
+- O cenario legado permanece ativo e nao foi alterado.
+
+### Validacao
+- Planilha real conferida: `GRUPO_REDE` na coluna B e `NOME_LOJA` na coluna C.
+- Make real: criacao de industria/data, reutilizacao da data, segundo arquivo e
+  reenvio idempotente aprovados.
+- Preview Netlify `6a71daebf3d78a601bb1fe68`: healthcheck aprovado e rota
+  de background respondeu HTTP 202.
+- `npm.cmd test`: 23 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build` e `npx.cmd netlify build`: concluidos; permanece apenas o
+  aviso conhecido de chunk JavaScript acima de 500 KB.
+
+### Pendencias
+- Remover manualmente a industria tecnica `_TESTE_ORGANIZACAO_V2` do Drive
+  depois da conferencia visual da hierarquia. Ela nao participa da producao.
+
 ## [2026-08-03] - Etapa B concluida: envio integral de fotos
 
 ### Alterado

@@ -7,6 +7,7 @@ import { isConfigCacheFresh } from './config-cache';
 import {
   findColumnIndex,
   getRowValue,
+  getTableDataRows,
   mapPromotersTable,
   normalizeColumnName,
   normalizeRole,
@@ -46,7 +47,7 @@ type ProvisionalUser = {
   expiresAt?: string;
 };
 
-const CONFIG_SCHEMA_VERSION = 4;
+const CONFIG_SCHEMA_VERSION = 5;
 const defaultIndustries = ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
 const configStore = getJsonStore('criativa-config');
 
@@ -225,18 +226,31 @@ const mapConfig = async (): Promise<AppData> => {
     'NOME_PDV',
     'PDV',
     'LOJA',
-  ], 1);
-  const storeRegionColumn = findColumnIndex(storesTable, ['REGIAO', 'REGIONAL', 'UF', 'CIDADE'], 2);
-  const storeResponsibleColumn = findColumnIndex(storesTable, ['PROMOTOR', 'RESPONSAVEL', 'RESPONSAVEL_LOJA'], 11);
+  ], 2);
+  const storeRegionColumn = findColumnIndex(storesTable, [
+    'REGIAO',
+    'REGIONAL',
+    'REGIONAL_LOJA',
+    'UF',
+    'CIDADE',
+  ], 9);
+  const storeResponsibleColumn = findColumnIndex(storesTable, [
+    'PROMOTOR',
+    'RESPONSAVEL',
+    'RESPONSAVEL_LOJA',
+    'ID_PROMOTOR_RESPONSAVEL',
+  ], 11);
 
-  const stores = storesTable?.rows
-    .map((row) => ({
-      id: getRowValue(row, storeIdColumn),
-      name: getRowValue(row, storeNameColumn),
-      region: getRowValue(row, storeRegionColumn),
-      responsible: getRowValue(row, storeResponsibleColumn),
-    }))
-    .filter((store) => store.name && normalizeColumnName(store.name) !== 'NOMELOJA') ?? [];
+  const stores = storesTable
+    ? getTableDataRows(storesTable)
+      .map((row) => ({
+        id: getRowValue(row, storeIdColumn),
+        name: getRowValue(row, storeNameColumn),
+        region: getRowValue(row, storeRegionColumn),
+        responsible: getRowValue(row, storeResponsibleColumn),
+      }))
+      .filter((store) => store.name && normalizeColumnName(store.name) !== 'NOMELOJA')
+    : [];
 
   return {
     schemaVersion: CONFIG_SCHEMA_VERSION,

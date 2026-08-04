@@ -247,6 +247,17 @@ export const apiService = {
     });
   },
 
+  startBackgroundSync: async (visitId: string) => {
+    await requestJson<string>(`/sync/${visitId}/background`, {
+      method: 'POST',
+    });
+    return {
+      visitId,
+      syncStatus: 'enviando',
+      syncError: null,
+    } satisfies SyncResponse;
+  },
+
   syncSavedVisit: async (visitId: string, onProgress?: (message: string) => void) => {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const result = await apiService.retrySync(visitId);

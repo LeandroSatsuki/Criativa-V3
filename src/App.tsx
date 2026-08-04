@@ -212,9 +212,9 @@ const App: React.FC = () => {
 
         const draft = await apiService.createVisit({ ...queuedVisit.payload, visitId: queuedVisit.visitId });
         const serverVisitId = draft.visitId || queuedVisit.visitId;
-        const result = await apiService.syncSavedVisit(serverVisitId, (message) => setPromptSyncMessage(message));
+        const status = await apiService.getSyncStatus(serverVisitId);
 
-        if (result.syncStatus === 'enviado') {
+        if (status.syncStatus === 'enviado') {
           await removeQueuedVisit(ownerId, serverVisitId);
           if (serverVisitId !== queuedVisit.visitId) {
             await removeQueuedVisit(ownerId, queuedVisit.visitId);
@@ -223,16 +223,17 @@ const App: React.FC = () => {
           continue;
         }
 
+        if (status.syncStatus !== 'enviando') {
+          await apiService.startBackgroundSync(serverVisitId);
+        }
         await updateQueuedVisit(ownerId, serverVisitId, {
-          status: 'error',
-          error: result.syncError || 'Falha na sincronização',
-          attempts: queuedVisit.attempts + 1,
+          status: 'syncing',
+          error: null,
         });
-        throw new Error(result.syncError || 'Falha na sincronização');
       }
 
       notifyQueueChanged();
-      setPromptSyncMessage('Fila sincronizada com sucesso.');
+      setPromptSyncMessage('Envios iniciados em segundo plano. Você já pode continuar.');
       setTimeout(() => setShowPendingSyncPrompt(false), 1200);
     } catch (error: any) {
       setPromptSyncError(formatSyncError(error.message || 'Não foi possível sincronizar a fila agora.'));
@@ -242,6 +243,51 @@ const App: React.FC = () => {
       setPromptSyncing(false);
     }
   };
+
+  useEffect(() => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId) return;
+
+    let cancelled = false;
+    const reconcileQueue = async () => {
+      const queuedVisits = await listQueuedVisits(ownerId);
+      let changed = false;
+
+      for (const queuedVisit of queuedVisits) {
+        if (cancelled || queuedVisit.status === 'pending') continue;
+        try {
+          const status = await apiService.getSyncStatus(queuedVisit.visitId);
+          if (status.syncStatus === 'enviado') {
+            await removeQueuedVisit(ownerId, queuedVisit.visitId);
+            changed = true;
+          } else if (status.syncStatus === 'erro') {
+            await updateQueuedVisit(ownerId, queuedVisit.visitId, {
+              status: 'error',
+              error: status.syncError || 'Falha no envio em segundo plano.',
+            });
+            changed = true;
+          }
+        } catch {
+          // A fila local continua disponível se o aparelho estiver sem conexão.
+        }
+      }
+
+      if (changed && !cancelled) notifyQueueChanged();
+    };
+
+    const intervalId = window.setInterval(() => void reconcileQueue(), 15000);
+    const handleResume = () => void reconcileQueue();
+    window.addEventListener('online', handleResume);
+    window.addEventListener('focus', handleResume);
+    void reconcileQueue();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('online', handleResume);
+      window.removeEventListener('focus', handleResume);
+    };
+  }, [visitState.user?.id]);
 
   const clearCurrentUserQueue = async () => {
     const ownerId = visitState.user?.id;

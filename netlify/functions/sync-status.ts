@@ -28,6 +28,10 @@ export default async (request: Request, context: Context) => {
     visitId: visit.visitId,
     syncStatus: visit.syncStatus,
     syncError: visit.syncError || null,
+    progress: visit.payload?.driveSync ? {
+      sent: Object.keys(visit.payload.driveSync.photos || {}).length,
+      total: Number(visit.payload.driveSync.totalPhotos || 0),
+    } : undefined,
     updatedAt: visit.updatedAt,
   });
 };

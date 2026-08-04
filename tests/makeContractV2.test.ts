@@ -52,11 +52,18 @@ test('gera um evento por foto, sem duplicar devolução e com IDs estáveis', ()
   const first = buildMakePhotoEvents(payload);
   const second = buildMakePhotoEvents(payload);
 
-  assert.equal(first.length, 8);
+  assert.equal(first.length, 10);
   assert.deepEqual(first.map((event) => event.ID_FOTO), second.map((event) => event.ID_FOTO));
   assert.equal(new Set(first.map((event) => event.ID_FOTO)).size, first.length);
   assert.equal(first.filter((event) => event.ETAPA === 'TROCAS').length, 1);
   assert.ok(first.every((event) => event.ROW_WRITE === false));
+  assert.ok(first.every((event) => event.PASTA_VISITA_NOME === '17-07-2026'));
+  assert.deepEqual(
+    new Set(first.map((event) => event.PASTA_INDUSTRIA_NOME)),
+    new Set(['VENEZA', 'IDEALPAN']),
+  );
+  assert.equal(first.filter((event) => event.ETAPA === 'FACHADA').length, 2);
+  assert.equal(first.filter((event) => event.ETAPA === 'CHECKOUT').length, 2);
 });
 
 test('preserva 90 fotos, inclusive capturas com conteúdo idêntico', () => {
@@ -73,7 +80,7 @@ test('preserva 90 fotos, inclusive capturas com conteúdo idêntico', () => {
   const events = buildMakePhotoEvents(manyPhotosPayload);
 
   assert.equal(events.length, 92);
-  assert.equal(events.filter((event) => event.INDUSTRIA === 'VENEZA').length, 90);
+  assert.equal(events.filter((event) => event.INDUSTRIA === 'VENEZA').length, 92);
   assert.equal(events.filter((event) => event.ETAPA === 'ANTES').length, 30);
   assert.equal(new Set(events.map((event) => event.ID_FOTO)).size, 92);
   assert.deepEqual(
@@ -85,7 +92,7 @@ test('preserva 90 fotos, inclusive capturas com conteúdo idêntico', () => {
 test('gera um único fechamento por visita, sem base64 e com dados agregados', () => {
   const events = buildMakePhotoEvents(payload);
   const manifest: DriveSyncManifest = {
-    contractVersion: '2.0',
+    contractVersion: '2.1',
     totalPhotos: events.length,
     folderUrl: 'https://drive.google.com/drive/folders/pasta',
     photos: Object.fromEntries(events.map((event) => [event.ID_FOTO, {
@@ -107,11 +114,12 @@ test('gera um único fechamento por visita, sem base64 e com dados agregados', (
   assert.equal(finalize.ROW_MODE, 'UPSERT_BY_ID_VISITA');
   assert.equal(finalize.ID_VISITA, payload.visitId);
   assert.equal(finalize.INDUSTRIAS_VISITA, 'IDEALPAN, VENEZA');
-  assert.equal(finalize.TOTAL_FOTOS, 8);
+  assert.equal(finalize.TOTAL_FOTOS, 10);
   assert.equal(finalize.QTD_FOTOS_ANTES, 3);
   assert.equal(finalize.LINK_FOTO_ANTES, '');
   assert.ok(finalize.LINK_FOTO_CHECKIN.includes('/file-'));
   assert.equal(JSON.stringify(finalize).includes('FOTO_BASE64'), false);
+  assert.match(finalize.PASTA_FOTOS_DRIVE_URL, /IDEALPAN|VENEZA/);
 });
 
 test('não aceita HTTP 200 genérico como confirmação de upload', () => {
@@ -134,7 +142,7 @@ test('valida confirmações vinculadas ao evento e à visita', () => {
   }), event);
   assert.equal(receipt.fileId, 'drive-file-id');
 
-  const manifest: DriveSyncManifest = { contractVersion: '2.0', totalPhotos: 1, photos: { [event.ID_FOTO]: receipt } };
+  const manifest: DriveSyncManifest = { contractVersion: '2.1', totalPhotos: 1, photos: { [event.ID_FOTO]: receipt } };
   const finalize = buildMakeVisitFinalizeEvent(payload, [event], manifest);
   const confirmation = validateVisitFinalizeResponse(JSON.stringify({
     success: true,

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { formatBrasiliaDate, formatBrasiliaTime, formatFileDate, getBrasiliaISO } from './time.ts';
 
-export const MAKE_CONTRACT_VERSION = '2.0';
+export const MAKE_CONTRACT_VERSION = '2.1';
 export const MAKE_PHOTOS_PER_RUN = 3;
 
 export type PhotoStage = 'FACHADA' | 'ANTES' | 'ESTOQUE' | 'DEPOIS' | 'TROCAS' | 'CHECKOUT';
@@ -20,6 +20,7 @@ export type MakePhotoEvent = {
   MIME_TYPE: 'image/jpeg';
   TAMANHO_BYTES: number;
   FOTO_BASE64: string;
+  PASTA_INDUSTRIA_NOME: string;
   PASTA_VISITA_NOME: string;
   NOME_LOJA: string;
   NOME_PROMOTOR: string;
@@ -125,6 +126,19 @@ const calculateDuration = (checkInValue: unknown, checkOutValue: unknown) => {
 const getExecutionEntries = (payload: any) => Object.values(payload.industryExecutions || {})
   .filter(Boolean) as any[];
 
+const getPhotoIndustryNames = (payload: any) => {
+  const industries = getExecutionEntries(payload)
+    .filter((execution) => Object.values(execution.photos || {}).some(
+      (photos) => Array.isArray(photos) && photos.length > 0,
+    ))
+    .map((execution) => normalizeText(execution.industry, ''))
+    .filter(Boolean);
+
+  return Array.from(new Set(industries.length
+    ? industries
+    : [normalizeText(payload.selectedIndustry || payload.industry, 'GERAL')]));
+};
+
 const addCandidates = (
   candidates: PhotoCandidate[],
   photos: unknown,
@@ -144,8 +158,10 @@ const collectPhotoCandidates = (payload: any) => {
   const selectedIndustry = normalizeText(payload.selectedIndustry || payload.industry, 'GERAL');
   const executions = getExecutionEntries(payload);
 
-  addCandidates(candidates, payload.photos?.FACHADA, 'FACHADA', 'GERAL');
-  addCandidates(candidates, payload.photos?.CHECKOUT, 'CHECKOUT', 'GERAL');
+  getPhotoIndustryNames(payload).forEach((industry) => {
+    addCandidates(candidates, payload.photos?.FACHADA, 'FACHADA', industry);
+    addCandidates(candidates, payload.photos?.CHECKOUT, 'CHECKOUT', industry);
+  });
 
   executions
     .sort((left, right) => String(left.industry || '').localeCompare(String(right.industry || ''), 'pt-BR'))
@@ -178,7 +194,6 @@ export const buildMakePhotoEvents = (payload: any): MakePhotoEvent[] => {
   const storeName = normalizeText(payload.currentStore, 'Loja');
   const promoterName = normalizeText(payload.user?.name, 'Promotor');
   const storeSlug = safeName(storeName, 'LOJA');
-  const visitFolderName = `${storeSlug}_${fileDate}_${safeName(visitId, 'VISITA')}`;
   const stageCounts = new Map<string, number>();
 
   return collectPhotoCandidates(payload).map((candidate) => {
@@ -207,7 +222,8 @@ export const buildMakePhotoEvents = (payload: any): MakePhotoEvent[] => {
       MIME_TYPE: 'image/jpeg',
       TAMANHO_BYTES: Buffer.byteLength(candidate.base64, 'base64'),
       FOTO_BASE64: candidate.base64,
-      PASTA_VISITA_NOME: visitFolderName,
+      PASTA_INDUSTRIA_NOME: candidate.industry,
+      PASTA_VISITA_NOME: fileDate,
       NOME_LOJA: storeName,
       NOME_PROMOTOR: promoterName,
       ROW_WRITE: false,
@@ -261,6 +277,11 @@ export const buildMakeVisitFinalizeEvent = (
     .map((execution) => execution.aiResults?.DEPOIS)
     .filter(Boolean);
   const checkInReceipt = Object.values(manifest.photos).find((photo) => photo.stage === 'FACHADA');
+  const folderLinks = Array.from(new Map(
+    Object.values(manifest.photos)
+      .filter((photo) => photo.folderUrl)
+      .map((photo) => [photo.industry, `${photo.industry}: ${photo.folderUrl}`]),
+  ).values()).join(' | ');
   const countStage = (stage: PhotoStage) => events.filter((event) => event.ETAPA === stage).length;
 
   return {
@@ -298,7 +319,7 @@ export const buildMakeVisitFinalizeEvent = (
     QTD_FOTOS_TROCAS: countStage('TROCAS'),
     QTD_FOTOS_CHECKOUT: countStage('CHECKOUT'),
     TOTAL_FOTOS: events.length,
-    PASTA_FOTOS_DRIVE_URL: manifest.folderUrl || '',
+    PASTA_FOTOS_DRIVE_URL: folderLinks || manifest.folderUrl || '',
     STATUS_UPLOAD_FOTOS: 'CONCLUIDO',
     STATUS_ANALISE: aiResults.length ? 'CONCLUIDA' : 'PENDENTE',
     STATUS_REVISAO: 'PENDENTE',

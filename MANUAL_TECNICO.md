@@ -171,7 +171,10 @@ O backend:
 3. verifica o SHA-256 do conteudo reconstruido;
 4. salva a visita completa no storage;
 5. remove os fragmentos temporarios;
-6. sincroniza usando a visita ja salva, sem reenviar todo o JSON pelo navegador.
+6. inicia `/api/sync/:id/background`, que sincroniza a visita ja salva sem
+   manter a tela do navegador bloqueada;
+7. atualiza o manifesto depois de cada arquivo confirmado e finaliza uma unica
+   linha da visita na planilha.
 
 O limite seguro atual de uma visita reconstruida e 64 MB. Visitas pequenas
 continuam usando `/api/visits`, preservando compatibilidade.
@@ -333,6 +336,10 @@ O campo `storeResponsible` e opcional, mas recomendado para testes. Ele permite 
 - O contrato Make v2 esta ativo, envia cada foto separadamente, exige confirmacao
   real do Drive e so depois faz `UPSERT_BY_ID_VISITA`, mantendo uma linha por
   visita.
+- O Drive usa `Industria/Data da visita`. Fachada e checkout sao copiados para
+  cada industria com fotos, preservando a organizacao usada nos relatorios.
+- O nome aplicado ao carimbo vem de `CADASTRO_LOJAS.NOME_LOJA`; `GRUPO_REDE`
+  nao deve ser usado como identificacao do PDV.
 - Para rollback emergencial, altere apenas `BACKEND_MAKE_SYNC_MODE=legacy`, faca
   um novo deploy e mantenha os dois cenarios Make ativos durante a analise.
 - A configuracao operacional completa esta em `CONFIGURACAO_MAKE_ETAPA_B.md`.
