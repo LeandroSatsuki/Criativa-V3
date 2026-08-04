@@ -53,6 +53,14 @@ const cacheAppShell = async () => {
   await cache.put('/', shellResponse);
 };
 
+const serveCachedAppShell = async (request) => {
+  const cache = await caches.open(STATIC_CACHE);
+  const cachedShell = await cache.match('/');
+
+  if (cachedShell) return cachedShell;
+  return fetch(request);
+};
+
 self.addEventListener('install', (event) => {
   event.waitUntil(cacheAppShell());
   // A nova versao espera as telas abertas fecharem para nao interromper visitas.
@@ -86,7 +94,13 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match('/')));
+    const navigationResponse = serveCachedAppShell(request);
+    event.respondWith(navigationResponse);
+    event.waitUntil(
+      navigationResponse
+        .then(() => cacheAppShell())
+        .catch(() => undefined),
+    );
     return;
   }
 

@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## [2026-08-04] - Compatibilidade offline do iOS em homologacao
+
+### Alterado
+- O service worker passa a ser registrado imediatamente ao iniciar o app, sem
+  aguardar o carregamento completo da pagina.
+- Navegacoes passam a abrir primeiro o app shell versionado ja confirmado no
+  cache e atualizam esse shell em segundo plano quando houver internet.
+
+### Adicionado
+- Testes para abertura pelo cache, primeiro acesso sem cache, atualizacao segura
+  do shell e tipo de conteudo do manifesto.
+- Procedimento de homologacao do iPhone sem apagar rascunhos ou filas locais.
+
+### Corrigido
+- `manifest.webmanifest` passa a ser servido pelo Netlify como
+  `application/manifest+json`, em vez de `application/octet-stream`.
+- Removida a janela em que o app podia ser fechado no iOS antes de iniciar a
+  preparacao do modo offline.
+
+### Seguranca
+- APIs, login, visitas e rotas `/.netlify/functions/*` permanecem fora do cache.
+- `skipWaiting` continua proibido para nao trocar a versao durante uma visita.
+- Nenhum rascunho, fila ou armazenamento existente foi migrado ou removido.
+
+### Validacao
+- `npm.cmd test`: 58 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- CDN confirmou `Content-Type: application/manifest+json; charset=UTF-8`.
+- Chromium com armazenamento limpo confirmou worker ativo e cache versionado;
+  depois, com rede bloqueada, reabriu a tela `ACESSAR` pelo service worker.
+- Preview `6a723461835d8524ff5fc242` publicado no alias `pwa-offline`.
+
+### Pendencias
+- Repetir a homologacao no Safari/WebKit de um iPhone real.
+- Promover para producao somente depois da aprovacao no aparelho.
+
 ## [2026-08-04] - Navegacao dos cards supervisor em homologacao
 
 ### Alterado

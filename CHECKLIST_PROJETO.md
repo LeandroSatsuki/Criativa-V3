@@ -226,8 +226,20 @@ Data da ultima auditoria: 2026-06-27
   configuracao do backend.
 - [x] Perda de rede simulada em Chromium com app shell restaurado do cache.
 - [x] Atualizacao simulada manteve a versao atual ativa e a nova em `waiting`.
-- [ ] Instalacao e reabertura sem rede validadas em Android real.
+- [x] Instalacao e reabertura sem rede validadas em Android real pelo cliente.
 - [ ] Instalacao e reabertura sem rede validadas em iPhone real.
+- [ ] Preview aprovado para promocao a producao.
+
+### PWA-5 - Compatibilidade iOS em homologacao
+
+- [x] Registro do service worker iniciado sem aguardar `window.load`.
+- [x] Navegacao usa app shell versionado do cache antes da rede.
+- [x] Atualizacao do shell executada em segundo plano sem `skipWaiting`.
+- [x] Manifesto servido como `application/manifest+json` no CDN.
+- [x] APIs, autenticacao e dados operacionais permanecem fora do cache estatico.
+- [x] Perfil limpo preparou o cache online e reabriu com rede bloqueada.
+- [x] Testes, lint, build e preview Netlify aprovados.
+- [ ] Safari/WebKit validado em iPhone real.
 - [ ] Preview aprovado para promocao a producao.
 
 ### PWA-2 em homologacao

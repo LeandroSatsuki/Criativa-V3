@@ -51,7 +51,17 @@ No iPhone/Safari:
 1. Abra a URL publicada.
 2. Toque em compartilhar.
 3. Escolha adicionar à tela de início.
-4. Abra pelo ícone criado na tela do aparelho.
+4. Mantenha a internet ativa e abra pelo icone criado na tela do aparelho.
+5. Faca o primeiro login dentro do aplicativo instalado, nao apenas na aba do
+   Safari, e aguarde a tela inicial terminar de carregar.
+6. Feche o aplicativo pelo seletor do iPhone e abra novamente uma vez com
+   internet antes do primeiro teste em modo aviao.
+
+Ao receber uma atualizacao no iPhone, primeiro confirme que nao existe visita
+aberta nem envio pendente. Abra o aplicativo instalado com internet, aguarde o
+carregamento, feche-o pelo seletor e abra novamente. Nao apague o icone nem os
+dados do Safari enquanto houver registros locais, pois isso remove rascunhos e
+filas ainda nao sincronizadas.
 
 A instalação não muda o fluxo do promotor. Ela apenas deixa o acesso mais parecido com aplicativo e ajuda o navegador a manter os arquivos principais carregados.
 

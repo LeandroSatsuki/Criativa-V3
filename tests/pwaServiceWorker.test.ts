@@ -6,6 +6,7 @@ import vm from 'node:vm';
 type ServiceWorkerPolicy = {
   staticCache: string;
   discoverShellAssets: (html: string) => string[];
+  serveCachedAppShell: (request: Request) => Promise<Response>;
   isCacheableStaticRequest: (
     request: { method: string },
     url: URL,
@@ -13,7 +14,13 @@ type ServiceWorkerPolicy = {
   isSensitiveRequestPath: (pathname: string) => boolean;
 };
 
-const loadPolicy = async () => {
+const loadPolicy = async ({
+  cachedShell,
+  fetchResponse,
+}: {
+  cachedShell?: Response | null;
+  fetchResponse?: Response;
+} = {}) => {
   const source = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
   const listeners = new Map<string, (event: unknown) => void>();
   const self = {
@@ -30,13 +37,19 @@ const loadPolicy = async () => {
   const context = vm.createContext({
     URL,
     Request,
-    caches: {},
-    fetch: () => Promise.reject(new Error('fetch nao esperado neste teste')),
+    caches: {
+      open: () => Promise.resolve({
+        match: () => Promise.resolve(cachedShell ?? null),
+      }),
+    },
+    fetch: () => fetchResponse
+      ? Promise.resolve(fetchResponse)
+      : Promise.reject(new Error('fetch nao esperado neste teste')),
     self,
   });
 
   vm.runInContext(
-    `${source}\nself.__policy = { staticCache: STATIC_CACHE, discoverShellAssets, isCacheableStaticRequest, isSensitiveRequestPath };`,
+    `${source}\nself.__policy = { staticCache: STATIC_CACHE, discoverShellAssets, serveCachedAppShell, isCacheableStaticRequest, isSensitiveRequestPath };`,
     context,
   );
 
@@ -124,4 +137,42 @@ test('instalacao descobre os arquivos versionados gerados pelo Vite', async () =
     [...policy.discoverShellAssets(html)].sort(),
     ['/assets/index-CSS.css', '/assets/index-JS.js'],
   );
+});
+
+test('navegacao usa o app shell do cache sem consultar a rede', async () => {
+  const cachedShell = new Response('<main>offline ios</main>');
+  const { policy } = await loadPolicy({ cachedShell });
+
+  const response = await policy.serveCachedAppShell(
+    new Request('https://criativa.example/'),
+  );
+
+  assert.equal(await response.text(), '<main>offline ios</main>');
+});
+
+test('navegacao agenda atualizacao segura do shell sem usar skipWaiting', async () => {
+  const { source } = await loadPolicy();
+
+  assert.match(source, /event\.waitUntil\([\s\S]*cacheAppShell\(\)/);
+  assert.doesNotMatch(source, /skipWaiting\s*\(/);
+});
+
+test('navegacao consulta a rede somente quando o shell ainda nao foi preparado', async () => {
+  const fetchResponse = new Response('<main>primeiro acesso online</main>');
+  const { policy } = await loadPolicy({ fetchResponse });
+
+  const response = await policy.serveCachedAppShell(
+    new Request('https://criativa.example/'),
+  );
+
+  assert.equal(await response.text(), '<main>primeiro acesso online</main>');
+});
+
+test('Netlify entrega o manifesto com tipo reconhecido pelo iOS', async () => {
+  const config = await readFile(new URL('../netlify.toml', import.meta.url), 'utf8');
+  const manifestHeaders = config.match(
+    /\[\[headers\]\]\s+for = "\/manifest\.webmanifest"[\s\S]*?(?=\[\[headers\]\]|$)/,
+  )?.[0] || '';
+
+  assert.match(manifestHeaders, /Content-Type = "application\/manifest\+json; charset=UTF-8"/);
 });
