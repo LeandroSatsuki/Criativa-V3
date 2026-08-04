@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## [2026-08-04] - PWA-4 em homologacao: liberacao segura apos envio offline
+
+### Alterado
+- A tentativa de sincronizacao passa a distinguir falha de rede de erro HTTP,
+  autorizacao ou armazenamento local.
+- Depois de uma falha de rede, a visita confirmada na fila volta para `Selecao
+  de Unidade`, permitindo iniciar outra operacao.
+
+### Adicionado
+- Politica central de falha de sincronizacao com status, mensagem e decisao de
+  liberar ou preservar a visita atual.
+- Atualizacao imediata do indicador da fila quando a tentativa offline termina.
+- Dois testes para garantir liberacao em falha de rede e bloqueio em erro HTTP.
+
+### Corrigido
+- Corrigido o estado em que `Failed to fetch` mantinha o promotor preso na tela
+  de sincronizacao mesmo depois de a visita estar salva no IndexedDB.
+
+### Seguranca
+- O reset so acontece depois de `upsertQueuedVisit` e da atualizacao persistida
+  do item da fila.
+- Falha ao gravar localmente, `401` e demais respostas HTTP nao apagam nem
+  liberam o rascunho atual.
+- A fila continua isolada por proprietario e preserva o `visitId` idempotente.
+
+### Validacao
+- `npm.cmd test`: 35 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 14 Functions empacotados com sucesso.
+- Preview `6a71f71882d36e00e8e15a60` publicado no alias `pwa-offline`.
+- Chromium offline confirmou uma visita `pending` com proprietario, loja,
+  payload e foto de check-out, seguida de retorno a selecao de unidade.
+- Reabertura offline confirmou fila pendente e nova operacao disponivel.
+
+### Pendencias
+- Repetir duas visitas completas sem rede em um celular real.
+- Recuperar a conexao e confirmar o envio integral das duas visitas antes de
+  promover para producao.
+- O build mantem o aviso conhecido de chunk JavaScript acima de `500 KB`.
+
 ## [2026-08-04] - PWA-2 em homologacao: cadastro operacional offline
 
 ### Alterado

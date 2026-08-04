@@ -240,8 +240,20 @@ Data da ultima auditoria: 2026-06-27
 - [x] Preview estavel `pwa-offline` publicado.
 - [x] Contexto Netlify `branch-deploy` validado com sessao, Sheets e Make V2.
 - [x] Chromium offline restaurou promotor e loja autorizada sem erro de conexao.
-- [ ] Login online e reabertura offline validados com promotor real no celular.
+- [x] Login online e reabertura offline validados com promotor real no celular.
 - [ ] Cache renovado depois de recuperar conexao validado no celular.
+
+### PWA-4 em homologacao
+
+- [x] Fila IndexedDB confirmada antes da tentativa de rede.
+- [x] Falha de rede classificada como `pending`, e nao como perda ou envio.
+- [x] Payload, proprietario, loja, fotos e `visitId` preservados na fila.
+- [x] Retorno para `Selecao de Unidade` liberado somente depois da gravacao.
+- [x] Erro HTTP, autorizacao ou falha local continuam bloqueando o reset.
+- [x] Evento da fila atualiza o indicador de pendencias no cabecalho.
+- [x] Chromium offline concluiu a operacao com uma visita pendente preservada.
+- [ ] Fluxo repetido com duas visitas offline reais no celular.
+- [ ] Recuperacao da rede e envio das duas visitas validados no celular.
 
 ### Gates obrigatorios por subfase PWA
 

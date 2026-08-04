@@ -8,6 +8,7 @@ import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { analyzeProductPhoto } from '../services/geminiService';
 import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
+import { classifyQueuedSyncFailure } from '../services/syncPolicy';
 import { generateVisitId } from '../services/visitId';
 import {
   compressStampedPhoto,
@@ -494,16 +495,27 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       });
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
       window.dispatchEvent(new Event('criativa-sync-queue-updated'));
-      return result;
+      return {
+        started: true as const,
+        result,
+        visitId: serverVisitId,
+      };
     } catch (error: any) {
+      const failure = classifyQueuedSyncFailure(error);
       await updateQueuedVisit(queueOwnerId, activeVisitId, {
-        status: 'error',
-        error: error.message || 'Falha na sincronização',
+        status: failure.status,
+        error: failure.message,
         attempts: queued.attempts + 1,
         payload: { ...payload, visitId: activeVisitId },
       });
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
-      throw error;
+      window.dispatchEvent(new Event('criativa-sync-queue-updated'));
+      return {
+        started: false as const,
+        error: failure.message,
+        releaseVisit: failure.releaseVisit,
+        visitId: activeVisitId,
+      };
     }
   };
 
@@ -529,10 +541,21 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     setIsSyncing(true);
     setSyncMessage('Iniciando sincronização...');
     try {
-      await syncQueuedVisit({
+      const attempt = await syncQueuedVisit({
         ...visitState,
         timestamp: getBrasiliaISO()
       }, visitState.visitId || undefined);
+
+      if (!attempt.started) {
+        if (attempt.releaseVisit) {
+          setSyncMessage('Visita salva no aparelho. O envio será retomado quando houver conexão.');
+          setQueueCount(await getQueuedVisitCount(queueOwnerId));
+          onReset();
+          return;
+        }
+        throw new Error(attempt.error);
+      }
+
       setSyncMessage('Visita salva. As fotos continuarão sendo enviadas em segundo plano.');
       setSyncSuccess(true);
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
@@ -558,7 +581,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     try {
       for (const queuedVisit of queuedVisits) {
         setSyncMessage(`Reenviando ${queuedVisit.visitId}...`);
-        await syncQueuedVisit(queuedVisit.payload, queuedVisit.visitId, true);
+        const attempt = await syncQueuedVisit(queuedVisit.payload, queuedVisit.visitId, true);
+        if (!attempt.started) throw new Error(attempt.error);
       }
 
       setSyncSuccess(true);

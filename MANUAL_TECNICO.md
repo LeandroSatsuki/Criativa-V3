@@ -85,6 +85,11 @@ Este documento resume a arquitetura real do projeto, o fluxo de dados e onde cad
   autenticada. O cache e aceito por sete dias apenas para `FIELD_OPS`.
 - Erros HTTP, especialmente `401`, nao ativam o fallback local. O cache e usado
   somente em falha de rede, e supervisores continuam dependentes de dados online.
+- Na PWA-4, a fila IndexedDB e gravada antes da primeira chamada ao backend. Uma
+  falha de rede muda o item para `pending`, preserva payload e fotos, atualiza o
+  indicador da fila e libera o reset da visita.
+- O reset nao ocorre se a fila local falhar, nem para erro HTTP ou autorizacao.
+  Nesses casos, a visita atual continua aberta para evitar perda de dados.
 
 ## 3. Onde os dados ficam
 

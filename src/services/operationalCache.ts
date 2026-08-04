@@ -86,8 +86,3 @@ export const writeOperationalCache = (
     return false;
   }
 };
-
-export const isOfflineRequestFailure = (
-  error: unknown,
-  online = typeof navigator === 'undefined' ? true : navigator.onLine,
-) => !online || error instanceof TypeError;

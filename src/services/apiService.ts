@@ -8,10 +8,10 @@ import type {
   User,
 } from '../types';
 import {
-  isOfflineRequestFailure,
   readOperationalCache,
   writeOperationalCache,
 } from './operationalCache';
+import { isNetworkRequestFailure } from './networkStatus';
 import {
   DIRECT_VISIT_PAYLOAD_MAX_BYTES,
   getUtf8ByteLength,
@@ -197,7 +197,7 @@ export const apiService = {
       writeOperationalCache(user.id, user.role, stores, industries);
       return { stores, industries, source: 'network' as const };
     } catch (error) {
-      if (user.role !== 'FIELD_OPS' || !isOfflineRequestFailure(error)) {
+      if (user.role !== 'FIELD_OPS' || !isNetworkRequestFailure(error)) {
         throw error;
       }
 

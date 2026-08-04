@@ -3,12 +3,13 @@ import test from 'node:test';
 import {
   OPERATIONAL_CACHE_MAX_AGE_MS,
   buildOperationalCacheKey,
-  isOfflineRequestFailure,
   isOperationalCacheFresh,
   parseOperationalCache,
   readOperationalCache,
   writeOperationalCache,
 } from '../src/services/operationalCache.ts';
+import { isNetworkRequestFailure } from '../src/services/networkStatus.ts';
+import { classifyQueuedSyncFailure } from '../src/services/syncPolicy.ts';
 
 const now = Date.parse('2026-08-04T15:00:00.000Z');
 
@@ -82,9 +83,31 @@ test('preserva lojas e industrias somente do promotor autenticado', () => {
 });
 
 test('fallback offline nao mascara erro HTTP ou de autorizacao', () => {
-  assert.equal(isOfflineRequestFailure(new TypeError('Failed to fetch'), true), true);
-  assert.equal(isOfflineRequestFailure(new Error('Nao autorizado'), true), false);
-  assert.equal(isOfflineRequestFailure(new Error('qualquer erro'), false), true);
+  assert.equal(isNetworkRequestFailure(new TypeError('Failed to fetch'), true), true);
+  assert.equal(isNetworkRequestFailure(new Error('Nao autorizado'), true), false);
+  assert.equal(isNetworkRequestFailure(new Error('qualquer erro'), false), true);
+});
+
+test('falha de rede mantem visita pendente e libera nova operacao', () => {
+  assert.deepEqual(
+    classifyQueuedSyncFailure(new TypeError('Failed to fetch'), true),
+    {
+      status: 'pending',
+      message: 'Sem conexão. Visita salva no aparelho e aguardando envio.',
+      releaseVisit: true,
+    },
+  );
+});
+
+test('erro HTTP permanece visivel e nao libera o rascunho atual', () => {
+  assert.deepEqual(
+    classifyQueuedSyncFailure(new Error('Não autorizado'), true),
+    {
+      status: 'error',
+      message: 'Não autorizado',
+      releaseVisit: false,
+    },
+  );
 });
 
 test('grava e restaura o cadastro do promotor no armazenamento do aparelho', () => {

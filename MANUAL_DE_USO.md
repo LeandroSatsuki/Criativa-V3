@@ -134,6 +134,12 @@ Importante durante a evolucao offline:
 - O app envia os dados para o backend.
 - O backend repassa os dados para o destino operacional configurado.
 - Se houver erro, a visita entra em fila local para reenvio.
+- Se o aparelho estiver sem internet, o app primeiro confirma a gravacao da
+  visita completa na fila local e depois volta para `Selecao de Unidade`.
+- O promotor pode iniciar outra visita enquanto o envio anterior permanece
+  pendente. O icone no cabecalho mostra a quantidade na fila.
+- Erro de autorizacao, resposta HTTP ou falha ao gravar no aparelho nao libera
+  a visita automaticamente, evitando perda silenciosa.
 
 ## 4. Fluxo do supervisor
 
