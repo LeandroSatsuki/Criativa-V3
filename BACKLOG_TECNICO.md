@@ -200,3 +200,27 @@ Recomendacao inicial: manter o frontend React + Vite e adicionar uma camada de b
 3. Separar storage de fotos para reduzir payloads em base64.
 4. Avaliar Supabase/Postgres como banco operacional para relatorios e auditoria.
 5. Expandir relatorios do supervisor com filtros e exportacao controlada.
+
+## Epic: aplicativo instalavel e operacao offline segura
+
+Execucao regida por `METODOLOGIA_PWA_OFFLINE.md`, sempre em subfases pequenas e
+com gate de nao regressao antes da publicacao.
+
+1. PWA-0: proteger baseline, documentar metodologia e criar marco de rollback.
+2. PWA-1: corrigir precache do app shell e ciclo seguro de atualizacao.
+3. PWA-2: persistir perfil operacional, lojas e industrias por usuario.
+4. PWA-3: implementar sessao offline segura com renovacao e revogacao.
+5. PWA-4: permitir finalizacao offline por outbox idempotente.
+6. PWA-5: automatizar tentativas com fallback universal e Background Sync
+   apenas como melhoria progressiva.
+7. PWA-6: homologar instalacao e operacao real em iOS e Android.
+
+### Riscos controlados pelo epic
+
+- Perda de rascunhos ou fotos durante migracao do IndexedDB.
+- Duplicidade de visita, foto ou linha de planilha em retry.
+- Cache acidental de token ou resposta autenticada.
+- Sessao offline utilizada depois de revogacao.
+- Fila herdada por outro usuario no mesmo aparelho.
+- Dependencia de Background Sync em navegador sem suporte.
+- Atualizacao do service worker interrompendo visita em andamento.

@@ -200,3 +200,28 @@ Data da ultima auditoria: 2026-06-27
 - A Fase 7 foi publicada no Netlify e validada na URL publica.
 - A chave de Gemini continua opcional e ausente no ambiente de producao, mantendo a rota de IA em fallback seguro.
 - A Fase 8 fechou a documentacao de uso, tecnica e operacao do projeto.
+
+## Evolucao PWA e operacao offline
+
+- [x] Baseline funcional identificado antes de qualquer alteracao de runtime.
+- [x] Metodologia de nao regressao, rollback e condicoes de parada documentada.
+- [x] Tag de rollback `pwa-offline-baseline-2026-08-04` publicada.
+- [ ] PWA-1: app shell e instalacao validados sem cache de APIs autenticadas.
+- [ ] PWA-2: perfil, lojas e industrias disponiveis offline por usuario.
+- [ ] PWA-3: sessao offline segura, renovacao e revogacao validadas.
+- [ ] PWA-4: finalizacao offline e outbox idempotente validadas.
+- [ ] PWA-5: retries automaticos e fallback para iOS validados.
+- [ ] PWA-6: homologacao concluida em iPhone e Android reais.
+
+### Gates obrigatorios por subfase PWA
+
+- [ ] Escopo e arquivos envolvidos registrados antes da edicao.
+- [ ] Testes automatizados do comportamento novo e da regressao aprovados.
+- [ ] Compatibilidade com registros anteriores do IndexedDB confirmada.
+- [ ] `npm.cmd test`, lint, build e `netlify build` aprovados.
+- [ ] Preview Netlify validado antes da producao.
+- [ ] Fluxo online completo preservado.
+- [ ] Fluxo offline da subfase validado em aparelho real.
+- [ ] Contagem de fotos local, backend, Drive e planilha conferida.
+- [ ] `CHANGELOG.md` e manuais atualizados.
+- [ ] Commit, push, deploy e smoke test registrados.

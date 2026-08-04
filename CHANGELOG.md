@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## [2026-08-04] - PWA-0: metodologia segura e baseline offline
+
+### Alterado
+- O backlog e o checklist passam a dividir a evolucao instalavel/offline em
+  subfases independentes, cada uma com gate de nao regressao.
+
+### Adicionado
+- `METODOLOGIA_PWA_OFFLINE.md` com invariantes, protocolo de entrega, matriz de
+  testes, migracao aditiva, observabilidade, condicoes de parada e rollback.
+- Baseline de referencia para preservar a versao funcional anterior ao trabalho
+  offline.
+
+### Corrigido
+- Eliminado o risco de iniciar uma alteracao ampla de PWA sem criterios formais
+  de aceite, recuperacao e compatibilidade com dados locais existentes.
+
+### Seguranca
+- Definido que APIs autenticadas, tokens e login nunca serao armazenados pelo
+  cache HTTP do service worker.
+- Definidas regras de isolamento por usuario, idempotencia, logs sanitizados e
+  revalidacao obrigatoria no backend.
+
+### Validacao
+- `npm.cmd test`: 23 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: concluido com sucesso.
+- `npx.cmd netlify build`: build e empacotamento de 14 Functions concluidos.
+- Tag `pwa-offline-baseline-2026-08-04` criada no commit funcional
+  `dde4d53cd045e5197e541ea20b7b366ea8fc5611` e publicada no GitHub.
+- Revisao documental confirmou ausencia de mudanca em arquivos de runtime.
+
+### Pendencias
+- Iniciar PWA-1 somente depois da conclusao formal de PWA-0.
+- O build mantem o aviso conhecido de chunk JavaScript acima de `500 KB`.
+
 ## [2026-08-04] - Ajuste: reducao de 35% na resolucao das fotos
 
 ### Alterado
