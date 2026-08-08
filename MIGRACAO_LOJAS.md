@@ -1,6 +1,7 @@
 # Plano de Migracao de Lojas e Roteiro
 
-Status: em homologacao, sem escrita na base de producao.
+Status: base migrada e validada; backend de roteirizacao aguardando homologacao
+com usuarios reais antes da publicacao em producao.
 
 ## Origem e destino
 
@@ -25,6 +26,22 @@ Status: em homologacao, sem escrita na base de producao.
 - Giovana Silveira Pessoa possui rotas na origem, mas nao possui cadastro em
   `PROMOTORES`; essas rotas ficarao sem usuario autorizado, nunca em fallback.
 
+## Resultado da migracao em 2026-08-08
+
+- Backup integral criado na aba
+  `BACKUP_LOJAS_2026-08-08_ANTES_ROTEIRO` antes da primeira alteracao.
+- As 154 linhas do backup foram relidas e comparadas com a base anterior.
+- 153 lojas receberam nome fantasia, responsavel, dias de roteiro e campos de
+  auditoria.
+- A loja exclusiva do destino, ID `140`, foi preservada sem alteracao.
+- Os 154 `ID_LOJA` permaneceram unicos e nenhum CNPJ foi alterado.
+- 141 lojas possuem `ROTA_PROMOTOR_ID`; 12 ficaram sem ID porque pertencem a
+  Giovana, estao marcadas como `Sem Promotor` ou nao possuem dia de roteiro.
+- As variacoes inequivocas de nome de Laila, Leoni e Luane foram vinculadas aos
+  IDs existentes de `PROMOTORES` sem criar novos usuarios.
+- A conferencia pos-escrita de `CADASTRO_LOJAS!A1:U155` terminou sem
+  divergencias.
+
 ## Estrutura final planejada
 
 - `A:Q`: estrutura atual preservada.
@@ -39,15 +56,18 @@ Status: em homologacao, sem escrita na base de producao.
 
 ## Sequencia obrigatoria de escrita
 
-1. Reler metadados e `CADASTRO_LOJAS!A1:U155`.
-2. Duplicar a aba como `BACKUP_LOJAS_2026-08-08_ANTES_ROTEIRO`.
-3. Reler a copia e confirmar 154 registros antes de continuar.
-4. Atualizar em lote as 153 linhas conciliadas, mantendo `ID_LOJA`.
-5. Preservar sem alteracao destrutiva a linha exclusiva do destino.
-6. Reler `A1:U155` e comparar contagens, IDs, CNPJs, nomes, responsaveis e dias.
-7. Forcar a renovacao do cache de configuracao em homologacao.
-8. Testar um promotor com rota do dia, um sem rota e um supervisor.
-9. Somente apos aprovacao promover o backend para producao.
+1. [Concluido] Reler metadados e `CADASTRO_LOJAS!A1:U155`.
+2. [Concluido] Duplicar a aba como
+   `BACKUP_LOJAS_2026-08-08_ANTES_ROTEIRO`.
+3. [Concluido] Reler a copia e confirmar 154 registros antes de continuar.
+4. [Concluido] Atualizar em lote as 153 linhas conciliadas, mantendo
+   `ID_LOJA`.
+5. [Concluido] Preservar sem alteracao destrutiva a linha exclusiva do destino.
+6. [Concluido] Reler `A1:U155` e comparar contagens, IDs, CNPJs, nomes,
+   responsaveis e dias.
+7. [Concluido] Renovar o cache de configuracao com novo deploy de homologacao.
+8. [Pendente] Testar um promotor com rota do dia, um sem rota e um supervisor.
+9. [Pendente] Somente apos aprovacao promover o backend para producao.
 
 ## Rollback
 

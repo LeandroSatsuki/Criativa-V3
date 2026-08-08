@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [2026-08-08] - Roteirizacao diaria de lojas em homologacao
+## [2026-08-08] - Roteirizacao diaria de lojas e migracao da base
 
 ### Alterado
 - O backend de homologacao passa a interpretar `Segunda` a `Sexta` e o fuso
@@ -9,6 +9,8 @@
   atribuicao direta quando o nome do responsavel nao coincidisse.
 - Schema de configuracao elevado para `7`, invalidando caches anteriores sem
   informacao de roteiro.
+- `CADASTRO_LOJAS` passou a usar o nome fantasia em `NOME_LOJA` e recebeu os
+  responsaveis e dias de roteiro da origem validada.
 
 ### Adicionado
 - Vinculo opcional e estavel por `ROTA_PROMOTOR_ID`, com compatibilidade por
@@ -16,6 +18,9 @@
 - Quatro testes de dia de Brasilia, atribuicao, ausencia de `X` e visao do
   supervisor.
 - Plano auditavel em `MIGRACAO_LOJAS.md`.
+- Backup integral `BACKUP_LOJAS_2026-08-08_ANTES_ROTEIRO`.
+- Colunas `FILIAL`, `RAZAO_SOCIAL`, `TELEFONE_PROMOTOR` e
+  `ROTA_PROMOTOR_ID` em `CADASTRO_LOJAS!R:U`.
 
 ### Corrigido
 - Comparacao de responsavel passa a ignorar caixa, acentos e espacos quando o
@@ -24,24 +29,26 @@
 
 ### Seguranca
 - IDs atuais das lojas foram definidos como imutaveis no plano de migracao.
-- Nenhum dado da origem ou de `CADASTRO_LOJAS` foi alterado: a conexao Google
-  atual bloqueou a criacao do backup por falta de escopo de escrita.
+- A escrita ocorreu somente depois da reautorizacao Google e da criacao e
+  releitura do backup integral.
+- Os 154 IDs permaneceram unicos, nenhum CNPJ foi alterado e a loja exclusiva
+  do destino foi preservada.
 - Producao nao foi publicada.
 
 ### Validacao
 - Auditoria local somente leitura: 153 linhas de origem e 154 no destino.
-- 153 linhas mapeadas sem ambiguidade; uma linha exclusiva do destino sera
-  preservada.
+- 153 linhas mapeadas e migradas sem ambiguidade; uma linha exclusiva do
+  destino foi preservada.
+- Verificacao de `CADASTRO_LOJAS!A1:U155` sem divergencias: 154 IDs unicos,
+  backup integro, CNPJs preservados, 141 rotas com ID e 12 sem rota ativa.
 - `npm.cmd test`: 62 testes aprovados.
 - `npm.cmd run lint`: concluido sem erros.
 - `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
-- Preview `6a77961feeb48f4eca22cd50` publicado no alias `pwa-offline`.
-- `/api/config` e `/api/health` responderam `200` na homologacao.
+- Preview `6a779addff6f043d434ebced` publicado no alias `pwa-offline`, renovando o
+  cache de configuracao do backend depois da migracao.
+- `/`, `/api/config` e `/api/health` responderam `200` na homologacao.
 
 ### Pendencias
-- Reautorizar Google Drive/Sheets com permissao de edicao.
-- Criar e verificar `BACKUP_LOJAS_2026-08-08_ANTES_ROTEIRO` antes da escrita.
-- Migrar e reler `CADASTRO_LOJAS!A1:U155`.
 - Resolver o cadastro da promotora Giovana Silveira Pessoa, ausente em
   `PROMOTORES`; as lojas dela nao devem ser entregues a outro usuario.
 - Validar 12 lojas sem `X`, que corretamente nao aparecerao em nenhum dia.

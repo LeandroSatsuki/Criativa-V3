@@ -1,6 +1,6 @@
 # Checklist do Projeto - Criativa Field Ops
 
-Data da ultima auditoria: 2026-06-27
+Data da ultima auditoria: 2026-08-08
 
 ## Homologacao - Roteirizacao diaria de lojas
 
@@ -13,9 +13,9 @@ Data da ultima auditoria: 2026-06-27
 - [x] Compatibilidade por nome normalizado e ID estavel implementada.
 - [x] Supervisor preservado sem filtro de roteiro.
 - [x] Testes, lint, build e preview Netlify aprovados.
-- [ ] Conexao Google reautorizada com escopo de edicao.
-- [ ] Backup completo da aba criado e relido.
-- [ ] Migracao `A1:U155` aplicada e verificada.
+- [x] Conexao Google reautorizada com escopo de edicao.
+- [x] Backup completo da aba criado e relido.
+- [x] Migracao `A1:U155` aplicada e verificada.
 - [ ] Promotora Giovana cadastrada ou rotas formalmente realocadas.
 - [ ] Doze lojas sem dia confirmadas pelo cliente.
 - [ ] Fluxo real de segunda a sexta homologado.
