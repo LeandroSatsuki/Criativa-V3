@@ -1,5 +1,52 @@
 # CHANGELOG
 
+## [2026-08-08] - Roteirizacao diaria de lojas em homologacao
+
+### Alterado
+- O backend de homologacao passa a interpretar `Segunda` a `Sexta` e o fuso
+  `America/Sao_Paulo` ao listar lojas para o promotor.
+- Removido no novo fluxo o fallback regional que poderia liberar lojas sem
+  atribuicao direta quando o nome do responsavel nao coincidisse.
+- Schema de configuracao elevado para `7`, invalidando caches anteriores sem
+  informacao de roteiro.
+
+### Adicionado
+- Vinculo opcional e estavel por `ROTA_PROMOTOR_ID`, com compatibilidade por
+  nome normalizado quando o ID ainda nao estiver preenchido.
+- Quatro testes de dia de Brasilia, atribuicao, ausencia de `X` e visao do
+  supervisor.
+- Plano auditavel em `MIGRACAO_LOJAS.md`.
+
+### Corrigido
+- Comparacao de responsavel passa a ignorar caixa, acentos e espacos quando o
+  cadastro ainda depende do nome.
+- Supervisor continua vendo todas as lojas, sem filtro de roteiro.
+
+### Seguranca
+- IDs atuais das lojas foram definidos como imutaveis no plano de migracao.
+- Nenhum dado da origem ou de `CADASTRO_LOJAS` foi alterado: a conexao Google
+  atual bloqueou a criacao do backup por falta de escopo de escrita.
+- Producao nao foi publicada.
+
+### Validacao
+- Auditoria local somente leitura: 153 linhas de origem e 154 no destino.
+- 153 linhas mapeadas sem ambiguidade; uma linha exclusiva do destino sera
+  preservada.
+- `npm.cmd test`: 62 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Preview `6a77961feeb48f4eca22cd50` publicado no alias `pwa-offline`.
+- `/api/config` e `/api/health` responderam `200` na homologacao.
+
+### Pendencias
+- Reautorizar Google Drive/Sheets com permissao de edicao.
+- Criar e verificar `BACKUP_LOJAS_2026-08-08_ANTES_ROTEIRO` antes da escrita.
+- Migrar e reler `CADASTRO_LOJAS!A1:U155`.
+- Resolver o cadastro da promotora Giovana Silveira Pessoa, ausente em
+  `PROMOTORES`; as lojas dela nao devem ser entregues a outro usuario.
+- Validar 12 lojas sem `X`, que corretamente nao aparecerao em nenhum dia.
+- Homologar com usuarios reais antes de promover para producao.
+
 ## [2026-08-04] - Concorrencia de login corrigida em homologacao
 
 ### Alterado

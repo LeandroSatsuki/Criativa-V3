@@ -2,6 +2,15 @@
 
 Data da auditoria: 2026-06-27
 
+## Bloqueador atual - Migracao de lojas e roteiro
+
+- Reautorizar a conexao Google Drive/Sheets com escopo de edicao; leituras
+  funcionam, mas `duplicateSheet` retorna `ACCESS_TOKEN_SCOPE_INSUFFICIENT`.
+- Somente depois criar backup integral de `CADASTRO_LOJAS` e aplicar a migracao
+  documentada em `MIGRACAO_LOJAS.md`.
+- Nao promover o filtro diario para producao antes da verificacao da planilha e
+  da homologacao com promotores reais.
+
 ## Atualizacao operacional - 2026-07-17
 
 - As integracoes sensiveis ja passam pelo backend Netlify e nao pelo frontend.

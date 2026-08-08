@@ -2,6 +2,25 @@
 
 Data da ultima auditoria: 2026-06-27
 
+## Homologacao - Roteirizacao diaria de lojas
+
+- [x] Origem `.xls` baixada e auditada em modo leitura.
+- [x] Destino `Sistema Criativa / CADASTRO_LOJAS` identificado.
+- [x] 153 linhas da origem mapeadas para IDs existentes sem ambiguidade.
+- [x] Linha exclusiva do destino identificada para preservacao.
+- [x] Nome fantasia definido como `NOME_LOJA`.
+- [x] Filtro por dia de Brasilia implementado sem fallback regional.
+- [x] Compatibilidade por nome normalizado e ID estavel implementada.
+- [x] Supervisor preservado sem filtro de roteiro.
+- [x] Testes, lint, build e preview Netlify aprovados.
+- [ ] Conexao Google reautorizada com escopo de edicao.
+- [ ] Backup completo da aba criado e relido.
+- [ ] Migracao `A1:U155` aplicada e verificada.
+- [ ] Promotora Giovana cadastrada ou rotas formalmente realocadas.
+- [ ] Doze lojas sem dia confirmadas pelo cliente.
+- [ ] Fluxo real de segunda a sexta homologado.
+- [ ] Preview aprovado para producao.
+
 ## Situacao atual
 
 - [x] Estrutura do projeto mapeada.

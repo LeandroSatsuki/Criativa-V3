@@ -14,6 +14,7 @@ import {
   PROMOTER_SHEET_NAMES,
   type SheetTable,
 } from './promoter-sheet';
+export { getStoresForUser } from './store-routes';
 
 export type AppData = {
   schemaVersion?: number;
@@ -33,6 +34,8 @@ export type AppData = {
     name: string;
     region: string;
     responsible: string;
+    routePromoterId?: string;
+    routeDays?: number[];
   }>;
   timestamp: string | null;
 };
@@ -49,7 +52,7 @@ type ProvisionalUser = {
   expiresAt?: string;
 };
 
-const CONFIG_SCHEMA_VERSION = 6;
+const CONFIG_SCHEMA_VERSION = 7;
 const defaultIndustries = ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
 const configStore = getJsonStore('criativa-config');
 
@@ -244,6 +247,17 @@ const mapConfig = async (): Promise<AppData> => {
     'RESPONSAVEL_LOJA',
     'ID_PROMOTOR_RESPONSAVEL',
   ], 11);
+  const routePromoterIdColumn = findColumnIndex(storesTable, [
+    'ROTA_PROMOTOR_ID',
+    'ID_PROMOTOR_ROTA',
+  ], -1);
+  const routeDayColumns = [
+    findColumnIndex(storesTable, ['SEGUNDA', 'SEG', 'SEGUNDA_FEIRA'], -1),
+    findColumnIndex(storesTable, ['TERCA', 'TER', 'TERCA_FEIRA'], -1),
+    findColumnIndex(storesTable, ['QUARTA', 'QUA', 'QUARTA_FEIRA'], -1),
+    findColumnIndex(storesTable, ['QUINTA', 'QUI', 'QUINTA_FEIRA'], -1),
+    findColumnIndex(storesTable, ['SEXTA', 'SEX', 'SEXTA_FEIRA'], -1),
+  ];
 
   const stores = storesTable
     ? getTableDataRows(storesTable)
@@ -252,6 +266,9 @@ const mapConfig = async (): Promise<AppData> => {
         name: getRowValue(row, storeNameColumn),
         region: getRowValue(row, storeRegionColumn),
         responsible: getRowValue(row, storeResponsibleColumn),
+        routePromoterId: getRowValue(row, routePromoterIdColumn),
+        routeDays: routeDayColumns.flatMap((columnIndex, index) =>
+          normalizeColumnName(getRowValue(row, columnIndex)) === 'X' ? [index + 1] : []),
       }))
       .filter((store) => store.name && normalizeColumnName(store.name) !== 'NOMELOJA')
     : [];
@@ -293,26 +310,6 @@ export const refreshAppData = async () => {
     await configStore.set('latest', fresh);
   }
   return fresh;
-};
-
-export const getStoresForUser = (data: AppData, user: User) => {
-  const promoters = data.promoters || [];
-  const allStores = data.stores || [];
-
-  if (user.id === '0' || user.role === 'SUPERVISOR') {
-    return allStores;
-  }
-
-  const promoter = promoters.find((p) => p.id === user.id);
-  const promoterName = user.storeResponsible || promoter?.name || user.name || '';
-  const regional = promoter?.region || user.region || '';
-
-  const myStores = allStores.filter((store) => store.responsible === promoterName);
-  if (myStores.length > 0) return myStores;
-
-  return allStores.filter((store) =>
-    store.region.toLowerCase().includes(regional.toLowerCase()),
-  );
 };
 
 export const findUserByCredentials = async (userName: string, password: string) => {
