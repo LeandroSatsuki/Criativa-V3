@@ -2,6 +2,21 @@
 
 Data da ultima auditoria: 2026-08-14
 
+## Homologacao - Pastas por PDV e devolucoes
+
+- [x] Contrato adiciona nome seguro da pasta do PDV.
+- [x] Fotos `TROCAS` recebem destino logico `DEVOLUCOES`.
+- [x] Link agregado prioriza a pasta raiz do PDV.
+- [x] Compatibilidade com respostas antigas do Make preservada.
+- [x] Contrato 2.1 mantido para nao invalidar manifestos pendentes.
+- [x] Testes e typecheck aprovados.
+- [x] Build e preview Netlify aprovados.
+- [ ] Confirmar que nao existem visitas parcialmente enviadas.
+- [ ] Atualizar os modulos de pasta no Make.
+- [ ] Testar uma visita com fotos normais e devolucao.
+- [ ] Confirmar idempotencia ao reenviar a mesma visita.
+- [ ] Publicar em producao somente depois da homologacao do Make.
+
 ## Producao - Fuso horario das visitas
 
 - [x] Diferenca de tres horas confirmada em `RELATORIO_VISITAS`.

@@ -58,12 +58,27 @@ test('gera um evento por foto, sem duplicar devolução e com IDs estáveis', ()
   assert.equal(first.filter((event) => event.ETAPA === 'TROCAS').length, 1);
   assert.ok(first.every((event) => event.ROW_WRITE === false));
   assert.ok(first.every((event) => event.PASTA_VISITA_NOME === '17-07-2026'));
+  assert.ok(first.every((event) => event.PASTA_PDV_NOME === 'Itapoã Supermercado - Mata da Praia'));
+  assert.ok(first.every((event) => event.LAYOUT_PASTAS === 'INDUSTRIA_DATA_PDV_V1'));
+  assert.equal(first.filter((event) => event.PASTA_SUBPASTA_NOME === 'DEVOLUCOES').length, 1);
+  assert.ok(first.filter((event) => event.ETAPA !== 'TROCAS').every(
+    (event) => event.PASTA_SUBPASTA_NOME === '',
+  ));
   assert.deepEqual(
     new Set(first.map((event) => event.PASTA_INDUSTRIA_NOME)),
     new Set(['VENEZA', 'IDEALPAN']),
   );
   assert.equal(first.filter((event) => event.ETAPA === 'FACHADA').length, 2);
   assert.equal(first.filter((event) => event.ETAPA === 'CHECKOUT').length, 2);
+});
+
+test('normaliza separadores perigosos no nome da pasta do PDV', () => {
+  const event = buildMakePhotoEvents({
+    ...payload,
+    currentStore: 'Loja / Filial \\ Centro',
+  })[0];
+
+  assert.equal(event.PASTA_PDV_NOME, 'Loja - Filial - Centro');
 });
 
 test('preserva 90 fotos, inclusive capturas com conteúdo idêntico', () => {
@@ -105,6 +120,7 @@ test('gera um único fechamento por visita, sem base64 e com dados agregados', (
       fileId: `file-${event.ID_FOTO}`,
       fileUrl: `https://drive.google.com/file/d/file-${event.ID_FOTO}/view`,
       folderUrl: 'https://drive.google.com/drive/folders/pasta',
+      pdvFolderUrl: 'https://drive.google.com/drive/folders/pdv',
       syncedAt: '2026-07-17T10:01:00',
     }])),
   };
@@ -120,6 +136,7 @@ test('gera um único fechamento por visita, sem base64 e com dados agregados', (
   assert.ok(finalize.LINK_FOTO_CHECKIN.includes('/file-'));
   assert.equal(JSON.stringify(finalize).includes('FOTO_BASE64'), false);
   assert.match(finalize.PASTA_FOTOS_DRIVE_URL, /IDEALPAN|VENEZA/);
+  assert.match(finalize.PASTA_FOTOS_DRIVE_URL, /\/pdv/);
 });
 
 test('preserva o horario de Brasilia em filas antigas sem fuso', () => {
@@ -159,8 +176,11 @@ test('valida confirmações vinculadas ao evento e à visita', () => {
     fileUrl: 'https://drive.google.com/file/d/drive-file-id/view',
     folderId: 'drive-folder-id',
     folderUrl: 'https://drive.google.com/drive/folders/drive-folder-id',
+    pdvFolderId: 'drive-pdv-folder-id',
+    pdvFolderUrl: 'https://drive.google.com/drive/folders/drive-pdv-folder-id',
   }), event);
   assert.equal(receipt.fileId, 'drive-file-id');
+  assert.equal(receipt.pdvFolderId, 'drive-pdv-folder-id');
 
   const manifest: DriveSyncManifest = { contractVersion: '2.1', totalPhotos: 1, photos: { [event.ID_FOTO]: receipt } };
   const finalize = buildMakeVisitFinalizeEvent(payload, [event], manifest);

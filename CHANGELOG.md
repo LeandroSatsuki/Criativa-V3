@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## [2026-08-14] - Estrutura de pastas por PDV preparada em homologacao
+
+### Alterado
+- Eventos de foto passam a informar o nome seguro do PDV e a subpasta logica de
+  devolucoes sem alterar o contrato Make 2.1.
+- O manifesto passa a priorizar a URL da pasta raiz do PDV no link agregado da
+  visita.
+
+### Adicionado
+- Campos `PASTA_PDV_NOME`, `PASTA_SUBPASTA_NOME` e `LAYOUT_PASTAS` no evento
+  `PHOTO_UPLOAD`.
+- Suporte opcional a `pdvFolderId` e `pdvFolderUrl` na confirmacao do Make.
+- Instrucoes completas para a estrutura
+  `INDUSTRIA/DATA/PDV/DEVOLUCOES` em `CONFIGURACAO_MAKE_ETAPA_B.md`.
+
+### Corrigido
+- Nomes de PDV com `/`, `\` ou caracteres de controle nao geram segmentos de
+  pasta ambiguos.
+- O link da planilha nao fica limitado a `DEVOLUCOES` quando essa for a ultima
+  foto confirmada da industria.
+
+### Seguranca
+- O contrato permanece retrocompativel e o layout atual do Make continua
+  funcionando enquanto ignora os campos adicionais.
+- Nenhuma credencial, webhook ou variavel de producao foi alterada.
+
+### Validacao
+- `npm.cmd test`: 67 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Validada separacao logica: somente `ETAPA = TROCAS` recebe `DEVOLUCOES`.
+- Preview `6a7ee9cc29866ac59ae52b48` publicado; pagina, healthcheck e configuracao
+  responderam HTTP `200`.
+
+### Pendencias
+- Zerar visitas parcialmente enviadas antes de mudar o roteamento de pastas.
+- Atualizar e homologar o cenario Make antes do deploy de producao.
+
 ## [2026-08-14] - Correcao do fuso horario das visitas
 
 ### Alterado

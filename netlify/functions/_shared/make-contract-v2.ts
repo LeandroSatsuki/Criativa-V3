@@ -28,6 +28,9 @@ export type MakePhotoEvent = {
   FOTO_BASE64: string;
   PASTA_INDUSTRIA_NOME: string;
   PASTA_VISITA_NOME: string;
+  PASTA_PDV_NOME: string;
+  PASTA_SUBPASTA_NOME: '' | 'DEVOLUCOES';
+  LAYOUT_PASTAS: 'INDUSTRIA_DATA_PDV_V1';
   NOME_LOJA: string;
   NOME_PROMOTOR: string;
   ROW_WRITE: false;
@@ -44,6 +47,8 @@ export type DrivePhotoReceipt = {
   fileUrl: string;
   folderId?: string;
   folderUrl?: string;
+  pdvFolderId?: string;
+  pdvFolderUrl?: string;
   syncedAt: string;
 };
 
@@ -116,6 +121,13 @@ const safeName = (value: unknown, fallback: string) => normalizeText(value, fall
   .replace(/[^A-Za-z0-9]+/g, '_')
   .replace(/^_+|_+$/g, '')
   .toUpperCase() || fallback;
+
+const safeFolderName = (value: unknown, fallback: string) => normalizeText(value, fallback)
+  .replace(/[\u0000-\u001f]/g, ' ')
+  .replace(/[\\/]+/g, ' - ')
+  .replace(/\s+/g, ' ')
+  .replace(/[. ]+$/g, '')
+  .slice(0, 120) || fallback;
 
 const hashPhoto = (base64: string) => createHash('sha256').update(base64).digest('hex');
 
@@ -200,6 +212,7 @@ export const buildMakePhotoEvents = (payload: any): MakePhotoEvent[] => {
   const storeName = normalizeText(payload.currentStore, 'Loja');
   const promoterName = normalizeText(payload.user?.name, 'Promotor');
   const storeSlug = safeName(storeName, 'LOJA');
+  const storeFolderName = safeFolderName(storeName, 'Loja');
   const stageCounts = new Map<string, number>();
 
   return collectPhotoCandidates(payload).map((candidate) => {
@@ -230,6 +243,9 @@ export const buildMakePhotoEvents = (payload: any): MakePhotoEvent[] => {
       FOTO_BASE64: candidate.base64,
       PASTA_INDUSTRIA_NOME: candidate.industry,
       PASTA_VISITA_NOME: fileDate,
+      PASTA_PDV_NOME: storeFolderName,
+      PASTA_SUBPASTA_NOME: candidate.stage === 'TROCAS' ? 'DEVOLUCOES' : '',
+      LAYOUT_PASTAS: 'INDUSTRIA_DATA_PDV_V1',
       NOME_LOJA: storeName,
       NOME_PROMOTOR: promoterName,
       ROW_WRITE: false,
@@ -285,8 +301,12 @@ export const buildMakeVisitFinalizeEvent = (
   const checkInReceipt = Object.values(manifest.photos).find((photo) => photo.stage === 'FACHADA');
   const folderLinks = Array.from(new Map(
     Object.values(manifest.photos)
-      .filter((photo) => photo.folderUrl)
-      .map((photo) => [photo.industry, `${photo.industry}: ${photo.folderUrl}`]),
+      .map((photo) => ({
+        ...photo,
+        visitFolderUrl: photo.pdvFolderUrl || photo.folderUrl,
+      }))
+      .filter((photo) => photo.visitFolderUrl)
+      .map((photo) => [photo.industry, `${photo.industry}: ${photo.visitFolderUrl}`]),
   ).values()).join(' | ');
   const countStage = (stage: PhotoStage) => events.filter((event) => event.ETAPA === stage).length;
 
@@ -367,6 +387,8 @@ export const validatePhotoUploadResponse = (body: string, event: MakePhotoEvent)
     fileUrl: String(parsed.fileUrl),
     folderId: parsed.folderId ? String(parsed.folderId) : undefined,
     folderUrl: parsed.folderUrl ? String(parsed.folderUrl) : undefined,
+    pdvFolderId: parsed.pdvFolderId ? String(parsed.pdvFolderId) : undefined,
+    pdvFolderUrl: parsed.pdvFolderUrl ? String(parsed.pdvFolderUrl) : undefined,
     syncedAt: getBrasiliaISO(),
   } satisfies DrivePhotoReceipt;
 };

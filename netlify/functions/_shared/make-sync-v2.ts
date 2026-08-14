@@ -74,8 +74,8 @@ export const syncVisitRecordV2 = async (visit: VisitRecord, webhookUrl: string):
       const receipt = validatePhotoUploadResponse(responseBody, event);
       manifest = {
         ...manifest,
-        folderId: manifest.folderId || receipt.folderId,
-        folderUrl: manifest.folderUrl || receipt.folderUrl,
+        folderId: manifest.folderId || receipt.pdvFolderId || receipt.folderId,
+        folderUrl: manifest.folderUrl || receipt.pdvFolderUrl || receipt.folderUrl,
         photos: { ...manifest.photos, [event.ID_FOTO]: receipt },
       };
       current = await saveVisit({
@@ -153,4 +153,3 @@ export const syncVisitRecordV2 = async (visit: VisitRecord, webhookUrl: string):
     };
   }
 };
-
