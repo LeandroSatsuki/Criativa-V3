@@ -34,14 +34,22 @@
 - `npm.cmd run lint`: concluido sem erros.
 - `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
 - Preview `6a7ee6ecf60e7e165f043a74` publicado e validado com HTTP `200`.
-- Producao `6a7ee732adf8c9f426c7d7cc` publicada; pagina, healthcheck e artefato
-  versionado responderam HTTP `200` no dominio principal e no deploy imutavel.
+- Producao inicial da correcao `6a7ee732adf8c9f426c7d7cc` publicada com
+  sucesso.
+- Producao final `6a7ee8a4d562b75a976e061e`, alinhada ao commit de merge
+  `b9f6cdd`, validada no dominio principal e no deploy imutavel: pagina,
+  healthcheck e bundle versionado responderam HTTP `200`.
+- `main` e `feat/pwa-1-safe-app-shell` sincronizadas no GitHub sem sobrescrever
+  o commit externo de apresentacao e dependencias.
 
 ### Pendencias
 - Realizar uma visita curta real e conferir os horarios gerados na nova linha de
   `RELATORIO_VISITAS`; nao foi criada visita ficticia na base de producao.
 - Os tres registros historicos permanecem com os valores originais para manter
   a trilha de auditoria; qualquer correcao retroativa deve ser autorizada.
+- `npm install` reportou 8 vulnerabilidades no inventario (2 baixas e 6 altas);
+  corrigir somente apos auditoria de impacto, sem `npm audit fix --force` em
+  producao.
 
 ## [2026-08-08] - Roteirizacao diaria de lojas e migracao da base
 
