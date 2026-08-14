@@ -122,6 +122,26 @@ test('gera um único fechamento por visita, sem base64 e com dados agregados', (
   assert.match(finalize.PASTA_FOTOS_DRIVE_URL, /IDEALPAN|VENEZA/);
 });
 
+test('preserva o horario de Brasilia em filas antigas sem fuso', () => {
+  const legacyPayload = {
+    ...payload,
+    checkInTime: '2026-08-13T10:37:00',
+    checkOutTime: '2026-08-13T10:38:00',
+  };
+  const events = buildMakePhotoEvents(legacyPayload);
+  const manifest: DriveSyncManifest = {
+    contractVersion: '2.1',
+    totalPhotos: events.length,
+    photos: {},
+  };
+
+  const finalize = buildMakeVisitFinalizeEvent(legacyPayload, events, manifest);
+
+  assert.equal(finalize['HORA_ENTRADA_CHECK-IN'], '10:37');
+  assert.equal(finalize['HORA_SAIDA_CHECK-OUT'], '10:38');
+  assert.equal(finalize.TEMPO_PERMANENCIA, '0h 1m');
+});
+
 test('não aceita HTTP 200 genérico como confirmação de upload', () => {
   const event = buildMakePhotoEvents(payload)[0];
   assert.throws(() => validatePhotoUploadResponse('Accepted', event));

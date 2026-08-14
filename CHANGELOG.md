@@ -1,5 +1,48 @@
 # CHANGELOG
 
+## [2026-08-14] - Correcao do fuso horario das visitas
+
+### Alterado
+- O aplicativo passa a registrar check-in, check-out e eventos com um instante
+  ISO que informa explicitamente o fuso.
+- O backend passa a gerar timestamps de Brasilia com o offset `-03:00`.
+- Datas usadas em nomes de pastas e arquivos agora sao calculadas no fuso
+  `America/Sao_Paulo`, inclusive perto da virada do dia.
+
+### Adicionado
+- Parser compativel com rascunhos e filas antigas que possuem horario local sem
+  offset de fuso.
+- Testes unitarios para timestamps legados, UTC, com offset e virada do dia em
+  Brasilia.
+
+### Corrigido
+- Eliminado o deslocamento de tres horas em `HORA_ENTRADA_CHECK-IN` e
+  `HORA_SAIDA_CHECK-OUT` na aba `RELATORIO_VISITAS`.
+- O calculo de permanencia continua correto quando uma visita antiga sem fuso e
+  sincronizada depois da atualizacao.
+- O timestamp de configuracao deixou de aplicar o deslocamento de Brasilia duas
+  vezes ao ser exibido no aparelho.
+
+### Seguranca
+- Nenhuma credencial, webhook ou permissao foi alterada.
+- Nenhum registro historico da planilha foi reescrito automaticamente.
+
+### Validacao
+- Evidencia em producao: os tres registros existentes exibiam entrada entre
+  `07:19` e `07:37`, enquanto `ATUALIZADO_EM` estava entre `10:39` e `10:50`.
+- `npm.cmd test`: 66 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Preview `6a7ee6ecf60e7e165f043a74` publicado e validado com HTTP `200`.
+- Producao `6a7ee732adf8c9f426c7d7cc` publicada; pagina, healthcheck e artefato
+  versionado responderam HTTP `200` no dominio principal e no deploy imutavel.
+
+### Pendencias
+- Realizar uma visita curta real e conferir os horarios gerados na nova linha de
+  `RELATORIO_VISITAS`; nao foi criada visita ficticia na base de producao.
+- Os tres registros historicos permanecem com os valores originais para manter
+  a trilha de auditoria; qualquer correcao retroativa deve ser autorizada.
+
 ## [2026-08-08] - Roteirizacao diaria de lojas e migracao da base
 
 ### Alterado

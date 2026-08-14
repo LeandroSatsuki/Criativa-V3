@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
-import { formatBrasiliaDate, formatBrasiliaTime, formatFileDate, getBrasiliaISO } from './time.ts';
+import {
+  formatBrasiliaDate,
+  formatBrasiliaTime,
+  formatFileDate,
+  getBrasiliaISO,
+  parseBrasiliaDate,
+} from './time.ts';
 
 export const MAKE_CONTRACT_VERSION = '2.1';
 export const MAKE_PHOTOS_PER_RUN = 3;
@@ -115,8 +121,8 @@ const hashPhoto = (base64: string) => createHash('sha256').update(base64).digest
 
 const calculateDuration = (checkInValue: unknown, checkOutValue: unknown) => {
   if (!checkInValue) return '';
-  const checkIn = new Date(String(checkInValue));
-  const checkOut = checkOutValue ? new Date(String(checkOutValue)) : new Date();
+  const checkIn = parseBrasiliaDate(String(checkInValue));
+  const checkOut = checkOutValue ? parseBrasiliaDate(String(checkOutValue)) : new Date();
   const diff = Math.max(0, checkOut.getTime() - checkIn.getTime());
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));

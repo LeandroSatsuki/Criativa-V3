@@ -1,5 +1,11 @@
 import { getJsonStore } from './storage';
-import { getBrasiliaISO, formatBrasiliaDate, formatBrasiliaTime, formatFileDate } from './time';
+import {
+  getBrasiliaISO,
+  formatBrasiliaDate,
+  formatBrasiliaTime,
+  formatFileDate,
+  parseBrasiliaDate,
+} from './time';
 
 export type VisitRecord = {
   visitId: string;
@@ -91,8 +97,8 @@ export const listVisits = async () => {
 };
 
 export const buildTransformedPayload = (payload: any) => {
-  const checkIn = payload.checkInTime ? new Date(payload.checkInTime) : null;
-  const checkOut = payload.checkOutTime ? new Date(payload.checkOutTime) : new Date();
+  const checkIn = payload.checkInTime ? parseBrasiliaDate(payload.checkInTime) : null;
+  const checkOut = payload.checkOutTime ? parseBrasiliaDate(payload.checkOutTime) : new Date();
   let duration = '';
 
   if (checkIn) {

@@ -1,6 +1,18 @@
 # Checklist do Projeto - Criativa Field Ops
 
-Data da ultima auditoria: 2026-08-08
+Data da ultima auditoria: 2026-08-14
+
+## Producao - Fuso horario das visitas
+
+- [x] Diferenca de tres horas confirmada em `RELATORIO_VISITAS`.
+- [x] Causa localizada em timestamps locais enviados sem offset.
+- [x] Novos registros passam a transportar instante ISO com fuso explicito.
+- [x] Filas e rascunhos antigos sem fuso sao interpretados como Brasilia.
+- [x] Datas de arquivo e pasta usam `America/Sao_Paulo`.
+- [x] Testes, typecheck, build, preview e smoke test aprovados.
+- [x] Correcao publicada em producao.
+- [ ] Nova visita real conferida na planilha pelo cliente.
+- [ ] Correcao retroativa dos tres registros antigos autorizada, se necessaria.
 
 ## Homologacao - Roteirizacao diaria de lojas
 

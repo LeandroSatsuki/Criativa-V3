@@ -67,16 +67,9 @@ export const getBrasiliaDate = () => {
 };
 
 export const getBrasiliaISO = () => {
-  const now = new Date();
-  return new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(now).replace(' ', 'T');
+  // Preserve the instant explicitly. The backend formats it for Brasilia;
+  // timestamps without a zone were previously interpreted as UTC by Netlify.
+  return new Date().toISOString();
 };
 
 const readCachedConfig = (): AppConfigResponse | null => {
