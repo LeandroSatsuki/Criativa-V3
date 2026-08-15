@@ -194,6 +194,11 @@ numero possui DDD valido.
 - Ao aceitar o envio, o aplicativo volta para a selecao de loja. O icone de
   upload no cabecalho mostra as visitas pendentes e o percentual confirmado.
 - O carimbo usa `NOME_LOJA` da aba `CADASTRO_LOJAS`, e nao `GRUPO_REDE`.
+- O roteiro diario usa as colunas `Segunda` a `Sabado` da aba
+  `CADASTRO_LOJAS`; somente lojas atribuidas ao promotor e marcadas com `X`
+  no dia atual sao exibidas.
+- Ao entrar sem visita em andamento, o promotor abre diretamente a tela de
+  selecao de loja. Uma visita iniciada continua sendo retomada do ponto salvo.
 - O cenario legado permanece disponivel somente para rollback controlado por
   `BACKEND_MAKE_SYNC_MODE=legacy`.
 - As fotos recebem o carimbo no aparelho e sao convertidas para JPEG com alvo

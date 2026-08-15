@@ -31,6 +31,7 @@ const data: AppData = {
     { id: '3', name: 'Outro promotor', region: 'Vitoria', responsible: promoter.name, routePromoterId: '999', routeDays: [1] },
     { id: '4', name: 'Compatibilidade por nome', region: 'Vitoria', responsible: '  LAILA GABRIÉLE BORGES DOS SANTOS ', routeDays: [1] },
     { id: '5', name: 'Sem dia', region: 'Vitoria', responsible: promoter.name, routePromoterId: '123', routeDays: [] },
+    { id: '6', name: 'Rota de sabado', region: 'Vitoria', responsible: promoter.name, routePromoterId: '123', routeDays: [6] },
   ],
   timestamp: null,
 };
@@ -47,10 +48,16 @@ test('promotor recebe somente as lojas atribuidas e marcadas no dia', () => {
   assert.deepEqual(stores.map((store) => store.id), ['1', '4']);
 });
 
-test('loja sem X nao aparece e nao existe fallback regional', () => {
+test('promotor recebe as lojas atribuidas e marcadas no sabado', () => {
   const saturday = new Date('2026-08-08T12:00:00.000Z');
 
-  assert.deepEqual(getStoresForUser(data, promoter, saturday), []);
+  assert.deepEqual(getStoresForUser(data, promoter, saturday).map((store) => store.id), ['6']);
+});
+
+test('loja sem X nao aparece e nao existe fallback regional', () => {
+  const sunday = new Date('2026-08-09T12:00:00.000Z');
+
+  assert.deepEqual(getStoresForUser(data, promoter, sunday), []);
 });
 
 test('supervisor continua visualizando todas as lojas', () => {

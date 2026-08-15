@@ -37,6 +37,8 @@ Data da ultima auditoria: 2026-08-14
 - [x] Linha exclusiva do destino identificada para preservacao.
 - [x] Nome fantasia definido como `NOME_LOJA`.
 - [x] Filtro por dia de Brasilia implementado sem fallback regional.
+- [x] Roteiro de sabado adicionado em `CADASTRO_LOJAS!R:R` e no backend.
+- [x] Promotor sem visita ativa direcionado para a selecao de loja apos entrar.
 - [x] Compatibilidade por nome normalizado e ID estavel implementada.
 - [x] Supervisor preservado sem filtro de roteiro.
 - [x] Testes, lint, build e preview Netlify aprovados.
@@ -45,7 +47,7 @@ Data da ultima auditoria: 2026-08-14
 - [x] Migracao `A1:U155` aplicada e verificada.
 - [ ] Promotora Giovana cadastrada ou rotas formalmente realocadas.
 - [ ] Doze lojas sem dia confirmadas pelo cliente.
-- [ ] Fluxo real de segunda a sexta homologado.
+- [ ] Fluxo real de segunda a sabado homologado.
 - [ ] Preview aprovado para producao.
 
 ## Situacao atual

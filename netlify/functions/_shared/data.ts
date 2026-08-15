@@ -52,7 +52,7 @@ type ProvisionalUser = {
   expiresAt?: string;
 };
 
-const CONFIG_SCHEMA_VERSION = 7;
+const CONFIG_SCHEMA_VERSION = 8;
 const defaultIndustries = ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
 const configStore = getJsonStore('criativa-config');
 
@@ -257,6 +257,7 @@ const mapConfig = async (): Promise<AppData> => {
     findColumnIndex(storesTable, ['QUARTA', 'QUA', 'QUARTA_FEIRA'], -1),
     findColumnIndex(storesTable, ['QUINTA', 'QUI', 'QUINTA_FEIRA'], -1),
     findColumnIndex(storesTable, ['SEXTA', 'SEX', 'SEXTA_FEIRA'], -1),
+    findColumnIndex(storesTable, ['SABADO', 'SAB', 'SABADO_FEIRA'], -1),
   ];
 
   const stores = storesTable

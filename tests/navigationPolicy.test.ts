@@ -14,11 +14,12 @@ test('sessao restaurada de supervisor abre o painel de gestao', () => {
 
 test('sessao restaurada de promotor preserva a etapa salva', () => {
   assert.equal(
-    resolveSessionSection('FIELD_OPS', DEPOIS),
+    resolveSessionSection('FIELD_OPS', DEPOIS, true),
     DEPOIS,
   );
 });
 
-test('promotor sem etapa salva inicia no painel geral', () => {
-  assert.equal(resolveSessionSection('FIELD_OPS'), 'DASHBOARD');
+test('promotor sem visita ativa inicia na selecao de loja', () => {
+  assert.equal(resolveSessionSection('FIELD_OPS'), 'CHECKIN');
+  assert.equal(resolveSessionSection('FIELD_OPS', DEPOIS, false), 'CHECKIN');
 });

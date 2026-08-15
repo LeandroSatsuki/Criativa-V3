@@ -32,6 +32,14 @@ type PendingSyncView = {
   total: number;
 };
 
+const hasVisitInProgress = (state: {
+  visitId?: string | null;
+  checkInDone?: boolean;
+  currentStoreId?: string;
+}) => Boolean(
+  state.visitId || state.checkInDone || state.currentStoreId,
+);
+
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
@@ -62,7 +70,7 @@ const App: React.FC = () => {
   });
 
   const [activeSection, setActiveSection] = useState<SectionId>(() =>
-    resolveSessionSection(visitState.user?.role, visitState.step),
+    resolveSessionSection(visitState.user?.role, visitState.step, hasVisitInProgress(visitState)),
   );
 
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
@@ -98,6 +106,7 @@ const App: React.FC = () => {
         setActiveSection(resolveSessionSection(
           session?.user.role,
           sessionMatchesDraft ? saved.step : SectionId.Dashboard,
+          sessionMatchesDraft && hasVisitInProgress(saved),
         ));
       } else if (session?.user) {
         setActiveSection(resolveSessionSection(session.user.role));
@@ -386,17 +395,11 @@ const App: React.FC = () => {
       const userData = await apiService.login(loginForm);
       setLoginForm({ user: userData.user, pass: '' });
       const sameDraftOwner = !visitState.draftOwnerId || visitState.draftOwnerId === userData.id;
-      const hasActiveVisit = sameDraftOwner && Boolean(visitState.visitId || visitState.checkInDone || visitState.currentStoreId);
+      const hasActiveVisit = sameDraftOwner && hasVisitInProgress(visitState);
       setVisitState((prev: any) => sameDraftOwner
         ? { ...prev, user: userData, draftOwnerId: userData.id }
         : { ...INITIAL_STATE, user: userData, draftOwnerId: userData.id });
-      setActiveSection(
-        userData.role === 'SUPERVISOR'
-          ? SectionId.Supervisor
-          : hasActiveVisit
-            ? (visitState.step || SectionId.Dashboard)
-            : SectionId.CheckIn,
-      );
+      setActiveSection(resolveSessionSection(userData.role, visitState.step, hasActiveVisit));
     } catch (err: any) { 
       setLoginError(err.message);
     } finally {

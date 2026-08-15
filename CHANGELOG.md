@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## [2026-08-15] - Roteiro de sabado e entrada pela selecao de loja
+
+### Alterado
+- A leitura do roteiro passa a considerar `Segunda` a `Sabado` no fuso de
+  Brasilia.
+- Promotores sem visita ativa entram diretamente na tela de selecao de loja.
+- O schema do cache cadastral foi elevado para `8`, forçando a leitura da nova
+  coluna sem reutilizar configuracao anterior.
+
+### Adicionado
+- Coluna `Sabado` em `Sistema Criativa / CADASTRO_LOJAS!R:R`, preservando os
+  dados auxiliares existentes em `S:V`.
+- Cobertura automatizada para rota de sabado e navegacao inicial do promotor.
+
+### Corrigido
+- Sessao salva sem visita em andamento nao abre mais o painel geral vazio.
+- A retomada de uma visita realmente iniciada continua respeitando a etapa
+  persistida.
+
+### Seguranca
+- Nenhuma credencial, webhook, permissao ou regra de autenticacao foi alterada.
+- A nova coluna nasce vazia; apenas lojas explicitamente marcadas com `X`
+  aparecem no sabado.
+
+### Validacao
+- `npm.cmd test`: 68 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Estrutura da tabela nativa verificada apos a insercao: `Sabado` em `R`,
+  `FILIAL` em `S`, `RAZAO_SOCIAL` em `T`, `TELEFONE_PROMOTOR` em `U` e
+  `ROTA_PROMOTOR_ID` em `V`.
+- Preview `6a805bdc8732af2892d626a7` validado com pagina, healthcheck,
+  configuracao e bundle em HTTP `200`.
+- Producao `6a805c248732af2892d62823` publicada; dominio principal e URL imutavel
+  responderam HTTP `200` e serviram o mesmo bundle `index-C-11r0SA.js`.
+
+### Pendencias
+- Marcar com `X` em `CADASTRO_LOJAS!R:R` as lojas que pertencem ao roteiro de
+  sabado; nenhuma atribuicao foi presumida automaticamente.
+- Realizar uma validacao curta com um promotor que possua rota de sabado.
+
 ## [2026-08-14] - Estrutura de pastas por PDV preparada em homologacao
 
 ### Alterado
