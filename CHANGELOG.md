@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## [2026-08-15] - Correcao da tela inicial do promotor
+
+### Alterado
+- Promotor sem visita ativa passa a entrar em `Processo da Visita`, mantendo a
+  selecao de loja como a primeira acao disponivel nessa tela.
+- O titulo do cabecalho do painel inicial passa de `Painel Geral` para
+  `Processo da Visita`.
+
+### Corrigido
+- Revertido o redirecionamento direto para a lista de lojas feito na entrega
+  anterior por interpretacao incorreta do destino solicitado.
+- Uma etapa antiga salva sem visita ativa nao desvia o promotor do processo
+  inicial.
+
+### Seguranca
+- Nenhuma regra de sessao, credencial, integracao ou dado operacional foi
+  alterado.
+
+### Validacao
+- Teste automatizado atualizado para cobrir o destino `DASHBOARD` sem visita e
+  a retomada da etapa salva quando existe visita em andamento.
+- `npm.cmd test`: 68 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: build e 15 Functions empacotados com sucesso.
+- Preview `6a805e649a55fb84f5b882ed` validado com pagina, healthcheck e bundle
+  em HTTP `200`.
+- Producao `6a805eb2a3bffedf2ae1216c` publicada; dominio principal e URL
+  imutavel servem o bundle `index-DhiciQSD.js` com o titulo correto.
+
+### Pendencias
+- Validar o destino visual com um login real apos a publicacao.
+
 ## [2026-08-15] - Roteiro de sabado e entrada pela selecao de loja
 
 ### Alterado

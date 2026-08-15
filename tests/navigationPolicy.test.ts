@@ -19,7 +19,7 @@ test('sessao restaurada de promotor preserva a etapa salva', () => {
   );
 });
 
-test('promotor sem visita ativa inicia na selecao de loja', () => {
-  assert.equal(resolveSessionSection('FIELD_OPS'), 'CHECKIN');
-  assert.equal(resolveSessionSection('FIELD_OPS', DEPOIS, false), 'CHECKIN');
+test('promotor sem visita ativa inicia no processo da visita', () => {
+  assert.equal(resolveSessionSection('FIELD_OPS'), 'DASHBOARD');
+  assert.equal(resolveSessionSection('FIELD_OPS', DEPOIS, false), 'DASHBOARD');
 });

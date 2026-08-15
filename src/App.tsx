@@ -620,7 +620,7 @@ const App: React.FC = () => {
             <div className="min-w-0 flex-1">
               <h2 className="font-black text-base md:text-lg uppercase tracking-tight text-[#0F172A] truncate">
                 {activeSection === SectionId.CheckIn ? 'Seleção de Unidade' : 
-                 activeSection === SectionId.Dashboard ? 'Painel Geral' : 
+                 activeSection === SectionId.Dashboard ? 'Processo da Visita' :
                  activeSection === SectionId.Supervisor ? 'Gestão de Equipe' : 'Operação de Campo'}
               </h2>
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.16em] md:tracking-[0.2em] mt-0.5 truncate max-w-[48vw] md:max-w-none">
