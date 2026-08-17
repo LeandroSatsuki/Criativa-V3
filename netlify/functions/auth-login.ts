@@ -2,8 +2,9 @@ import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { createSessionToken } from './_shared/auth';
 import { findUserByCredentials } from './_shared/data';
+import { isExpiredNetlifyBlobTokenError } from './_shared/storage';
 
-export default async (request: Request, _context: Context) => {
+export default async (request: Request, context: Context) => {
   if (request.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405);
   }
@@ -16,19 +17,25 @@ export default async (request: Request, _context: Context) => {
     return json({ error: 'Usuário e senha são obrigatórios' }, 400);
   }
 
-  const found = await findUserByCredentials(user, pass);
-  if (!found) {
-    return json({ error: 'Credenciais inválidas ou usuário não encontrado.' }, 401);
-  }
-
   try {
+    const found = await findUserByCredentials(user, pass);
+    if (!found) {
+      return json({ error: 'Credenciais inválidas ou usuário não encontrado.' }, 401);
+    }
+
     const token = await createSessionToken(found);
     return json({
       user: found,
       token,
     });
-  } catch (error: any) {
-    return json({ error: error.message || 'Falha ao gerar sessão' }, 500);
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'auth_login_unavailable',
+      reason: isExpiredNetlifyBlobTokenError(error) ? 'blob_token_expired' : 'dependency_error',
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+      requestId: context.requestId,
+    }));
+    return json({ error: 'Serviço de autenticação temporariamente indisponível. Tente novamente.' }, 503);
   }
 };
 

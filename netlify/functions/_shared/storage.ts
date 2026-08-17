@@ -1,5 +1,5 @@
 import { del as deleteBlob, get as getBlob, list as listBlobs, put as putBlob } from '@vercel/blob';
-import { getStore } from '@netlify/blobs';
+import { getStore, type Store } from '@netlify/blobs';
 
 type JsonStore = {
   get<T = unknown>(key: string): Promise<T | null>;
@@ -11,19 +11,39 @@ type JsonStore = {
 const isNetlifyRuntime = () => Boolean((globalThis as typeof globalThis & { Netlify?: unknown }).Netlify);
 const isVercelRuntime = () => Boolean((globalThis as typeof globalThis & { VERCEL?: string }).VERCEL || process.env.VERCEL || process.env.VERCEL_ENV);
 
+type NetlifyStoreFactory = (name: string) => Store;
+
+const createNetlifyStore: NetlifyStoreFactory = (name) => getStore({ name, consistency: 'strong' });
+
+export const isExpiredNetlifyBlobTokenError = (error: unknown) =>
+  error instanceof Error && error.message.includes('Failed to decode token: Token expired');
+
+export const withFreshNetlifyStore = async <T>(
+  name: string,
+  operation: (store: Store) => Promise<T>,
+  createStore: NetlifyStoreFactory = createNetlifyStore,
+) => {
+  try {
+    return await operation(createStore(name));
+  } catch (error) {
+    if (!isExpiredNetlifyBlobTokenError(error)) throw error;
+    return operation(createStore(name));
+  }
+};
+
 const netlifyStore = (name: string): JsonStore => {
-  const store = getStore({ name, consistency: 'strong' });
   return {
-    get: async <T = unknown>(key: string) => store.get(key, { type: 'json' }) as Promise<T | null>,
+    get: async <T = unknown>(key: string) =>
+      withFreshNetlifyStore(name, (store) => store.get(key, { type: 'json' }) as Promise<T | null>),
     set: async (key: string, value: unknown) => {
-      await store.setJSON(key, value);
+      await withFreshNetlifyStore(name, (store) => store.setJSON(key, value));
     },
-    list: async (prefix: string) => {
+    list: async (prefix: string) => withFreshNetlifyStore(name, async (store) => {
       const { blobs } = await store.list({ prefix });
       return blobs.map((blob) => blob.key);
-    },
+    }),
     remove: async (key: string) => {
-      await store.delete(key);
+      await withFreshNetlifyStore(name, (store) => store.delete(key));
     },
   };
 };

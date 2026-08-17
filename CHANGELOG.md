@@ -1,5 +1,38 @@
 # CHANGELOG
 
+## [2026-08-17] - Estabilidade do login com Netlify Blobs
+
+### Corrigido
+- O acesso aos stores do Netlify Blobs passa a obter uma credencial atual em
+  cada operacao, evitando reutilizar o token interno depois da expiracao.
+- Operacoes que recebem especificamente `Token expired` renovam o store e
+  fazem uma unica nova tentativa.
+- Falhas do storage durante a validacao da sessao deixam de ser registradas
+  incorretamente como token malformado.
+
+### Alterado
+- A rota de login passa a responder `503` com mensagem estavel quando uma
+  dependencia temporariamente indisponivel impede a autenticacao.
+- Logs de indisponibilidade informam apenas categoria, tipo do erro e ID da
+  requisicao, sem usuario, senha ou token de sessao.
+
+### Seguranca
+- A repeticao automatica fica restrita ao erro exato de expiracao do token
+  interno do Netlify Blobs e ocorre no maximo uma vez.
+- Nenhuma credencial de usuario e incluida nos novos logs.
+
+### Validacao
+- Testes automatizados adicionados para renovacao do store, limite de uma
+  repeticao e rejeicao de erros nao relacionados.
+- `npm run test`: 71 testes aprovados.
+- `npm run lint`: concluido sem erros.
+- `netlify build`: build e 15 Functions empacotados com sucesso.
+- Preview `6a83158d1972b8e2d5cfb169` validado com pagina e healthcheck em HTTP
+  `200`, login invalido em `401` e logs sem erros.
+- Producao `6a8316282db1af65b6fa3d10` publicada e validada no dominio
+  principal com pagina e healthcheck em HTTP `200`, login invalido em `401`
+  e logs sem erros de funcao.
+
 ## [2026-08-15] - Correcao da tela inicial do promotor
 
 ### Alterado

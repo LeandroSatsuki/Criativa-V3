@@ -1,7 +1,7 @@
 import type { Role, User } from '../../../src/types';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { getEnv } from './env';
-import { getJsonStore } from './storage';
+import { getJsonStore, isExpiredNetlifyBlobTokenError } from './storage';
 
 type SessionPayload = {
   sub: string;
@@ -80,19 +80,30 @@ export const authenticate = async (request: Request) => {
   const expected = sign(encoded, secret);
   if (!safeEqual(signature, expected)) return rejectAuthentication('invalid_signature');
 
+  let payload: SessionPayload;
   try {
-    const payload = decode<SessionPayload>(encoded);
-    if (payload.exp < Date.now()) return rejectAuthentication('expired_token');
-    if (!payload.sid) return rejectAuthentication('missing_session_id');
-
-    const active = await sessionStore.get<{ sessionId?: string }>(sessionKeyFor(payload.sub));
-    if (!active?.sessionId) return rejectAuthentication('session_not_found');
-    if (active.sessionId !== payload.sid) return rejectAuthentication('session_replaced');
-
-    return payload;
+    payload = decode<SessionPayload>(encoded);
   } catch {
     return rejectAuthentication('token_decode_failed');
   }
+
+  if (payload.exp < Date.now()) return rejectAuthentication('expired_token');
+  if (!payload.sid) return rejectAuthentication('missing_session_id');
+
+  try {
+    const active = await sessionStore.get<{ sessionId?: string }>(sessionKeyFor(payload.sub));
+    if (!active?.sessionId) return rejectAuthentication('session_not_found');
+    if (active.sessionId !== payload.sid) return rejectAuthentication('session_replaced');
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'auth_storage_unavailable',
+      reason: isExpiredNetlifyBlobTokenError(error) ? 'blob_token_expired' : 'storage_error',
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+    }));
+    throw error;
+  }
+
+  return payload;
 };
 
 export const requireAuth = async (request: Request) => {
