@@ -1,5 +1,55 @@
 # CHANGELOG
 
+## [2026-08-17] - Status cadastral e roteiro compartilhado
+
+### Alterado
+- O cadastro de promotores passa a reconhecer `ATIVO` e `INATIVO`, mantendo
+  campos vazios como ativos para compatibilidade com todas as linhas atuais.
+- O supervisor exibe totais ativos e inativos e preserva o historico de
+  promotores afastados sem inclui-los como offline ou na meta diaria.
+- A mesma loja pode ser atribuida a mais de um promotor sem duplicar o PDV.
+
+### Adicionado
+- Coluna `STATUS` com dropdown controlado na aba `PROMOTORES`.
+- Coluna `ROTA_PROMOTOR_IDS_ADICIONAIS` na aba `CADASTRO_LOJAS`.
+- Revalidacao do status cadastral nas sessoes autenticadas.
+- Leitura de IDs adicionais separados por virgula, ponto e virgula, barra
+  vertical ou quebra de linha.
+
+### Corrigido
+- Promotor afastado deixa de precisar ser excluido do cadastro para nao aparecer
+  como ativo na gestao.
+- Loja compartilhada deixa de exigir uma segunda linha de cadastro.
+- Promotores inativos deixam de inflar os indicadores de offline, roteiro e
+  visitas pendentes.
+
+### Seguranca
+- Login de usuario explicitamente inativo e recusado em HTTP `403` com codigo
+  `ACCOUNT_INACTIVE`.
+- Sessoes existentes sao revalidadas contra o status cadastral antes de acessar
+  endpoints protegidos.
+- Nenhuma senha, sessao, visita ou foto foi alterada na planilha.
+
+### Validacao
+- `npm run test`: 85 testes aprovados.
+- `npm run lint`: concluido sem erros.
+- `netlify build`: build Vite e 16 Functions empacotados com sucesso.
+- Estrutura nativa das tabelas e dropdown de status verificados pela API do
+  Google Sheets.
+- Pedro Amorim, ID `69`, marcado como `INATIVO` conforme orientacao operacional
+  do cliente; demais cadastros permaneceram sem alteracao de status.
+- Preview `6a83b763f3fea9871f0a691c` validado com pagina, healthcheck e
+  configuracao em HTTP `200`, painel sem sessao em `401` e login inativo em
+  `403 ACCOUNT_INACTIVE`.
+- Producao `6a83b814f3fea98a270a66dd` validada com os mesmos resultados, login
+  invalido em `401` e logs sem erros novos.
+
+### Pendencias
+- Preencher `TELEFONE` nos cadastros que ainda estao vazios para habilitar os
+  atalhos de WhatsApp no painel.
+- Definir IDs adicionais somente nas lojas efetivamente compartilhadas; a nova
+  coluna foi criada vazia para nao alterar roteiros em producao sem autorizacao.
+
 ## [2026-08-17] - Painel supervisor por roteiro e indice leve
 
 ### Alterado

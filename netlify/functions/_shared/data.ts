@@ -14,6 +14,7 @@ import {
   PROMOTER_SHEET_NAMES,
   type SheetTable,
 } from './promoter-sheet';
+import { parseRoutePromoterIds } from './store-routes';
 export { getStoresForUser } from './store-routes';
 
 export type AppData = {
@@ -28,6 +29,7 @@ export type AppData = {
     region: string;
     phone?: string;
     role?: Role;
+    status?: 'ATIVO' | 'INATIVO';
   }>;
   stores: Array<{
     id: string;
@@ -35,6 +37,7 @@ export type AppData = {
     region: string;
     responsible: string;
     routePromoterId?: string;
+    routePromoterIds?: string[];
     routeDays?: number[];
   }>;
   timestamp: string | null;
@@ -52,7 +55,7 @@ type ProvisionalUser = {
   expiresAt?: string;
 };
 
-const CONFIG_SCHEMA_VERSION = 8;
+const CONFIG_SCHEMA_VERSION = 9;
 const defaultIndustries = ['Veneza', 'Idealpan', 'Maricota', 'VidaVeg'];
 const configStore = getJsonStore('criativa-config');
 
@@ -251,6 +254,11 @@ const mapConfig = async (): Promise<AppData> => {
     'ROTA_PROMOTOR_ID',
     'ID_PROMOTOR_ROTA',
   ], -1);
+  const additionalRoutePromoterIdsColumn = findColumnIndex(storesTable, [
+    'ROTA_PROMOTOR_IDS_ADICIONAIS',
+    'IDS_PROMOTORES_ADICIONAIS',
+    'ROTA_PROMOTORES_ADICIONAIS',
+  ], -1);
   const routeDayColumns = [
     findColumnIndex(storesTable, ['SEGUNDA', 'SEG', 'SEGUNDA_FEIRA'], -1),
     findColumnIndex(storesTable, ['TERCA', 'TER', 'TERCA_FEIRA'], -1),
@@ -262,15 +270,20 @@ const mapConfig = async (): Promise<AppData> => {
 
   const stores = storesTable
     ? getTableDataRows(storesTable)
-      .map((row) => ({
-        id: getRowValue(row, storeIdColumn),
-        name: getRowValue(row, storeNameColumn),
-        region: getRowValue(row, storeRegionColumn),
-        responsible: getRowValue(row, storeResponsibleColumn),
-        routePromoterId: getRowValue(row, routePromoterIdColumn),
-        routeDays: routeDayColumns.flatMap((columnIndex, index) =>
-          normalizeColumnName(getRowValue(row, columnIndex)) === 'X' ? [index + 1] : []),
-      }))
+      .map((row) => {
+        const routePromoterId = getRowValue(row, routePromoterIdColumn);
+        const additionalIds = parseRoutePromoterIds(getRowValue(row, additionalRoutePromoterIdsColumn));
+        return {
+          id: getRowValue(row, storeIdColumn),
+          name: getRowValue(row, storeNameColumn),
+          region: getRowValue(row, storeRegionColumn),
+          responsible: getRowValue(row, storeResponsibleColumn),
+          routePromoterId,
+          routePromoterIds: parseRoutePromoterIds(routePromoterId, ...additionalIds),
+          routeDays: routeDayColumns.flatMap((columnIndex, index) =>
+            normalizeColumnName(getRowValue(row, columnIndex)) === 'X' ? [index + 1] : []),
+        };
+      })
       .filter((store) => store.name && normalizeColumnName(store.name) !== 'NOMELOJA')
     : [];
 
@@ -336,6 +349,10 @@ export const findUserByCredentials = async (userName: string, password: string) 
     } as User;
   }
 
+  if (found.status === 'INATIVO') {
+    throw new InactiveUserError();
+  }
+
   const role = resolvePromoterRole(found);
   return {
     id: found.id,
@@ -344,4 +361,21 @@ export const findUserByCredentials = async (userName: string, password: string) 
     region: found.region,
     user: found.user,
   } as User;
+};
+
+export class InactiveUserError extends Error {
+  constructor() {
+    super('Cadastro inativo. Procure seu supervisor.');
+    this.name = 'InactiveUserError';
+  }
+}
+
+export const isRegisteredUserInactive = async (id: string, user: string) => {
+  const data = await getAppData();
+  const normalizedId = String(id || '').trim();
+  const normalizedUser = normalizeCredential(user || '');
+  const promoter = data.promoters.find((item) => (
+    item.id === normalizedId || item.user === normalizedUser
+  ));
+  return promoter?.status === 'INATIVO';
 };

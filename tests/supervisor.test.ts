@@ -164,3 +164,24 @@ test('roteiro com ID sem cadastro continua visivel como pendencia operacional', 
   assert.equal(missingPromoter?.registered, false);
   assert.equal(missingPromoter?.todayVisits.total, 1);
 });
+
+test('promotor inativo aparece no cadastro sem inflar roteiro ou offline', () => {
+  const inactiveData: AppData = {
+    ...data,
+    promoters: data.promoters.map((promoter) => (
+      promoter.id === '3' ? { ...promoter, status: 'INATIVO' as const } : promoter
+    )),
+  };
+
+  const dashboard = buildSupervisorDashboard(inactiveData, [], new Date('2026-08-03T15:00:00-03:00'));
+  const inactive = dashboard.promoters.find((item) => item.id === '3');
+
+  assert.equal(dashboard.summary.totalPromoters, 1);
+  assert.equal(dashboard.summary.activePromoters, 0);
+  assert.equal(dashboard.summary.inactivePromoters, 1);
+  assert.equal(dashboard.summary.offlinePromoters, 0);
+  assert.equal(dashboard.summary.totalVisits, 0);
+  assert.equal(inactive?.registrationStatus, 'INATIVO');
+  assert.equal(inactive?.status, 'INATIVO');
+  assert.equal(inactive?.todayVisits.total, 0);
+});

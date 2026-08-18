@@ -17,6 +17,8 @@ const EMPTY_TIMELINE: SupervisorTimelinePoint[] = [
 
 const EMPTY_SUMMARY = {
   totalPromoters: 0,
+  activePromoters: 0,
+  inactivePromoters: 0,
   onlinePromoters: 0,
   offlinePromoters: 0,
   onRoutePromoters: 0,
@@ -224,6 +226,7 @@ const SupervisorDashboard: React.FC = () => {
                   <div><p className="text-[8px] font-black uppercase tracking-widest text-slate-400">ID</p><p className="text-sm font-black text-[#0F172A]">{selectedPromoter.id}</p></div>
                   <div><p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Usuário</p><p className="text-sm font-black text-[#0F172A]">{selectedPromoter.user || 'Não informado'}</p></div>
                   <div><p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Regional</p><p className="text-sm font-black text-[#0F172A]">{selectedPromoter.region || 'Não informada'}</p></div>
+                  <div><p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Situação cadastral</p><p className={`text-sm font-black ${selectedPromoter.registrationStatus === 'INATIVO' ? 'text-red-600' : 'text-emerald-600'}`}>{selectedPromoter.registrationStatus}</p></div>
                 </div>
                 <div className="bg-slate-50 rounded-3xl p-5 space-y-4">
                   <div>
@@ -297,6 +300,7 @@ const SupervisorDashboard: React.FC = () => {
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores Cadastrados</p>
           </div>
           <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.totalPromoters}</h4>
+          <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-1">{dashboard.summary.activePromoters} ativos • {dashboard.summary.inactivePromoters} inativos</p>
         </button>
 
         <button 
@@ -452,6 +456,7 @@ const SupervisorDashboard: React.FC = () => {
                       <MapPin size={10} /> {promoter.store}
                     </div>
                     <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${
+                      promoter.status === 'INATIVO' ? 'bg-red-50 text-red-600' :
                       promoter.status === 'CONCLUÍDO' ? 'bg-emerald-50 text-emerald-600' : 
                       promoter.status === 'EM ANDAMENTO' ? 'bg-amber-50 text-amber-600' :
                       promoter.status === 'PENDENTE' ? 'bg-orange-50 text-orange-600' :

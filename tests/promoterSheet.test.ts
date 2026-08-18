@@ -4,6 +4,7 @@ import {
   findColumnIndex,
   getTableDataRows,
   mapPromotersTable,
+  normalizePromoterStatus,
   PROMOTER_SHEET_NAMES,
   type SheetTable,
 } from '../netlify/functions/_shared/promoter-sheet.ts';
@@ -47,7 +48,23 @@ test('mapeia o cadastro atual sem transformar o cabeçalho em login', () => {
     region: 'Vitória',
     phone: '',
     role: undefined,
+    status: 'ATIVO',
   }]);
+});
+
+test('mantem cadastro antigo ativo e reconhece inativo explicitamente', () => {
+  assert.equal(normalizePromoterStatus(''), 'ATIVO');
+  assert.equal(normalizePromoterStatus('ATIVO'), 'ATIVO');
+  assert.equal(normalizePromoterStatus('inativo'), 'INATIVO');
+
+  const promoters = mapPromotersTable(table([
+    ['ID_PROMOTOR', 'NOME', 'USUARIO', 'SENHA', 'REGIONAL', 'ROLE', 'TELEFONE', 'STATUS'],
+    [1, 'Cadastro Antigo', 'antigo', 'senha', 'Vitoria', 'FIELD_OPS', '', ''],
+    [2, 'Cadastro Pausado', 'pausado', 'senha', 'Vitoria', 'FIELD_OPS', '', 'INATIVO'],
+  ]));
+
+  assert.equal(promoters[0].status, 'ATIVO');
+  assert.equal(promoters[1].status, 'INATIVO');
 });
 
 test('reconhece ROLE por cabeçalho mesmo com colunas reordenadas', () => {

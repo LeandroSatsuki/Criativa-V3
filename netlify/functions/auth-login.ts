@@ -1,7 +1,7 @@
 import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { createSessionToken } from './_shared/auth';
-import { findUserByCredentials } from './_shared/data';
+import { findUserByCredentials, InactiveUserError } from './_shared/data';
 import { isExpiredNetlifyBlobTokenError } from './_shared/storage';
 
 export default async (request: Request, context: Context) => {
@@ -29,6 +29,9 @@ export default async (request: Request, context: Context) => {
       token,
     });
   } catch (error) {
+    if (error instanceof InactiveUserError) {
+      return json({ error: error.message, code: 'ACCOUNT_INACTIVE' }, 403);
+    }
     console.error(JSON.stringify({
       event: 'auth_login_unavailable',
       reason: isExpiredNetlifyBlobTokenError(error) ? 'blob_token_expired' : 'dependency_error',

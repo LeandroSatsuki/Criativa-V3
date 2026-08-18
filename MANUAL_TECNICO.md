@@ -299,6 +299,19 @@ O nome apresentado ao usuario para a etapa final e `Finalizacao da Visita`.
 Por compatibilidade, continuam inalterados o enum `CHECKOUT`, `checkOutTime`,
 `FOTO_CHECKOUT`, `NOME_CHECKOUT` e os mapeamentos da Make e do Google Sheets.
 
+O cadastro de promotores aceita `STATUS`, `SITUACAO` ou `STATUS_CADASTRO`.
+Somente o valor explicito `INATIVO` bloqueia o usuario; vazio e valores antigos
+permanecem ativos para evitar bloqueio em massa. Login de inativo responde HTTP
+`403` com `ACCOUNT_INACTIVE`. Sessoes ja emitidas tambem revalidam o status no
+cache cadastral antes de autorizar chamadas ao backend.
+
+O roteiro preserva `ROTA_PROMOTOR_ID` como responsavel principal e aceita IDs
+extras em `ROTA_PROMOTOR_IDS_ADICIONAIS`. Valores podem ser separados por
+virgula, ponto e virgula, barra vertical ou quebra de linha. A loja permanece em
+uma unica linha e pode compor a meta de cada promotor ativo associado. Um
+promotor inativo preserva atribuicoes para reativacao futura, mas recebe roteiro
+vazio enquanto estiver inativo.
+
 As rotas supervisor retornam `401` quando o token esta ausente, expirado ou foi
 substituido por uma nova sessao, e `403` somente quando o token e valido mas o
 papel nao e `SUPERVISOR`. No frontend, um `401` autenticado limpa o token e

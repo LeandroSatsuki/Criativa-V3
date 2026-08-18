@@ -12,6 +12,7 @@ const promoter = (
   region: 'Vitória',
   phone: '(27) 99999-9999',
   registered: true,
+  registrationStatus: 'ATIVO',
   activeToday: true,
   hasRouteToday: true,
   status: 'PENDENTE',
@@ -39,12 +40,25 @@ test('card de concluidas lista promotores que contribuiram para o total', () => 
 });
 
 test('card de cadastrados exclui usuario somente historico', () => {
-  const data = [promoter(), promoter({ id: 'HISTORICO', registered: false })];
+  const data = [
+    promoter(),
+    promoter({ id: 'INATIVO', registrationStatus: 'INATIVO', status: 'INATIVO' }),
+    promoter({ id: 'HISTORICO', registered: false }),
+  ];
 
   assert.deepEqual(
     filterSupervisorPromoters(data, 'active').map((item) => item.id),
-    ['PROMOTOR-1'],
+    ['PROMOTOR-1', 'INATIVO'],
   );
+});
+
+test('inativo nao aparece como falta de atualizacao operacional', () => {
+  const data = [
+    promoter(),
+    promoter({ id: 'INATIVO', registrationStatus: 'INATIVO', status: 'INATIVO', online: false }),
+  ];
+
+  assert.deepEqual(filterSupervisorPromoters(data, 'offline').map((item) => item.id), ['PROMOTOR-1']);
 });
 
 test('cards diarios usam somente contribuicoes de hoje', () => {

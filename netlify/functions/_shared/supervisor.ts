@@ -21,9 +21,10 @@ export type SupervisorPromoterOverview = {
   region: string;
   phone: string;
   registered: boolean;
+  registrationStatus: 'ATIVO' | 'INATIVO';
   activeToday: boolean;
   hasRouteToday: boolean;
-  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'SEM ATIVIDADE';
+  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'SEM ATIVIDADE' | 'INATIVO';
   online: boolean;
   progress: number;
   store: string;
@@ -46,6 +47,8 @@ export type SupervisorPromoterOverview = {
 
 export type SupervisorDashboardSummary = {
   totalPromoters: number;
+  activePromoters: number;
+  inactivePromoters: number;
   onlinePromoters: number;
   offlinePromoters: number;
   onRoutePromoters: number;
@@ -92,6 +95,7 @@ export type SupervisorPromoterDetailResponse = {
     region: string;
     phone: string;
     registered: boolean;
+    registrationStatus: 'ATIVO' | 'INATIVO';
   };
   metrics: {
     efficiency: string;
@@ -269,8 +273,12 @@ const buildPromoterOverview = (
   const pendingSyncVisits = orderedVisits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
   const online = Boolean(latestTime && (nowMs - new Date(latestTime).getTime()) < 15 * 60 * 1000);
   const routeProgress = buildRouteProgress(plannedStores, todayVisits);
+  const registrationStatus: SupervisorPromoterOverview['registrationStatus'] =
+    promoter.status === 'INATIVO' ? 'INATIVO' : 'ATIVO';
 
-  const status: SupervisorPromoterOverview['status'] = latestToday?.syncStatus === 'enviando'
+  const status: SupervisorPromoterOverview['status'] = registrationStatus === 'INATIVO'
+    ? 'INATIVO'
+    : latestToday?.syncStatus === 'enviando'
     ? 'EM ANDAMENTO'
     : routeProgress.planned > 0 && routeProgress.completed === routeProgress.planned
       ? 'CONCLUÍDO'
@@ -285,10 +293,11 @@ const buildPromoterOverview = (
     region: promoter.region,
     phone: promoter.phone || '',
     registered,
+    registrationStatus,
     activeToday: todayVisits.length > 0,
     hasRouteToday: plannedStores.length > 0,
     status,
-    online,
+    online: registrationStatus === 'ATIVO' && online,
     progress: routeProgress.planned === 0
       ? 0
       : Math.min(100, Math.round((routeProgress.completed / routeProgress.planned) * 100)),
@@ -392,15 +401,22 @@ export const buildSupervisorDashboard = (
     .filter((store) => store.routeDays?.includes(weekday))
     .forEach((store) => {
       const normalizedResponsible = normalizeStoreIdentity(store.responsible);
-      if (store.routePromoterId && !knownRouteIds.has(store.routePromoterId)) {
-        routeOnlyById.set(store.routePromoterId, {
-          id: store.routePromoterId,
-          name: store.responsible || `Promotor nao cadastrado ${store.routePromoterId}`,
+      const routePromoterIds = store.routePromoterIds?.length
+        ? store.routePromoterIds
+        : (store.routePromoterId ? [store.routePromoterId] : []);
+      routePromoterIds.forEach((routePromoterId, index) => {
+        if (knownRouteIds.has(routePromoterId)) return;
+        routeOnlyById.set(routePromoterId, {
+          id: routePromoterId,
+          name: index === 0 && store.responsible
+            ? store.responsible
+            : `Promotor nao cadastrado ${routePromoterId}`,
           user: '',
           pass: '',
           region: store.region,
         });
-      } else if (!store.routePromoterId && normalizedResponsible && !knownRouteNames.has(normalizedResponsible)) {
+      });
+      if (routePromoterIds.length === 0 && normalizedResponsible && !knownRouteNames.has(normalizedResponsible)) {
         const id = `rota-${normalizedResponsible.toLowerCase()}`;
         routeOnlyById.set(id, {
           id,
@@ -437,12 +453,15 @@ export const buildSupervisorDashboard = (
   const duplicateVisits = promoters.reduce((total, promoter) => total + promoter.todayVisits.duplicates, 0);
   const pendingSyncVisits = visits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
   const registeredPromoters = promoters.filter((promoter) => promoter.registered);
-  const onlinePromoters = registeredPromoters.filter((promoter) => promoter.online).length;
+  const activeRegisteredPromoters = registeredPromoters.filter((promoter) => promoter.registrationStatus === 'ATIVO');
+  const onlinePromoters = activeRegisteredPromoters.filter((promoter) => promoter.online).length;
   const activeTodayPromoters = promoters.filter((promoter) => promoter.activeToday).length;
   const summary: SupervisorDashboardSummary = {
     totalPromoters: registeredPromoters.length,
+    activePromoters: activeRegisteredPromoters.length,
+    inactivePromoters: registeredPromoters.length - activeRegisteredPromoters.length,
     onlinePromoters,
-    offlinePromoters: registeredPromoters.length - onlinePromoters,
+    offlinePromoters: activeRegisteredPromoters.length - onlinePromoters,
     onRoutePromoters: promoters.filter((promoter) => promoter.hasRouteToday).length,
     activeTodayPromoters,
     inProgressPromoters: promoters.filter((promoter) => promoter.status === 'EM ANDAMENTO').length,
@@ -498,6 +517,7 @@ export const buildSupervisorPromoterDetail = (
       region: String(profile?.region || latestUser.region || ''),
       phone: String(profile?.phone || ''),
       registered: profile?.registered !== false,
+      registrationStatus: profile?.status === 'INATIVO' ? 'INATIVO' : 'ATIVO',
     },
     metrics: {
       efficiency: routeProgress.planned

@@ -3,6 +3,7 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { getEnv } from './env';
 import { getJsonStore, isExpiredNetlifyBlobTokenError } from './storage';
 import { renewSessionExpiration, SESSION_TTL_MS } from './session-policy';
+import { isRegisteredUserInactive } from './data';
 export { SESSION_TTL_MS } from './session-policy';
 
 export type SessionPayload = {
@@ -25,7 +26,8 @@ export type AuthenticationRejectionReason =
   | 'expired_token'
   | 'missing_session_id'
   | 'session_not_found'
-  | 'session_replaced';
+  | 'session_replaced'
+  | 'inactive_user';
 
 export type AuthenticationResult =
   | { auth: SessionPayload; reason: null }
@@ -134,6 +136,9 @@ export const authenticateDetailed = async (request: Request): Promise<Authentica
     const active = await sessionStore.get<{ sessionId?: string }>(sessionKeyFor(payload.sub));
     if (!active?.sessionId) return rejectAuthentication('session_not_found');
     if (active.sessionId !== payload.sid) return rejectAuthentication('session_replaced');
+    if (await isRegisteredUserInactive(payload.sub, payload.user)) {
+      return rejectAuthentication('inactive_user');
+    }
   } catch (error) {
     console.error(JSON.stringify({
       event: 'auth_storage_unavailable',

@@ -78,7 +78,8 @@ export interface SupervisorPromoterOverview {
   registered: boolean;
   activeToday: boolean;
   hasRouteToday: boolean;
-  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'SEM ATIVIDADE';
+  registrationStatus: 'ATIVO' | 'INATIVO';
+  status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'SEM ATIVIDADE' | 'INATIVO';
   online: boolean;
   progress: number;
   store: string;
@@ -101,6 +102,8 @@ export interface SupervisorPromoterOverview {
 
 export interface SupervisorDashboardSummary {
   totalPromoters: number;
+  activePromoters: number;
+  inactivePromoters: number;
   onlinePromoters: number;
   offlinePromoters: number;
   onRoutePromoters: number;
@@ -147,6 +150,7 @@ export interface SupervisorPromoterDetailResponse {
     region: string;
     phone: string;
     registered: boolean;
+    registrationStatus: 'ATIVO' | 'INATIVO';
   };
   metrics: {
     efficiency: string;

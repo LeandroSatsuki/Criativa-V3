@@ -156,6 +156,10 @@ Importante durante a evolucao offline:
 ## 4. Fluxo do supervisor
 
 - O supervisor faz login com o mesmo mecanismo, mas recebe o papel de supervisão.
+- O card `Promotores Cadastrados` separa a quantidade de cadastros `ATIVO` e
+  `INATIVO`. Um cadastro inativo continua visivel para consulta historica, mas
+  nao entra no roteiro diario, nao e contado como offline e nao pode acessar o
+  backend.
 - Apenas uma sessao pode permanecer ativa por usuario. Se o mesmo supervisor
   entrar em outro aparelho ou a sessao expirar, o acesso anterior volta ao
   login e solicita a senha novamente.
@@ -182,6 +186,24 @@ Importante durante a evolucao offline:
   conclusao do roteiro.
 - Visitas feitas fora do roteiro e registros repetidos continuam visiveis no
   detalhamento, mas aparecem separadamente e nao alteram a meta prevista.
+
+### 4.1 Ativar ou inativar um promotor
+
+1. Abra a planilha `Sistema Criativa` e a aba `PROMOTORES`.
+2. Na coluna `STATUS`, selecione `ATIVO` ou `INATIVO`.
+3. Valor vazio continua sendo tratado como `ATIVO` para manter compatibilidade
+   com cadastros anteriores.
+4. Nao apague a linha para afastamentos temporarios. Ao voltar, altere apenas o
+   status para `ATIVO`.
+
+### 4.2 Compartilhar a mesma loja entre promotores
+
+1. Na aba `CADASTRO_LOJAS`, mantenha o promotor principal em
+   `ROTA_PROMOTOR_ID`.
+2. Em `ROTA_PROMOTOR_IDS_ADICIONAIS`, informe os outros IDs separados por
+   virgula, por exemplo `111, 123`.
+3. Nao duplique a linha da loja. Todos os IDs informados recebem o mesmo PDV nos
+   dias marcados com `X`.
 - `Pendencias de Sync` inclui envios antigos ainda nao confirmados.
 - O bloco `Indicador selecionado` explica o recorte e informa quantos promotores
   correspondem a ele.

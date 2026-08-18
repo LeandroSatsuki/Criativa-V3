@@ -1,4 +1,5 @@
 export type PromoterRole = 'FIELD_OPS' | 'SUPERVISOR';
+export type PromoterStatus = 'ATIVO' | 'INATIVO';
 
 export type SheetRow = {
   c?: Array<{ v?: string | number | null } | null>;
@@ -17,6 +18,7 @@ export type SheetPromoter = {
   region: string;
   phone: string;
   role?: PromoterRole;
+  status: PromoterStatus;
 };
 
 export const PROMOTER_SHEET_NAMES = ['PROMOTORES', 'CADASTRO_PROMOTORES'] as const;
@@ -26,6 +28,13 @@ export const normalizeRole = (value: unknown): PromoterRole | undefined => {
   if (normalized === 'SUPERVISOR') return 'SUPERVISOR';
   if (normalized === 'FIELD_OPS') return 'FIELD_OPS';
   return undefined;
+};
+
+export const normalizePromoterStatus = (value: unknown): PromoterStatus => {
+  const normalized = String(value || '').toUpperCase().trim();
+  return ['INATIVO', 'INACTIVE', 'NAO', 'NÃO', '0'].includes(normalized)
+    ? 'INATIVO'
+    : 'ATIVO';
 };
 
 export const normalizeColumnName = (value: unknown) => String(value || '')
@@ -67,6 +76,7 @@ export const mapPromotersTable = (table: SheetTable | null): SheetPromoter[] => 
   const regionColumn = findColumnIndex(table, ['REGIONAL', 'REGIAO', 'UF'], 4);
   const roleColumn = findColumnIndex(table, ['ROLE', 'PERFIL', 'TIPO_USUARIO'], 5);
   const phoneColumn = findColumnIndex(table, ['TELEFONE', 'CELULAR', 'WHATSAPP', 'CONTATO'], 6);
+  const statusColumn = findColumnIndex(table, ['STATUS', 'SITUACAO', 'STATUS_CADASTRO'], -1);
 
   return getTableDataRows(table)
     .map((row) => ({
@@ -77,6 +87,7 @@ export const mapPromotersTable = (table: SheetTable | null): SheetPromoter[] => 
       region: getRowValue(row, regionColumn),
       phone: getRowValue(row, phoneColumn),
       role: normalizeRole(getRowValue(row, roleColumn)),
+      status: normalizePromoterStatus(getRowValue(row, statusColumn)),
     }))
     .filter((promoter) => promoter.id && promoter.name && promoter.user && promoter.pass);
 };
