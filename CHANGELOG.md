@@ -1,5 +1,58 @@
 # CHANGELOG
 
+## [2026-08-17] - Estabilidade de sessao e retomada de rede
+
+### Alterado
+- Sessoes autenticadas passam a valer por sete dias e sao renovadas
+  silenciosamente quando o aplicativo abre, recupera conexao ou volta ao
+  primeiro plano.
+- A renovacao preserva o mesmo identificador de sessao e a regra de um acesso
+  ativo por usuario.
+- Consultas `GET` e `HEAD` recebem uma unica nova tentativa em falhas de rede
+  ou HTTP `502`, `503` e `504`; operacoes de escrita nunca sao repetidas
+  automaticamente.
+- A consulta visual da fila passa de cinco para quinze segundos e fica suspensa
+  enquanto o aplicativo esta oculto.
+
+### Adicionado
+- Endpoint autenticado `POST /api/auth/session` para renovacao segura da
+  sessao sem armazenar ou reenviar senha.
+- Timeout de 25 segundos para chamadas do frontend, com erro de rede
+  identificado separadamente de falha de autorizacao.
+- Eventos de retomada para `online`, `pageshow`, foco e retorno de visibilidade.
+
+### Corrigido
+- Falha de conexao ou timeout deixa de apagar a sessao e preserva rascunhos,
+  fotos e filas locais.
+- Sessao substituida por outro aparelho recebe mensagem diferente de sessao
+  expirada e permite novo login imediato no aparelho atual.
+- A configuracao publica deixa de executar autenticacao opcional sem token,
+  removendo alertas falsos dos logs.
+
+### Seguranca
+- A renovacao revalida assinatura, validade e sessao ativa no backend antes de
+  emitir um novo token.
+- Acesso substituido permanece revogado e nao pode sincronizar novos dados.
+- Rotas autenticadas e tokens continuam fora do cache do service worker.
+- Nenhuma senha, token ou payload operacional foi adicionado aos logs.
+
+### Validacao
+- `npm run test`: 75 testes aprovados.
+- `npm run lint`: concluido sem erros.
+- `netlify build`: build Vite e 16 Functions empacotados com sucesso.
+- Preview `6a83a5b287eb115bc8a8fc74` validado com pagina, healthcheck e
+  configuracao em HTTP `200`; renovacao sem token e login invalido rejeitados.
+- Producao `6a83a6afe764a4896813fb95` validada no dominio principal com pagina,
+  healthcheck e configuracao em HTTP `200`, e renovacao sem token em `401`
+  com codigo `SESSION_INVALID`.
+- Logs posteriores ao deploy sem erro novo; o alerta de token ausente foi
+  gerado somente pela chamada controlada de auditoria.
+
+### Pendencias
+- Homologar bloqueio prolongado e retomada em um Android e um iPhone reais.
+- Sessoes emitidas antes deste deploy ainda podem exigir um novo login ao
+  atingir a validade antiga de doze horas; depois disso recebem a nova regra.
+
 ## [2026-08-17] - Estabilidade do login com Netlify Blobs
 
 ### Corrigido

@@ -36,6 +36,10 @@ type LoginResponse = {
   token: string;
 };
 
+type SessionRefreshResponse = LoginResponse & {
+  expiresAt: string;
+};
+
 type SyncResponse = {
   visitId: string;
   syncStatus: string;
@@ -171,6 +175,21 @@ export const apiService = {
       token: response.token,
       user: response.user,
       issuedAt: getBrasiliaISO(),
+    });
+
+    return response.user;
+  },
+
+  refreshSession: async () => {
+    const response = await requestJson<SessionRefreshResponse>('/auth/session', {
+      method: 'POST',
+    });
+
+    setSession({
+      token: response.token,
+      user: response.user,
+      issuedAt: getBrasiliaISO(),
+      expiresAt: response.expiresAt,
     });
 
     return response.user;

@@ -76,6 +76,7 @@ test('rotas operacionais e autenticadas ficam fora do cache', async () => {
   for (const pathname of [
     '/api',
     '/api/auth/login',
+    '/api/auth/session',
     '/.netlify/functions',
     '/.netlify/functions/auth-login',
   ]) {

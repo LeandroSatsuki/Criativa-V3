@@ -137,7 +137,7 @@ Os testes cobrem o contrato de sincronização, isolamento da fila por usuário,
 
 ## Estado atual
 
-A aplicação está publicada e o fluxo de campo e supervisão foi validado no ambiente operacional. A evolução prevista inclui fortalecimento de sessão, storage dedicado para fotos, banco relacional para relatórios e ampliação dos indicadores de supervisão.
+A aplicação está publicada e o fluxo de campo e supervisão foi validado no ambiente operacional. A sessao autenticada e renovada online por sete dias sem perder o rascunho em falhas de rede. A evolução prevista inclui storage dedicado para fotos, banco relacional para relatórios e ampliação dos indicadores de supervisão.
 
 ## Variáveis de ambiente
 
@@ -182,6 +182,9 @@ numero possui DDD valido.
 - A Fase 3 adiciona fila local persistida e retry de sincronização.
 - Rascunhos com fotos e a fila offline usam `IndexedDB`; o `localStorage` guarda apenas sessão, configuração e uma cópia leve de compatibilidade.
 - O progresso da visita é retomado na etapa salva após bloquear ou fechar o app. Se a sessão expirar, o mesmo usuário faz login novamente e continua o rascunho.
+- A sessao e renovada por `POST /api/auth/session` ao abrir, recuperar conexao
+  ou voltar ao app. Falha de rede nao remove o login local; `401` confirmado
+  pelo backend encerra somente a sessao, preservando visita e fila.
 - A Fase 6 mantém a análise de imagem no backend e persiste o resultado quando possível.
 - A Fase 7 publicou o projeto no Netlify sem alterar o visual do app.
 - A Fase 8 fecha a documentação operacional e técnica da entrega.

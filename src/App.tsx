@@ -11,7 +11,8 @@ import { SectionId, STORAGE_KEY } from './types';
 import { apiService } from './services/apiService';
 import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X } from 'lucide-react';
 import { appConfig } from './config/appConfig';
-import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT } from './services/session';
+import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT, type SessionEndReason } from './services/session';
+import { HttpRequestError } from './services/httpClient';
 import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
 import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
@@ -84,6 +85,7 @@ const App: React.FC = () => {
   const [showSyncStatus, setShowSyncStatus] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
   const persistenceAlertShown = useRef(false);
+  const lastSessionRefresh = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +133,8 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const handleSessionExpired = () => {
+    const handleSessionExpired = (event: Event) => {
+      const reason = (event as CustomEvent<SessionEndReason>).detail;
       setVisitState((prev: any) => ({
         ...prev,
         draftOwnerId: prev.draftOwnerId || prev.user?.id || null,
@@ -139,16 +142,20 @@ const App: React.FC = () => {
         step: activeSection,
       }));
       setLoadingError(null);
-      setLoginError('Sua sessão expirou ou foi encerrada por outro acesso. Faça login novamente.');
+      setLoginError(reason === 'replaced'
+        ? 'Este acesso foi encerrado porque a conta entrou em outro aparelho. Você pode entrar novamente neste aparelho.'
+        : 'Sua sessão expirou. Entre novamente para continuar; o progresso salvo foi preservado.');
     };
 
     window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
   }, [activeSection]);
 
-  const loadConfig = async (force = false) => {
-    setLoading(true);
-    setLoadingError(null);
+  const loadConfig = async (force = false, silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setLoadingError(null);
+    }
     try {
       const config = await apiService.getAppConfig(force);
       if (config) {
@@ -173,26 +180,61 @@ const App: React.FC = () => {
       }
     } catch (e: any) {
       console.error("Erro ao atualizar dados:", e);
-      const message = String(e?.message || '');
-      if (message.includes('Sessão expirada') || message.includes('Não autorizado')) {
-        clearSession();
-        setVisitState((prev: any) => ({
-          ...prev,
-          draftOwnerId: prev.draftOwnerId || prev.user?.id || null,
-          user: null,
-          step: activeSection,
-        }));
-        setLoadingError(null);
+      if (e instanceof HttpRequestError && e.status === 401) {
         return;
       }
-      setLoadingError("Não foi possível carregar os dados. Verifique sua conexão ou tente novamente mais tarde.");
+      if (!silent) {
+        setLoadingError("Não foi possível carregar os dados. Verifique sua conexão ou tente novamente mais tarde.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadConfig();
+  }, [visitState.user?.id]);
+
+  useEffect(() => {
+    if (!visitState.user?.id) return;
+    let cancelled = false;
+
+    const renewSession = async (force = false) => {
+      if (!navigator.onLine || document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (!force && now - lastSessionRefresh.current < 5 * 60 * 1000) return;
+      lastSessionRefresh.current = now;
+
+      try {
+        const refreshedUser = await apiService.refreshSession();
+        if (cancelled) return;
+        setVisitState((prev: any) => ({ ...prev, user: refreshedUser }));
+        await loadConfig(false, true);
+      } catch (error) {
+        if (!(error instanceof HttpRequestError && error.status === 401)) {
+          console.warn('Sessão não pôde ser renovada agora; o acesso local foi preservado.');
+        }
+      }
+    };
+
+    const handleResume = () => void renewSession();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') handleResume();
+    };
+
+    void renewSession(true);
+    window.addEventListener('online', handleResume);
+    window.addEventListener('pageshow', handleResume);
+    window.addEventListener('focus', handleResume);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', handleResume);
+      window.removeEventListener('pageshow', handleResume);
+      window.removeEventListener('focus', handleResume);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [visitState.user?.id]);
 
   useEffect(() => {
@@ -353,10 +395,17 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!visitState.user?.id) return;
 
-    const handleResume = () => void refreshSyncStatus();
-    const intervalId = window.setInterval(handleResume, 5000);
+    const handleResume = () => {
+      if (document.visibilityState !== 'hidden') void refreshSyncStatus();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') handleResume();
+    };
+    const intervalId = window.setInterval(handleResume, 15000);
     window.addEventListener('online', handleResume);
     window.addEventListener('focus', handleResume);
+    window.addEventListener('pageshow', handleResume);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('criativa-sync-queue-updated', handleResume);
     void refreshSyncStatus();
 
@@ -364,6 +413,8 @@ const App: React.FC = () => {
       window.clearInterval(intervalId);
       window.removeEventListener('online', handleResume);
       window.removeEventListener('focus', handleResume);
+      window.removeEventListener('pageshow', handleResume);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('criativa-sync-queue-updated', handleResume);
     };
   }, [visitState.user?.id]);

@@ -74,9 +74,10 @@ Importante durante a evolucao offline:
   sem rede usando as lojas e industrias autorizadas salvas para aquele usuario.
 - O cadastro offline vale por ate sete dias e e renovado quando o aplicativo
   consulta o backend novamente.
-- Login inicial offline e finalizacao offline ainda nao estao liberados. Eles
-  pertencem as proximas subfases e nao devem ser considerados prontos antes do
-  respectivo registro no `CHANGELOG.md`.
+- O primeiro login de um usuario novo continua exigindo internet. Depois de um
+  login valido, falhas de conexao nao removem a sessao salva nem o progresso.
+- A sessao e renovada online por sete dias quando o aplicativo abre, recupera
+  conexao ou volta ao primeiro plano.
 - Quando existir uma atualizacao, a versao aberta continua funcionando. A nova
   versao assume somente depois que as janelas anteriores forem fechadas.
 
@@ -87,7 +88,8 @@ Importante durante a evolucao offline:
 - O app envia as credenciais para o backend.
 - O backend valida o usuário com a base cadastrada.
 - O backend devolve uma sessão assinada.
-- A sessão fica salva no navegador e vale por um período limitado.
+- A sessão fica salva no navegador, vale por sete dias e e renovada
+  silenciosamente quando o backend confirma que ela continua ativa.
 
 ### 3.2 Seleção de loja
 
@@ -157,6 +159,8 @@ Importante durante a evolucao offline:
 - Apenas uma sessao pode permanecer ativa por usuario. Se o mesmo supervisor
   entrar em outro aparelho ou a sessao expirar, o acesso anterior volta ao
   login e solicita a senha novamente.
+- Falha de internet nao encerra a sessao. Ao recuperar conexao, o aplicativo
+  tenta renovar o acesso sem bloquear a tela nem apagar dados locais.
 - O ultimo usuario permanece preenchido, mas a senha nunca e reaproveitada.
 - Durante o login, aguarde o botao `Acessando...` concluir. O aplicativo bloqueia
   novos toques para evitar que uma tentativa substitua a sessao da outra.

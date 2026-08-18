@@ -22,6 +22,10 @@ Este documento resume a arquitetura real do projeto, o fluxo de dados e onde cad
 - O backend valida o usuário com a fonte cadastrada.
 - O backend emite uma sessão assinada.
 - A sessão fica guardada no navegador e é usada nas rotas autenticadas.
+- A sessao vale por sete dias e pode ser renovada por `POST /api/auth/session`
+  enquanto ainda for valida e continuar ativa no servidor.
+- A renovacao preserva o identificador da sessao; um novo login do mesmo
+  usuario continua revogando o aparelho anterior.
 
 ### 2.2 Configuração inicial
 
@@ -79,10 +83,12 @@ Este documento resume a arquitetura real do projeto, o fluxo de dados e onde cad
 - `sw.js` e servido com `no-cache, no-store, must-revalidate`, e o registro usa
   `updateViaCache: none` para sempre verificar a versao publicada.
 - A continuidade de visita offline continua dependendo do estado local e da fila de sincronizacao.
-- A PWA-1 garante apenas a abertura do app shell offline. Perfil operacional,
-  sessao offline e finalizacao offline sao entregas separadas.
+- A PWA-1 garante a abertura do app shell offline.
 - A PWA-2 salva lojas e industrias por `user.id` depois de uma consulta online
   autenticada. O cache e aceito por sete dias apenas para `FIELD_OPS`.
+- A PWA-3 preserva a sessao local em falhas de rede e a renova silenciosamente
+  por sete dias ao abrir, recuperar conexao ou voltar ao primeiro plano. Uma
+  resposta `401` confirmada pelo backend ainda exige novo login.
 - Erros HTTP, especialmente `401`, nao ativam o fallback local. O cache e usado
   somente em falha de rede, e supervisores continuam dependentes de dados online.
 - Na PWA-4, a fila IndexedDB e gravada antes da primeira chamada ao backend. Uma

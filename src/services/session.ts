@@ -4,7 +4,10 @@ export type SessionData = {
   token: string;
   user: User;
   issuedAt: string;
+  expiresAt?: string;
 };
+
+export type SessionEndReason = 'expired' | 'replaced' | 'invalid' | 'unauthorized';
 
 const SESSION_KEY = 'criativa_session';
 const LAST_LOGIN_USER_KEY = 'criativa_last_login_user';
@@ -30,9 +33,11 @@ export const clearSession = () => {
   localStorage.removeItem(SESSION_KEY);
 };
 
-export const expireSession = () => {
+export const expireSession = (reason: SessionEndReason = 'unauthorized') => {
   clearSession();
-  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  window.dispatchEvent(new CustomEvent<SessionEndReason>(SESSION_EXPIRED_EVENT, {
+    detail: reason,
+  }));
 };
 
 export const getLastLoginUser = () => localStorage.getItem(LAST_LOGIN_USER_KEY) || '';
