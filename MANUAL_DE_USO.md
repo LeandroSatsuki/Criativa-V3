@@ -171,9 +171,17 @@ Importante durante a evolucao offline:
 - Em telas menores, depois do clique o painel desce automaticamente ate a lista
   filtrada; nao e necessario procurar o resultado abaixo dos cards.
 - `Promotores Cadastrados` mostra apenas cadastros atuais da aba `PROMOTORES`.
-- `Em Atividade Hoje` mostra quem possui ao menos uma visita registrada hoje;
-  esse indicador nao acompanha GPS ou deslocamento.
-- `Visitas Concluidas Hoje` e `Visitas Pendentes Hoje` usam o dia de Brasilia.
+- `Com Roteiro Hoje` mostra os promotores que possuem ao menos uma loja
+  prevista para o dia na planilha de roteiro; esse indicador nao acompanha GPS
+  ou deslocamento.
+- `Visitas Concluidas Hoje` conta lojas distintas do roteiro com visita
+  finalizada e sincronizada. Assim, `2 / 4` significa duas lojas concluidas
+  entre quatro lojas previstas para aquele promotor no dia de Brasilia.
+- `Visitas Pendentes Hoje` e a diferenca entre as lojas previstas e as lojas
+  distintas concluidas. Uma segunda visita na mesma loja nao aumenta a
+  conclusao do roteiro.
+- Visitas feitas fora do roteiro e registros repetidos continuam visiveis no
+  detalhamento, mas aparecem separadamente e nao alteram a meta prevista.
 - `Pendencias de Sync` inclui envios antigos ainda nao confirmados.
 - O bloco `Indicador selecionado` explica o recorte e informa quantos promotores
   correspondem a ele.

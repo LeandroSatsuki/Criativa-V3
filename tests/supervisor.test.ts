@@ -24,7 +24,14 @@ const visit = (visitId: string, user: any, photos: any): VisitRecord => ({
 
 const data: AppData = {
   industries: ['VENEZA'],
-  stores: [{ id: '1', name: 'Loja Teste', region: 'Vitoria', responsible: 'Promotora' }],
+  stores: [{
+    id: '1',
+    name: 'Loja Teste',
+    region: 'Vitoria',
+    responsible: 'Promotora',
+    routePromoterId: '3',
+    routeDays: [1],
+  }],
   promoters: [
     { id: '3', name: 'Promotora', user: 'promotora', pass: 'senha', region: 'Vitoria' },
     { id: '115', name: 'Supervisora', user: 'supervisora', pass: 'senha', region: 'Serra', role: 'SUPERVISOR' },
@@ -39,7 +46,9 @@ test('painel associa por usuario e preserva promotor historico sem listar superv
   ];
   const dashboard = buildSupervisorDashboard(data, visits, new Date('2026-08-03T15:00:00-03:00'));
 
-  assert.equal(dashboard.summary.totalVisits, 2);
+  assert.equal(dashboard.summary.totalVisits, 1);
+  assert.equal(dashboard.summary.recordedVisits, 2);
+  assert.equal(dashboard.summary.extraVisits, 1);
   assert.equal(dashboard.promoters.length, 2);
   assert.equal(dashboard.promoters.find((item) => item.id === '3')?.visits.total, 1);
   assert.equal(dashboard.promoters.some((item) => item.id === 'temporario-antigo'), true);
@@ -80,4 +89,78 @@ test('detalhe conta fotos unicas no fluxo geral e por industria', () => {
 
   const detail = buildSupervisorPromoterDetail([record]);
   assert.equal(detail.route[0].photos, 4);
+});
+
+test('progresso usa lojas distintas previstas e separa extras e duplicadas', () => {
+  const routeData: AppData = {
+    ...data,
+    stores: ['1', '2', '3', '4'].map((id) => ({
+      id,
+      name: `Loja ${id}`,
+      region: 'Vitoria',
+      responsible: 'Promotora',
+      routePromoterId: '3',
+      routeDays: [1],
+    })),
+  };
+  const makeVisit = (id: string, storeId: string, storeName: string) => ({
+    ...visit(id, { id: '3', user: 'promotora', name: 'Promotora' }, {}),
+    payload: {
+      ...visit(id, { id: '3', user: 'promotora', name: 'Promotora' }, {}).payload,
+      currentStoreId: storeId,
+      currentStore: storeName,
+    },
+  });
+  const visits = [
+    makeVisit('VISIT-LOJA-1-A', '1', 'Loja 1'),
+    makeVisit('VISIT-LOJA-1-B', '1', 'Loja 1'),
+    makeVisit('VISIT-LOJA-2', '2', 'Loja 2'),
+    makeVisit('VISIT-EXTRA', '99', 'Loja Extra'),
+  ];
+
+  const dashboard = buildSupervisorDashboard(routeData, visits, new Date('2026-08-03T15:00:00-03:00'));
+  const overview = dashboard.promoters.find((item) => item.id === '3');
+
+  assert.equal(dashboard.summary.totalVisits, 4);
+  assert.equal(dashboard.summary.completedVisits, 2);
+  assert.equal(dashboard.summary.pendingVisits, 2);
+  assert.equal(dashboard.summary.recordedVisits, 4);
+  assert.equal(dashboard.summary.extraVisits, 1);
+  assert.equal(dashboard.summary.duplicateVisits, 1);
+  assert.deepEqual(overview?.todayVisits, {
+    completed: 2,
+    pending: 2,
+    total: 4,
+    recorded: 4,
+    extra: 1,
+    duplicates: 1,
+  });
+  assert.equal(overview?.progress, 50);
+});
+
+test('roteiro com ID sem cadastro continua visivel como pendencia operacional', () => {
+  const routeData: AppData = {
+    ...data,
+    stores: [
+      ...data.stores,
+      {
+        id: '99',
+        name: 'Loja sem cadastro de promotor',
+        region: 'Vitoria',
+        responsible: 'Promotora Ausente',
+        routePromoterId: '999',
+        routeDays: [1],
+      },
+    ],
+  };
+
+  const dashboard = buildSupervisorDashboard(routeData, [], new Date('2026-08-03T15:00:00-03:00'));
+  const missingPromoter = dashboard.promoters.find((item) => item.id === '999');
+
+  assert.equal(dashboard.summary.totalPromoters, 1);
+  assert.equal(dashboard.summary.onRoutePromoters, 2);
+  assert.equal(dashboard.summary.totalVisits, 2);
+  assert.equal(dashboard.summary.pendingVisits, 2);
+  assert.equal(missingPromoter?.registered, false);
+  assert.equal(missingPromoter?.todayVisits.total, 1);
 });

@@ -2,7 +2,7 @@ import type { Config, Context } from '@netlify/functions';
 import { authenticate } from './_shared/auth';
 import { json } from './_shared/json';
 import { getAppData } from './_shared/data';
-import { listVisits } from './_shared/visits';
+import { listVisitSummaries } from './_shared/visits';
 import { buildSupervisorDashboard } from './_shared/supervisor';
 import { getSupervisorAccessError } from './_shared/supervisor-access';
 
@@ -17,7 +17,7 @@ export default async (request: Request, _context: Context) => {
     return json({ error: accessError.message }, accessError.status);
   }
 
-  const [data, visits] = await Promise.all([getAppData(), listVisits()]);
+  const [data, visits] = await Promise.all([getAppData(), listVisitSummaries()]);
   return json(buildSupervisorDashboard(data, visits));
 };
 

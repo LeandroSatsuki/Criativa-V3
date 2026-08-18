@@ -13,13 +13,14 @@ const promoter = (
   phone: '(27) 99999-9999',
   registered: true,
   activeToday: true,
+  hasRouteToday: true,
   status: 'PENDENTE',
   online: false,
   progress: 50,
   store: 'Loja Centro',
   lastSync: '10:00',
   visits: { completed: 1, total: 2 },
-  todayVisits: { completed: 1, pending: 1, total: 2 },
+  todayVisits: { completed: 1, pending: 1, total: 2, recorded: 1, extra: 0, duplicates: 0 },
   pendingSyncVisits: 1,
   lastVisitId: 'VISIT-1',
   ...overrides,
@@ -28,7 +29,7 @@ const promoter = (
 test('card de concluidas lista promotores que contribuiram para o total', () => {
   const data = [
     promoter(),
-    promoter({ id: 'PROMOTOR-2', todayVisits: { completed: 0, pending: 1, total: 1 } }),
+    promoter({ id: 'PROMOTOR-2', todayVisits: { completed: 0, pending: 1, total: 1, recorded: 0, extra: 0, duplicates: 0 } }),
   ];
 
   assert.deepEqual(
@@ -49,7 +50,7 @@ test('card de cadastrados exclui usuario somente historico', () => {
 test('cards diarios usam somente contribuicoes de hoje', () => {
   const data = [
     promoter(),
-    promoter({ id: 'ANTIGO', activeToday: false, todayVisits: { completed: 0, pending: 0, total: 0 } }),
+    promoter({ id: 'ANTIGO', activeToday: false, hasRouteToday: false, todayVisits: { completed: 0, pending: 0, total: 0, recorded: 0, extra: 0, duplicates: 0 } }),
   ];
 
   assert.deepEqual(filterSupervisorPromoters(data, 'on_route').map((item) => item.id), ['PROMOTOR-1']);

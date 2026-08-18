@@ -30,7 +30,7 @@ export const filterSupervisorPromoters = (
       if (filter === 'active') return promoter.registered;
       if (filter === 'completed' || filter === 'duration') return promoter.todayVisits.completed > 0;
       if (filter === 'sync_pending') return promoter.pendingSyncVisits > 0;
-      if (filter === 'on_route') return promoter.activeToday;
+      if (filter === 'on_route') return promoter.hasRouteToday;
       if (filter === 'in_progress') return promoter.status === 'EM ANDAMENTO';
       if (filter === 'pending') return promoter.todayVisits.pending > 0;
       if (filter === 'offline') return promoter.registered && !promoter.online;

@@ -29,6 +29,9 @@ const EMPTY_SUMMARY = {
   totalVisits: 0,
   completedVisits: 0,
   pendingVisits: 0,
+  recordedVisits: 0,
+  extraVisits: 0,
+  duplicateVisits: 0,
   averageVisitTime: '--:--',
   lastUpdated: '',
 };
@@ -58,8 +61,8 @@ const FILTER_INFO: Record<SupervisorFilter, { title: string; description: string
     description: 'Pessoas com ao menos um envio ainda não confirmado, inclusive pendências de dias anteriores.',
   },
   on_route: {
-    title: 'Em Atividade Hoje',
-    description: 'Promotores com pelo menos uma visita registrada hoje. Este indicador não representa localização por GPS.',
+    title: 'Com Roteiro Hoje',
+    description: 'Promotores que possuem ao menos uma loja atribuída para o dia atual. Não representa localização por GPS.',
   },
   in_progress: {
     title: 'Envios em Processamento',
@@ -90,6 +93,7 @@ const SupervisorDashboard: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const lastDashboardLoad = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +104,7 @@ const SupervisorDashboard: React.FC = () => {
         if (cancelled) return;
         setDashboard(response);
         setError(null);
+        lastDashboardLoad.current = Date.now();
       } catch (fetchError: any) {
         if (cancelled) return;
         setDashboard(EMPTY_DASHBOARD);
@@ -110,11 +115,30 @@ const SupervisorDashboard: React.FC = () => {
     };
 
     void loadDashboard();
-    const refreshInterval = window.setInterval(() => void loadDashboard(), 60_000);
+    const refreshWhenVisible = () => {
+      if (
+        document.visibilityState !== 'hidden' &&
+        Date.now() - lastDashboardLoad.current >= 60_000
+      ) {
+        void loadDashboard();
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshWhenVisible();
+    };
+    const refreshInterval = window.setInterval(refreshWhenVisible, 5 * 60_000);
+    window.addEventListener('online', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
+    window.addEventListener('pageshow', refreshWhenVisible);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       cancelled = true;
       window.clearInterval(refreshInterval);
+      window.removeEventListener('online', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
+      window.removeEventListener('pageshow', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -221,7 +245,7 @@ const SupervisorDashboard: React.FC = () => {
               {promoterDetail && (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-white border border-slate-100 rounded-2xl p-4"><p className="text-[8px] font-black uppercase text-slate-400">Visitas hoje</p><p className="text-xl font-black">{promoterDetail.metrics.totalVisits}</p></div>
+                    <div className="bg-white border border-slate-100 rounded-2xl p-4"><p className="text-[8px] font-black uppercase text-slate-400">Roteiro hoje</p><p className="text-xl font-black">{promoterDetail.metrics.totalVisits}</p></div>
                     <div className="bg-white border border-slate-100 rounded-2xl p-4"><p className="text-[8px] font-black uppercase text-slate-400">Concluídas</p><p className="text-xl font-black text-emerald-600">{promoterDetail.metrics.completedVisits}</p></div>
                     <div className="bg-white border border-slate-100 rounded-2xl p-4"><p className="text-[8px] font-black uppercase text-slate-400">Pendentes</p><p className="text-xl font-black text-orange-600">{promoterDetail.metrics.pendingSyncVisits}</p></div>
                     <div className="bg-white border border-slate-100 rounded-2xl p-4"><p className="text-[8px] font-black uppercase text-slate-400">Tempo médio</p><p className="text-xl font-black">{promoterDetail.metrics.averageDuration}</p></div>
@@ -313,9 +337,9 @@ const SupervisorDashboard: React.FC = () => {
             <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
               <Route className="text-blue-600" size={16} />
             </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Em Atividade Hoje</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Com Roteiro Hoje</p>
           </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.activeTodayPromoters}</h4>
+          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.onRoutePromoters}</h4>
         </button>
 
         <button 
@@ -344,6 +368,7 @@ const SupervisorDashboard: React.FC = () => {
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Concluídas Hoje</p>
           </div>
           <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.completedVisits}</h4>
+          <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-1">de {dashboard.summary.totalVisits} previstas</p>
         </button>
 
         <button 
@@ -439,8 +464,15 @@ const SupervisorDashboard: React.FC = () => {
               </div>
               <div className="flex items-center gap-8">
                 <div className="text-right hidden md:block">
-                  <p className="text-[9px] font-black text-slate-400 uppercase">Visitas hoje</p>
+                  <p className="text-[9px] font-black text-slate-400 uppercase">Roteiro hoje</p>
                   <p className="text-sm font-black text-[#0F172A]">{promoter.todayVisits?.completed || 0} / {promoter.todayVisits?.total || 0}</p>
+                  {(promoter.todayVisits.extra > 0 || promoter.todayVisits.duplicates > 0) && (
+                    <p className="text-[8px] font-bold text-orange-500 uppercase mt-1">
+                      {promoter.todayVisits.extra > 0 ? `${promoter.todayVisits.extra} extra` : ''}
+                      {promoter.todayVisits.extra > 0 && promoter.todayVisits.duplicates > 0 ? ' • ' : ''}
+                      {promoter.todayVisits.duplicates > 0 ? `${promoter.todayVisits.duplicates} duplicada(s)` : ''}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black text-[#0F172A]">{promoter.progress}%</p>
@@ -469,7 +501,7 @@ const SupervisorDashboard: React.FC = () => {
                   labelStyle={{ fontWeight: 'bold', color: '#0F172A' }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', paddingTop: '20px' }} />
-                <Line type="monotone" dataKey="totalVisits" name="Total" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="totalVisits" name="Registros" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="completedVisits" name="Concluídas" stroke="#10B981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="pendingSyncVisits" name="Pendências" stroke="#F59E0B" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
@@ -477,7 +509,7 @@ const SupervisorDashboard: React.FC = () => {
           </div>
           <div className="mt-6 pt-6 border-t border-slate-50 space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Total de Visitas</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Lojas Previstas</span>
               <span className="text-[10px] font-black text-blue-600">{dashboard.summary.totalVisits}</span>
             </div>
             <div className="flex justify-between items-center">
@@ -485,9 +517,15 @@ const SupervisorDashboard: React.FC = () => {
               <span className="text-[10px] font-black text-emerald-600">{dashboard.summary.completedVisits}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Pendências</span>
-              <span className="text-[10px] font-black text-orange-500">{dashboard.summary.pendingSyncVisits}</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Pendentes de Rota</span>
+              <span className="text-[10px] font-black text-orange-500">{dashboard.summary.pendingVisits}</span>
             </div>
+            {(dashboard.summary.extraVisits > 0 || dashboard.summary.duplicateVisits > 0) && (
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Extras / Duplicadas</span>
+                <span className="text-[10px] font-black text-orange-500">{dashboard.summary.extraVisits} / {dashboard.summary.duplicateVisits}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

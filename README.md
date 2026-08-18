@@ -114,7 +114,7 @@ npm test
 npm run build
 ```
 
-Os testes cobrem o contrato de sincronização, isolamento da fila por usuário, cache de configuração, regras do supervisor, payload das visitas e compressão de imagens.
+Os testes cobrem o contrato de sincronização, isolamento da fila por usuário, cache de configuração, regras de roteiro e indicadores do supervisor, índice resumido de visitas, payload das visitas e compressão de imagens.
 
 ## Segurança e privacidade
 

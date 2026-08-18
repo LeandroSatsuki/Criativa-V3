@@ -1,5 +1,59 @@
 # CHANGELOG
 
+## [2026-08-17] - Painel supervisor por roteiro e indice leve
+
+### Alterado
+- A meta diaria do promotor passa a usar as lojas previstas para o dia da
+  semana, em vez de usar como denominador apenas as visitas registradas.
+- Conclusao considera lojas distintas do roteiro com checkout e sincronizacao
+  confirmada; visitas repetidas e fora do roteiro sao exibidas separadamente.
+- O card `Em Atividade Hoje` passa a se chamar `Com Roteiro Hoje` e os detalhes
+  exibem a relacao concluido/previsto, como `2 / 4`.
+- A atualizacao automatica do painel ocorre a cada cinco minutos quando a tela
+  esta visivel, com atualizacao adicional ao recuperar rede ou foco.
+
+### Adicionado
+- Store `criativa-visit-summaries` com indice sem imagens para consultas do
+  supervisor.
+- Migracao aditiva e limitada em lotes para visitas antigas ainda sem resumo.
+- Contadores de visitas registradas, extras e repetidas no contrato do painel.
+- Perfis de rota sinalizados para atribuicoes que referenciam um promotor ainda
+  ausente do cadastro, evitando esconder lojas pendentes.
+
+### Corrigido
+- Indicadores que sempre aparentavam 100%, como `1 / 1`, mesmo quando o
+  promotor possuia outras lojas previstas no dia.
+- Carregamento do painel que lia todas as fotos em base64 das visitas completas.
+- Filtro de promotores em rota, que antes dependia de ja existir atividade.
+
+### Seguranca
+- O indice do supervisor nao armazena fotos, senhas, token de sessao nem a
+  resposta completa das integracoes.
+- As rotas do supervisor continuam exigindo sessao valida com papel
+  `SUPERVISOR`.
+- A visita completa e persistida antes do resumo; uma falha no indice nao causa
+  perda do registro operacional.
+
+### Validacao
+- `npm run test`: 79 testes aprovados.
+- `npm run lint`: concluido sem erros.
+- `netlify build`: build Vite e 16 Functions empacotados com sucesso.
+- Testes adicionados para meta `2 / 4`, lojas extras, repeticoes, atribuicao a
+  ID sem cadastro, ausencia de base64 no resumo e migracao com lote maximo de
+  quatro registros.
+- Preview `6a83b4c2d803dcb25774ce32` validado com pagina, healthcheck e
+  configuracao em HTTP `200`; painel sem sessao rejeitado em HTTP `401`.
+- Producao `6a83b51c9a578d99ff25e802` validada no dominio principal com pagina,
+  healthcheck e configuracao em HTTP `200`; painel sem sessao rejeitado em
+  HTTP `401` e integracao Make reportada como ativa.
+
+### Pendencias
+- Validar em producao o primeiro carregamento autenticado do painel e confirmar
+  a indexacao integral do historico. Essa validacao aguarda um supervisor real
+  para nao substituir a sessao ativa de nenhum usuario.
+- O status ativo/inativo do cadastro de promotores sera tratado na proxima
+  etapa, pois exige definir e importar uma coluna operacional sem excluir dados.
+
 ## [2026-08-17] - Estabilidade de sessao e retomada de rede
 
 ### Alterado

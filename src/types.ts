@@ -77,6 +77,7 @@ export interface SupervisorPromoterOverview {
   phone: string;
   registered: boolean;
   activeToday: boolean;
+  hasRouteToday: boolean;
   status: 'CONCLUÍDO' | 'EM ANDAMENTO' | 'PENDENTE' | 'SEM ATIVIDADE';
   online: boolean;
   progress: number;
@@ -90,6 +91,9 @@ export interface SupervisorPromoterOverview {
     completed: number;
     pending: number;
     total: number;
+    recorded: number;
+    extra: number;
+    duplicates: number;
   };
   pendingSyncVisits: number;
   lastVisitId: string | null;
@@ -109,6 +113,9 @@ export interface SupervisorDashboardSummary {
   totalVisits: number;
   completedVisits: number;
   pendingVisits: number;
+  recordedVisits: number;
+  extraVisits: number;
+  duplicateVisits: number;
   averageVisitTime: string;
   lastUpdated: string;
 }

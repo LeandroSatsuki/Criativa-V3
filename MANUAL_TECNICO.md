@@ -272,10 +272,20 @@ Opcional para migração futura:
 ## 9. Acesso supervisor
 
 Os cards do painel filtram localmente somente o conjunto autorizado retornado
-por `GET /api/supervisor/dashboard`. Concluidas, pendentes, atividade, curva e
-tempo medio usam o dia corrente em `America/Sao_Paulo`. Pendencias de sync nao
-sao limitadas ao dia para preservar alertas antigos. Busca e filtro podem ser
-combinados, sem gerar novas consultas ou ampliar permissoes.
+por `GET /api/supervisor/dashboard`. A meta diaria vem das lojas previstas para
+o promotor nas colunas de roteiro, considerando o dia corrente em
+`America/Sao_Paulo`. Concluidas contam lojas distintas previstas com checkout e
+status `enviado`; pendentes sao a diferenca para a meta. Visitas fora do roteiro
+e repeticoes sao contabilizadas separadamente e nao inflam a conclusao.
+Pendencias de sync nao sao limitadas ao dia para preservar alertas antigos.
+Busca e filtro podem ser combinados, sem gerar novas consultas ou ampliar
+permissoes.
+
+O dashboard le o store `criativa-visit-summaries`, que contem somente os campos
+escalares necessarios ao painel e nunca contem as imagens em base64. A gravacao
+de uma visita atualiza o registro completo primeiro e o resumo depois. Registros
+anteriores sao indexados de forma aditiva, em lotes pequenos, no primeiro acesso
+do supervisor; os blobs completos permanecem inalterados como fonte oficial.
 
 `Em Atividade Hoje` significa ao menos uma visita persistida no backend no dia;
 nao e geolocalizacao. Operacoes totalmente offline so aparecem para o supervisor

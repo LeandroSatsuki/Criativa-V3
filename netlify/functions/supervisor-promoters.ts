@@ -1,10 +1,11 @@
 import type { Config, Context } from '@netlify/functions';
 import { authenticate } from './_shared/auth';
 import { json } from './_shared/json';
-import { listVisits } from './_shared/visits';
+import { listVisitSummaries } from './_shared/visits';
 import { buildSupervisorPromoterDetail } from './_shared/supervisor';
 import { getSupervisorAccessError } from './_shared/supervisor-access';
 import { getAppData } from './_shared/data';
+import { getStoresForUser } from './_shared/store-routes';
 
 export default async (request: Request, context: Context) => {
   if (request.method !== 'GET') {
@@ -22,7 +23,7 @@ export default async (request: Request, context: Context) => {
     return json({ error: 'ID do promotor é obrigatório' }, 400);
   }
 
-  const [visits, data] = await Promise.all([listVisits(), getAppData()]);
+  const [visits, data] = await Promise.all([listVisitSummaries(), getAppData()]);
   const promoter = data.promoters.find((item) => item.id === promoterId);
   const identities = new Set(
     [promoterId, promoter?.user]
@@ -33,10 +34,13 @@ export default async (request: Request, context: Context) => {
     identities.has(String(visit.payload?.user?.id || '').toLowerCase().trim()) ||
     identities.has(String(visit.payload?.user?.user || '').toLowerCase().trim())
   ));
+  const plannedStores = promoter
+    ? getStoresForUser(data, { ...promoter, role: 'FIELD_OPS' })
+    : [];
 
   return json(buildSupervisorPromoterDetail(promoterVisits, promoter
     ? { ...promoter, registered: true }
-    : { id: promoterId, registered: false }));
+    : { id: promoterId, registered: false }, new Date(), plannedStores));
 };
 
 export const config: Config = {

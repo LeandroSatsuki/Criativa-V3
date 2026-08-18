@@ -6,6 +6,11 @@ import {
   formatFileDate,
   parseBrasiliaDate,
 } from './time';
+import {
+  buildVisitSummary,
+  completeVisitSummaryIndex,
+  type VisitSummary,
+} from './visit-summary';
 
 export type VisitRecord = {
   visitId: string;
@@ -22,8 +27,11 @@ export type VisitRecord = {
 };
 
 const visitStore = getJsonStore('criativa-visits');
+const visitSummaryStore = getJsonStore('criativa-visit-summaries');
 
 const keyFor = (visitId: string) => `visits/${visitId}`;
+const summaryKeyFor = (visitId: string) => `visits/${visitId}`;
+const SUMMARY_MIGRATION_BATCH_SIZE = 4;
 
 export const generateVisitId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -38,6 +46,15 @@ export const getVisit = async (visitId: string) => {
 
 export const saveVisit = async (record: VisitRecord) => {
   await visitStore.set(keyFor(record.visitId), record);
+  try {
+    await visitSummaryStore.set(summaryKeyFor(record.visitId), buildVisitSummary(record));
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'visit_summary_write_failed',
+      visitId: record.visitId,
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+    }));
+  }
   return record;
 };
 
@@ -94,6 +111,44 @@ export const listVisits = async () => {
     keys.map(async (key) => visitStore.get<VisitRecord>(key)),
   );
   return visits.filter(Boolean) as VisitRecord[];
+};
+
+export const listVisitSummaries = async () => {
+  const [visitKeys, summaryKeys] = await Promise.all([
+    visitStore.list('visits/'),
+    visitSummaryStore.list('visits/'),
+  ]);
+  const visitKeySet = new Set(visitKeys);
+  const validSummaryKeys = summaryKeys.filter((key) => visitKeySet.has(key));
+  const summaries = (await Promise.all(
+    validSummaryKeys.map((key) => visitSummaryStore.get<VisitSummary>(key)),
+  )).filter(Boolean) as VisitSummary[];
+  const missingCount = visitKeys.length - summaries.length;
+  if (missingCount > 0) {
+    console.info(JSON.stringify({
+      event: 'visit_summary_migration_started',
+      totalVisits: visitKeys.length,
+      existingSummaries: summaries.length,
+      missingSummaries: missingCount,
+    }));
+  }
+
+  const completedSummaries = await completeVisitSummaryIndex(
+    visitKeys,
+    summaries,
+    (key) => visitStore.get<VisitRecord>(key),
+    (summary) => visitSummaryStore.set(summaryKeyFor(summary.visitId), summary),
+    SUMMARY_MIGRATION_BATCH_SIZE,
+  );
+
+  if (missingCount > 0) {
+    console.info(JSON.stringify({
+      event: 'visit_summary_migration_completed',
+      totalSummaries: completedSummaries.length,
+    }));
+  }
+
+  return completedSummaries;
 };
 
 export const buildTransformedPayload = (payload: any) => {
