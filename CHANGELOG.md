@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## [2026-08-17] - Observabilidade operacional protegida
+
+### Alterado
+- Falhas de sincronizacao passam a gerar logs estruturados com categoria,
+  visita, modo e progresso, sem registrar fotos, payload ou webhook.
+
+### Adicionado
+- Endpoint supervisor `GET /api/supervisor/operations-health` com integridade
+  cadastral, estados de sincronizacao, envios parados e pendencias recentes.
+- Sanitizacao de URLs nas mensagens do diagnostico.
+- Testes do resumo operacional e da classificacao de risco.
+- Auditoria das ultimas 24 horas em `AUDITORIA_LOGS_2026-08-17.md`.
+
+### Corrigido
+- Lacuna de observabilidade que fazia falhas salvas na visita nao aparecerem nos
+  logs operacionais do Netlify.
+- Checklist antigo do cadastro ID `121`, agora concluido.
+
+### Seguranca
+- Endpoint exige papel `SUPERVISOR` e nao retorna senha, foto, payload completo
+  ou URL de integracao.
+- Logs nao incluem resposta do Make nem dados base64.
+
+### Validacao
+- `npm.cmd run test`: 90 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: frontend e 17 Functions empacotados com sucesso;
+  permanece apenas o aviso conhecido de chunk principal acima de 500 kB.
+- Preview `6a83c925244b36c759bbf2a6` validado com pagina e healthcheck em
+  HTTP `200`, endpoint sem sessao em `401` e promotor em `403`.
+- Producao `6a83c985c21068efcc302a80` validada com os mesmos resultados;
+  Google Sheets e Make v2 reportados como ativos.
+- Logs das ultimas 24 horas auditados e nenhuma falha `error` ou `fatal`
+  encontrada nos dez minutos posteriores ao deploy.
+
+### Pendencias
+- Validar o primeiro acesso autenticado ao diagnostico com um supervisor real,
+  sem substituir a sessao ativa de nenhum usuario durante a implantacao.
+
 ## [2026-08-17] - Cadastro ID 121 e integridade da fonte de lojas
 
 ### Alterado

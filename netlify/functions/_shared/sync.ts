@@ -20,6 +20,12 @@ export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> =
     : 'BACKEND_MAKE_WEBHOOK_URL';
   const webhookUrl = getEnv(webhookVariable);
   if (!webhookUrl) {
+    console.error(JSON.stringify({
+      event: 'visit_sync_failed',
+      visitId: visit.visitId,
+      mode: syncMode,
+      reason: 'webhook_not_configured',
+    }));
     const errored = await saveVisit({
       ...visit,
       syncStatus: 'erro',
@@ -60,6 +66,13 @@ export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> =
       makeResponses.push({ status: response.status, ok: response.ok, body: responseBody });
 
       if (!response.ok) {
+        console.error(JSON.stringify({
+          event: 'visit_sync_failed',
+          visitId: sending.visitId,
+          mode: syncMode,
+          reason: 'make_http_error',
+          httpStatus: response.status,
+        }));
         const syncError = `Make retornou HTTP ${response.status}: ${responseBody || response.statusText}`;
         const errored = await saveVisit({
           ...sending,
@@ -95,6 +108,13 @@ export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> =
       syncError: sent.syncError || null,
     };
   } catch (error: any) {
+    console.error(JSON.stringify({
+      event: 'visit_sync_failed',
+      visitId: sending.visitId,
+      mode: syncMode,
+      reason: error?.name === 'AbortError' ? 'timeout' : 'request_failed',
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+    }));
     const errored = await saveVisit({
       ...sending,
       syncStatus: 'erro',

@@ -2,6 +2,15 @@
 
 Data da ultima auditoria: 2026-08-17
 
+## Producao - Observabilidade operacional
+
+- [x] Diagnostico restrito ao supervisor definido sem fotos ou payloads.
+- [x] Integridade de lojas, promotores e atribuicoes incluida.
+- [x] Estados de sincronizacao total e diario incluidos.
+- [x] Envios parados por mais de 30 minutos identificados.
+- [x] URLs removidas das mensagens exibidas no diagnostico.
+- [x] Falhas de Make registradas em log estruturado sem webhook.
+
 ## Producao - Cadastro ID 121 e protecao contra filtros
 
 - [x] Vanessa Batista Maciel cadastrada como `FIELD_OPS` ativa no ID `121`.
@@ -24,7 +33,7 @@ Data da ultima auditoria: 2026-08-17
 - [x] Leitura posterior e comparacao integral sem diferencas inesperadas.
 - [x] Testes, lint, build e smoke test de producao aprovados.
 - [x] CHANGELOG e auditoria tecnica atualizados.
-- [ ] Cadastrar a pessoa correta para o ID `121`.
+- [x] Cadastrar a pessoa correta para o ID `121`.
 - [ ] Definir os dias de atendimento das sete lojas sem agenda.
 
 ## Homologacao - Pastas por PDV e devolucoes

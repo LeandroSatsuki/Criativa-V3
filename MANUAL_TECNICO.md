@@ -429,6 +429,15 @@ visualizacao de filtro particular. O backend tambem rejeita snapshots abaixo de
 
 A auditoria mais recente esta em `AUDITORIA_CADASTRAL_2026-08-17.md`.
 
+O diagnostico operacional protegido esta disponivel em
+`GET /api/supervisor/operations-health`. Ele exige sessao de supervisor e
+retorna contagens cadastrais, estados de sincronizacao e ate 20 pendencias
+recentes. O retorno nao inclui fotos, payload completo, senha ou URL de webhook.
+
+Nos logs Netlify, falhas de envio usam o evento estruturado
+`visit_sync_failed`, com ID da visita, modo, categoria da falha e progresso de
+fotos quando aplicavel.
+
 ## 11. Observações de manutenção
 
 - O build pode emitir warning de chunk grande, mas isso não impede a operação.

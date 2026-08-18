@@ -137,6 +137,15 @@ export const syncVisitRecordV2 = async (visit: VisitRecord, webhookUrl: string):
     const message = error?.name === 'AbortError'
       ? 'Tempo esgotado aguardando a confirmação do Make/Google Drive.'
       : error?.message || 'Falha na sincronização v2.';
+    console.error(JSON.stringify({
+      event: 'visit_sync_failed',
+      visitId: current.visitId,
+      mode: 'visit-v2',
+      reason: error?.name === 'AbortError' ? 'timeout' : 'make_event_failed',
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+      sentPhotos: Object.keys(manifest.photos).length,
+      totalPhotos: events.length,
+    }));
     const errored = await saveVisit({
       ...current,
       syncStatus: 'erro',
