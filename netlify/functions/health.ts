@@ -2,6 +2,7 @@ import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { getEnv } from './_shared/env';
 import { getProvisionalSupervisorDiagnostics } from './_shared/data';
+import { resolveMinimumStoreCount } from './_shared/config-integrity';
 
 export default async (_request: Request, _context: Context) => {
   return json({
@@ -10,6 +11,7 @@ export default async (_request: Request, _context: Context) => {
     timestamp: new Date().toISOString(),
     integrations: {
       googleSheets: Boolean(getEnv('BACKEND_GOOGLE_SHEETS_ID')),
+      minimumStoreCount: resolveMinimumStoreCount(getEnv('BACKEND_MIN_STORE_COUNT')),
       make: Boolean(getEnv('BACKEND_MAKE_WEBHOOK_URL')),
       makeV2: Boolean(getEnv('BACKEND_MAKE_WEBHOOK_V2_URL')),
       makeSyncMode: (getEnv('BACKEND_MAKE_SYNC_MODE') || 'legacy').trim().toLowerCase(),

@@ -2,6 +2,17 @@
 
 Data da ultima auditoria: 2026-08-17
 
+## Producao - Cadastro ID 121 e protecao contra filtros
+
+- [x] Vanessa Batista Maciel cadastrada como `FIELD_OPS` ativa no ID `121`.
+- [x] ID, usuario e telefone validados como unicos antes da escrita.
+- [x] Oito lojas vinculadas ao ID `121` preservadas.
+- [x] Loja sem agenda mantida fora da rota conforme decisao do cliente.
+- [x] Filtro global que reduzia a leitura de 154 para 5 lojas removido.
+- [x] Leitura GViz restaurada para 154 lojas.
+- [x] Backend passou a rejeitar snapshots abaixo do limite operacional.
+- [x] Login e roteiro real de segunda-feira validados em producao.
+
 ## Producao - Reconciliacao cadastral de rotas
 
 - [x] Abas `PROMOTORES` e `CADASTRO_LOJAS` relidas antes da alteracao.

@@ -46,6 +46,11 @@ Nao foi feita associacao com outra pessoa de nome semelhante. Para resolver, o
 cliente deve confirmar o cadastro correto, incluindo ID, usuario, credencial,
 regional, papel e status.
 
+Atualizacao: o cliente confirmou o cadastro ativo em 17/08/2026. Vanessa foi
+incluida como `FIELD_OPS`, ID `121`, com usuario proprio, regional Vitoria e o
+telefone ja comprovado pela fonte original. Os dias existentes foram
+preservados e a loja sem agenda permaneceu sem marcacao.
+
 ### Lojas sem dia definido
 
 Sete lojas atribuidas nao possuem `X` de segunda a sabado:

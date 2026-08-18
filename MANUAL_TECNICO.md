@@ -422,6 +422,11 @@ Mudancas na planilha passam a ser percebidas pelo backend em ate dois minutos,
 sem novo deploy. A sessao deve ser refeita apenas quando `ROLE` ou `STATUS` do
 proprio usuario mudar.
 
+Nao aplique filtro comum diretamente em `CADASTRO_LOJAS`: o endpoint GViz do
+Google pode retornar somente as linhas visiveis. Para analise, use uma
+visualizacao de filtro particular. O backend tambem rejeita snapshots abaixo de
+`BACKEND_MIN_STORE_COUNT` (padrao `100`) e preserva o ultimo cache integro.
+
 A auditoria mais recente esta em `AUDITORIA_CADASTRAL_2026-08-17.md`.
 
 ## 11. Observações de manutenção

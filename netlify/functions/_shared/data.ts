@@ -15,6 +15,7 @@ import {
   type SheetTable,
 } from './promoter-sheet';
 import { parseRoutePromoterIds } from './store-routes';
+import { hasMinimumStoreCoverage } from './config-integrity';
 export { getStoresForUser } from './store-routes';
 
 export type AppData = {
@@ -165,14 +166,20 @@ const isCompleteConfig = (data: AppData | null | undefined) =>
     data?.schemaVersion === CONFIG_SCHEMA_VERSION &&
     data.industries?.length &&
     data.promoters?.length &&
-    data.stores?.length,
+    data.stores?.length &&
+    hasMinimumStoreCoverage(data.stores.length, getEnv('BACKEND_MIN_STORE_COUNT')),
   );
 
 const isReusableConfig = (data: AppData | null | undefined) =>
   isCompleteConfig(data) && isConfigCacheFresh(data?.cachedAt);
 
 const hasOperationalData = (data: AppData | null | undefined) =>
-  Boolean(data?.industries?.length && data.promoters?.length && data.stores?.length);
+  Boolean(
+    data?.industries?.length &&
+    data.promoters?.length &&
+    data.stores?.length &&
+    hasMinimumStoreCoverage(data.stores.length, getEnv('BACKEND_MIN_STORE_COUNT')),
+  );
 
 const parseSheet = (text: string) => {
   const jsonStart = text.indexOf('{');

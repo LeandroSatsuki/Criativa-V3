@@ -151,6 +151,7 @@ A aplicação está publicada e o fluxo de campo e supervisão foi validado no a
 
 - `APP_SESSION_SECRET`
 - `BACKEND_GOOGLE_SHEETS_ID`
+- `BACKEND_MIN_STORE_COUNT` (padrao `100`; rejeita leituras de lojas truncadas)
 - `BACKEND_MAKE_WEBHOOK_URL`
 - `BACKEND_MAKE_WEBHOOK_V2_URL`
 - `BACKEND_MAKE_SYNC_MODE`

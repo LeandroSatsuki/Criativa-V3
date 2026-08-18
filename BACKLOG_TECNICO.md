@@ -2,11 +2,11 @@
 
 Data da auditoria: 2026-06-27
 
-## Pendencias cadastrais atuais - 2026-08-17
+## Situacao cadastral atual - 2026-08-17
 
-- Cadastrar corretamente Vanessa Batista Maciel, referenciada pelo ID `121` em
-  oito lojas, somente depois de o cliente confirmar usuario, credencial,
-  regional, papel e status.
+- Vanessa Batista Maciel cadastrada como ativa no ID `121`, com acesso proprio
+  e oito lojas vinculadas; uma delas permanece sem agenda por decisao do
+  cliente.
 - Definir os dias de atendimento de sete lojas atribuidas que ainda nao possuem
   marcacao de segunda a sabado.
 - Preencher telefone dos cadastros sem fonte inequivoca; nao inferir telefone

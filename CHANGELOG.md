@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## [2026-08-17] - Cadastro ID 121 e integridade da fonte de lojas
+
+### Alterado
+- Vanessa Batista Maciel foi cadastrada como promotora ativa `FIELD_OPS`, ID
+  `121`, com usuario exclusivo, regional Vitoria e telefone validado na fonte.
+- As oito lojas ja vinculadas ao ID foram preservadas; a loja sem agenda
+  continua fora da rota conforme decisao do cliente.
+
+### Adicionado
+- Limite operacional `BACKEND_MIN_STORE_COUNT`, com padrao `100`, para rejeitar
+  snapshots anormalmente pequenos da base de 154 lojas.
+- Testes unitarios da protecao de integridade cadastral.
+
+### Corrigido
+- Filtro comum em `CADASTRO_LOJAS` que ocultava 27 responsaveis e fazia o GViz
+  entregar apenas 5 das 154 lojas ao backend.
+- Roteiro de Vanessa validado com quatro lojas previstas na segunda-feira.
+
+### Seguranca
+- ID e usuario foram verificados como unicos antes da criacao.
+- A senha provisoria nao foi adicionada ao codigo, documentacao ou historico
+  Git; permanece somente na fonte operacional protegida.
+- Snapshots incompletos deixam de substituir o ultimo cache cadastral integro.
+
+### Validacao
+- `npm.cmd run test`: 88 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npx.cmd netlify build`: frontend e 16 Functions empacotados com sucesso;
+  permanece apenas o aviso conhecido de chunk principal acima de 500 kB.
+- Leitura GViz confirmada com 154 lojas e oito vinculos ao ID `121`.
+- Login real da Vanessa e rota de segunda-feira validados com quatro lojas; a
+  loja sem agenda permaneceu fora do resultado.
+- Preview `6a83c1a441e937c9f7f8591b` validado com pagina, healthcheck,
+  limite operacional, login e rota em HTTP `200`.
+- Producao `6a83c24660509ce8243ce193` validada no dominio principal com os
+  mesmos resultados; Google Sheets e Make v2 reportados como ativos.
+
+### Pendencias
+- Seis lojas de outros promotores e uma loja de Vanessa permanecem sem agenda,
+  conforme a fonte original e a decisao operacional atual.
+
 ## [2026-08-17] - Reconciliacao cadastral de rotas e telefones
 
 ### Alterado
