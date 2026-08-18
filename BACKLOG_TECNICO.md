@@ -2,6 +2,18 @@
 
 Data da auditoria: 2026-06-27
 
+## Pendencias cadastrais atuais - 2026-08-17
+
+- Cadastrar corretamente Vanessa Batista Maciel, referenciada pelo ID `121` em
+  oito lojas, somente depois de o cliente confirmar usuario, credencial,
+  regional, papel e status.
+- Definir os dias de atendimento de sete lojas atribuidas que ainda nao possuem
+  marcacao de segunda a sabado.
+- Preencher telefone dos cadastros sem fonte inequivoca; nao inferir telefone
+  por nome ou por proximidade de rota.
+- O resultado e os numeros de linha estao em
+  `AUDITORIA_CADASTRAL_2026-08-17.md`.
+
 ## Bloqueador atual - Migracao de lojas e roteiro
 
 - Reautorizar a conexao Google Drive/Sheets com escopo de edicao; leituras

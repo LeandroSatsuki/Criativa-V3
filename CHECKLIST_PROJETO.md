@@ -1,6 +1,20 @@
 # Checklist do Projeto - Criativa Field Ops
 
-Data da ultima auditoria: 2026-08-14
+Data da ultima auditoria: 2026-08-17
+
+## Producao - Reconciliacao cadastral de rotas
+
+- [x] Abas `PROMOTORES` e `CADASTRO_LOJAS` relidas antes da alteracao.
+- [x] IDs e nomes comparados com normalizacao deterministica.
+- [x] Telefones propagados somente quando havia uma unica fonte consistente.
+- [x] Sete IDs de rota faltantes preenchidos por correspondencia exata.
+- [x] Oito grafias de responsavel alinhadas ao cadastro autoritativo.
+- [x] Credenciais, papeis, status, dias, visitas e fotos preservados.
+- [x] Leitura posterior e comparacao integral sem diferencas inesperadas.
+- [x] Testes, lint, build e smoke test de producao aprovados.
+- [x] CHANGELOG e auditoria tecnica atualizados.
+- [ ] Cadastrar a pessoa correta para o ID `121`.
+- [ ] Definir os dias de atendimento das sete lojas sem agenda.
 
 ## Homologacao - Pastas por PDV e devolucoes
 

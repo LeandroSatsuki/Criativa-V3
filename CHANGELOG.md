@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## [2026-08-17] - Reconciliacao cadastral de rotas e telefones
+
+### Alterado
+- Telefones de 26 promotores foram preenchidos a partir de dados consistentes
+  das lojas ja atribuidas aos respectivos IDs.
+- Sete lojas com responsavel inequivoco receberam o `ROTA_PROMOTOR_ID`
+  faltante.
+- Oito nomes de responsaveis foram alinhados a grafia exata do cadastro.
+
+### Adicionado
+- Auditoria reproduzivel em `AUDITORIA_CADASTRAL_2026-08-17.md`.
+- Procedimento de manutencao segura do cadastro no manual tecnico.
+
+### Corrigido
+- Rotas de Giovana Silveira Pessoa e Alex Rosa da Silva que estavam cadastradas
+  por nome, mas sem o ID necessario para a associacao operacional.
+- Divergencias de grafia em rotas que ja possuiam ID valido.
+
+### Seguranca
+- Nenhuma credencial, papel, status, visita, foto ou dia de roteiro foi alterado.
+- Telefones so foram propagados quando havia uma unica fonte consistente para o
+  mesmo promotor; correspondencias aproximadas foram recusadas.
+
+### Validacao
+- 31 promotores e 154 lojas relidos da planilha oficial apos a escrita.
+- Comparacao integral confirmou exatamente 26 alteracoes em `TELEFONE`, 8 em
+  `RESPONSAVEL` e 7 em `ROTA_PROMOTOR_ID`, sem diferencas inesperadas.
+- Zero nome divergente para IDs cadastrados e zero ID vazio quando havia
+  correspondencia unica com o cadastro.
+- `npm.cmd run test`: 85 testes aprovados.
+- `npm.cmd run lint`: concluido sem erros.
+- `npm.cmd run build`: build de producao concluido; permanece somente o aviso
+  conhecido de chunk principal acima de 500 kB.
+- Producao validada com pagina, healthcheck e configuracao em HTTP `200`;
+  Google Sheets e Make v2 reportados como ativos.
+- Nenhum deploy Netlify foi necessario, pois nao houve alteracao de runtime e a
+  fonte Google Sheets e recarregada automaticamente pelo backend.
+
+### Pendencias
+- O ID `121`, presente em oito lojas de Vanessa Batista Maciel, ainda nao
+  possui cadastro correspondente em `PROMOTORES`.
+- Sete lojas atribuidas permanecem sem dia de atendimento; nenhuma agenda foi
+  inferida.
+
 ## [2026-08-17] - Status cadastral e roteiro compartilhado
 
 ### Alterado

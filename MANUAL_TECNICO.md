@@ -404,7 +404,27 @@ provisorio-leandro-pinheiro|Leandro Pinheiro|leandro.pinheiro|hash_sha256_da_sen
 
 O campo `storeResponsible` e opcional, mas recomendado para testes. Ele permite que um usuario provisorio veja uma rota real sem assumir o nome ou ID de um promotor cadastrado.
 
-## 10. Observações de manutenção
+## 10. Manutencao do cadastro e das rotas
+
+`ID_PROMOTOR` e a chave autoritativa para relacionar `PROMOTORES` e
+`CADASTRO_LOJAS`. O nome e apenas uma informacao de exibicao e apoio de
+auditoria. Ao corrigir dados em producao:
+
+1. leia as duas abas completas antes de escrever;
+2. associe por ID ou por nome normalizado com correspondencia unica e exata;
+3. nunca associe pessoas apenas por nome parecido;
+4. so copie telefone quando todas as lojas associadas indicarem o mesmo numero;
+5. nao deduza dias de roteiro, papel, status ou credencial;
+6. releia a planilha e compare todas as colunas depois da escrita;
+7. registre as celulas alteradas e as pendencias no `CHANGELOG.md`.
+
+Mudancas na planilha passam a ser percebidas pelo backend em ate dois minutos,
+sem novo deploy. A sessao deve ser refeita apenas quando `ROLE` ou `STATUS` do
+proprio usuario mudar.
+
+A auditoria mais recente esta em `AUDITORIA_CADASTRAL_2026-08-17.md`.
+
+## 11. Observações de manutenção
 
 - O build pode emitir warning de chunk grande, mas isso não impede a operação.
 - O `localStorage` continua sendo importante para continuidade offline, mas não deve ser a única fonte de verdade.
