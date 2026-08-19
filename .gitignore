@@ -9,3 +9,6 @@ coverage/
 
 # Local Netlify folder
 .netlify
+
+# Artefatos locais de homologacao e snapshots de deploy
+.tmp-*
