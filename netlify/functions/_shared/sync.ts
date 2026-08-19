@@ -2,6 +2,7 @@ import { getEnv } from './env';
 import { buildTransformedPayloads, saveVisit, type VisitRecord } from './visits';
 import { getBrasiliaISO } from './time';
 import { syncVisitRecordV2 } from './make-sync-v2';
+import { syncVisitRecordGoogle } from './google-sync.ts';
 
 export type SyncResult = {
   visitId: string;
@@ -14,6 +15,8 @@ export type SyncResult = {
 };
 
 export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> => {
+  const provider = (getEnv('BACKEND_SYNC_PROVIDER') || 'make').trim().toLowerCase();
+  if (provider === 'google-v1') return syncVisitRecordGoogle(visit);
   const syncMode = (getEnv('BACKEND_MAKE_SYNC_MODE') || 'legacy').trim().toLowerCase();
   const webhookVariable = syncMode === 'visit-v2'
     ? 'BACKEND_MAKE_WEBHOOK_V2_URL'
