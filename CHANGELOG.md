@@ -1,5 +1,90 @@
 # CHANGELOG
 
+## [2026-08-25] - Recuperacao manual de lotes Google
+
+### Causa
+- Lotes que atingiam cinco falhas no Cloud Tasks ficavam em `dead_letter` e o
+  retry existente apenas consultava novamente o mesmo job terminal.
+- O botao `Atualizar status` nao oferecia uma acao de recuperacao ao promotor,
+  embora a visita permanecesse preservada na fila local e no backend.
+
+### Solucao aplicada
+- Foi implementado localmente o modo autenticado de recuperacao de
+  `dead_letter`, criando uma nova geracao da tarefa e preservando os IDs das
+  fotos para reutilizar a deduplicacao do Drive.
+- A tela de envios passa a oferecer `Tentar novamente` apenas para esse erro,
+  com limite de duas tentativas manuais por lote e intervalo de 60 segundos.
+- Depois do limite, o aplicativo sinaliza `Necessita suporte` e nao cria loops
+  automaticos. A recuperacao foi publicada em producao.
+- Os logs mostraram `504` no limite de aproximadamente 300 segundos. O tamanho
+  padrao foi reduzido de 20 para 10 fotos por lote na homologacao, preservando
+  margem para variacoes de latencia do Google Drive.
+- A homologacao confirmou lote de cinco fotos em 32 segundos. A producao foi
+  configurada com lote 5 para manter margem do limite de 300 segundos.
+- O aviso de fila pendente passou a permitir `Continuar trabalhando` sem
+  remover os registros, e as duas opcoes de limpar a fila foram eliminadas.
+
+### Checklist
+- [x] Preservar o fluxo normal e o polling automatico existentes.
+- [x] Exigir sessao e permissao de acesso a visita no endpoint de retry.
+- [x] Limitar e espaçar as recuperacoes manuais por lote.
+- [x] Manter IDs de foto estaveis para impedir duplicidade no Drive.
+- [x] Adicionar testes unitarios, TypeScript e build.
+- [x] Identificar o timeout real de 300 segundos nos logs do worker produtivo.
+- [x] Publicar preview isolado com lote 10 e ingresso de homologacao.
+- [x] Alinhar o token do ingresso no contexto `deploy-preview`.
+- [x] Validar lote 10 e recuperacao idempotente em homologacao.
+- [x] Validar lote 5 abaixo do limite operacional.
+- [x] Remover da interface e do servico a exclusao integral da fila local.
+- [x] Permitir abrir outro PDV mantendo os envios pendentes salvos.
+- [x] Publicar a mitigacao produtiva de forma atomica no Netlify.
+
+### Seguranca
+- Nenhum job terminal e reaberto e nenhuma tarefa e apagada. Cada recuperacao
+  recebe uma identidade nova e mantem o job original para auditoria.
+- O retry nao e automatico e nao pode ser acionado por outro promotor.
+- A mudanca produtiva ficou limitada ao lote 5 e ao deploy atomico; nenhum
+  registro operacional foi apagado ou reaberto.
+- O contexto `deploy-preview` foi configurado com lote 10 durante a validacao;
+  a producao foi promovida somente depois do teste com lote 5.
+- O segredo foi transferido sem ser gravado no repositorio ou em arquivo local,
+  e somente o contexto `deploy-preview` foi atualizado no Netlify.
+- Os lotes sinteticos foram enviados exclusivamente aos servicos e destinos de
+  homologacao; a producao recebeu somente codigo e configuracao validados.
+- A publicacao produtiva nao reiniciou nem removeu visitas. O Netlify manteve a
+  versao anterior ativa ate a troca atomica pelo novo deploy.
+
+### Testes realizados
+- Aplicativo: `99/99` testes aprovados, incluindo a politica que impede excluir
+  a fila e permite continuar trabalhando em outro PDV.
+- TypeScript: `tsc --noEmit` aprovado.
+- Build Vite de producao concluido; permanece apenas o aviso preexistente de
+  bundle principal acima de 500 kB.
+- Preview `6a8dfd567016c9f48fdba9a7` confirmou o provedor `google-v1`, manteve a
+  sonda interna protegida com `401` sem credencial e usou lote 10.
+- O token de `deploy-preview` foi alinhado ao segredo
+  `criativa-sync-ingress-secret`; a leitura autenticada do ingresso retornou o
+  job de controle `completed` com dois recibos.
+- Um lote sintetico com 10 fotos concluiu com 10 recibos. A conclusao foi
+  observada entre 243 e 308 segundos, faixa ainda muito proxima do timeout.
+- O reenvio com identidade `:RETRY:1` concluiu em ate 222 segundos, retornou 10
+  recibos e reutilizou os mesmos 10 IDs de arquivo e a mesma pasta do PDV.
+- A deduplicacao foi aprovada; como o lote 10 ficou proximo do timeout, a
+  promocao produtiva utilizou o lote 5 validado com margem operacional.
+- Um lote adicional de cinco fotos concluiu na homologacao em 32 segundos.
+- A base produtiva confirmou que `VISIT-BEAE0D3A` concluiu 8/8, enquanto
+  `VISIT-9F78346B` (15 fotos) e `VISIT-62DAA44B` (19 fotos) chegaram a
+  `dead_letter` sem recibos. As tres visitas foram criadas entre 15:57:58 e
+  15:58:02, confirmando concorrencia de jobs grandes e nao interferencia dos
+  testes isolados de homologacao.
+- Deploy produtivo `6a8e02c2124360d7e7dc7a86` publicado com lote 5 e
+  recuperacao manual idempotente. Health respondeu `200`, o provedor permaneceu
+  `google-v1` e rotas de sincronizacao sem sessao continuaram retornando `401`.
+- Deploy produtivo final `6a8e0613124360ebc1dc7947` publicou a fila nao
+  bloqueante e removeu a exclusao. O bundle publico e o deploy imutavel possuem
+  o mesmo SHA-256; `Continuar trabalhando` esta presente e `Limpar minha fila`
+  nao existe no JavaScript entregue aos usuarios.
+
 ## [2026-08-19] - Migracao produtiva do Make para Google Sync
 
 ### Causa
@@ -23,6 +108,9 @@
   Google, evitando esgotar tentativas enquanto um lote ainda esta processando.
 - A sonda de homologacao foi mantida desabilitada em producao e corrigida para
   responder `404` quando sua variavel nao existe.
+- Foi criado o orcamento mensal `Criativa - Controle mensal R$ 30`, limitado ao
+  projeto `make-criativa`, com alertas de gasto real em 25%, 50%, 75%, 90% e
+  100%, alem de alerta de previsao em 100%.
 
 ### Checklist
 - [x] Homologacao completa sem Make: ingresso, staging, Cloud Tasks, worker,
@@ -33,6 +121,7 @@
 - [x] Frontend produtivo preservado byte a byte durante os deploys do backend.
 - [x] Feature flag alterada para `google-v1` somente depois dos gates anteriores.
 - [x] Conferir as primeiras visitas reais completas pelos recibos persistidos.
+- [x] Configurar orcamento e alertas progressivos de custo no Google Cloud.
 - [ ] Manter observacao reforcada de erros e fila durante o primeiro dia.
 
 ### Seguranca
@@ -43,6 +132,8 @@
 - Nenhuma visita sintetica foi escrita na pasta ou planilha produtiva.
 - O Make nao foi desligado nem alterado e permanece como rollback imediato. O
   deploy validado anterior ao corte e `6a85cc51880b7360cf530f8e`.
+- O orcamento usa somente notificacoes; nenhum limite automatico de gastos ou
+  desligamento de servico foi habilitado.
 
 ### Testes realizados
 - Aplicativo: `96/96` testes, TypeScript e build aprovados.
@@ -60,6 +151,11 @@
   lotes com 96 fotos e tres finalizacoes reais foram processados; os 11 jobs
   ficaram `completed`, sem `processing`, `pending` ou `dead_letter`, e a fila
   voltou a zero.
+- O Google Cloud confirmou a criacao do orcamento em `make-criativa`, no valor
+  de R$ 30,00, exibindo os seis gatilhos configurados e gasto atual de R$ 0,00.
+- O Google Auth Platform do projeto `make-criativa` foi conferido com a conta
+  proprietaria: OAuth externo com status `Em producao`, usando 1 de 100
+  usuarios. O refresh token nao esta sujeito a expiracao semanal de teste.
 
 ## [2026-08-19] - Preparacao da migracao Make para Google Cloud
 

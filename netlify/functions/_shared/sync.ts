@@ -14,9 +14,12 @@ export type SyncResult = {
   };
 };
 
-export const syncVisitRecord = async (visit: VisitRecord): Promise<SyncResult> => {
+export const syncVisitRecord = async (
+  visit: VisitRecord,
+  options: { recoverDeadLetter?: boolean } = {},
+): Promise<SyncResult> => {
   const provider = (getEnv('BACKEND_SYNC_PROVIDER') || 'make').trim().toLowerCase();
-  if (provider === 'google-v1') return syncVisitRecordGoogle(visit);
+  if (provider === 'google-v1') return syncVisitRecordGoogle(visit, options);
   const syncMode = (getEnv('BACKEND_MAKE_SYNC_MODE') || 'legacy').trim().toLowerCase();
   const webhookVariable = syncMode === 'visit-v2'
     ? 'BACKEND_MAKE_WEBHOOK_V2_URL'

@@ -193,11 +193,3 @@ export const removeQueuedVisit = async (ownerId: string, visitId: string) => {
   ));
   await writeQueue(queue);
 };
-
-export const clearQueuedVisits = async (ownerId: string) => {
-  const normalizedOwnerId = normalizeOwnerId(ownerId);
-  const queue = (await listAllQueuedVisits()).filter(
-    (item) => getQueuedVisitOwnerId(item) !== normalizedOwnerId,
-  );
-  await writeQueue(queue);
-};

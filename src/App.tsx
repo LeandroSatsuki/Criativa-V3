@@ -13,7 +13,7 @@ import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X } from 'lucide-
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT, type SessionEndReason } from './services/session';
 import { HttpRequestError } from './services/httpClient';
-import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
+import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
 import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
 
@@ -31,6 +31,12 @@ type PendingSyncView = {
   error: string | null;
   sent: number;
   total: number;
+  retry?: {
+    retryable: boolean;
+    available: boolean;
+    remaining: number;
+    retryAfterSeconds: number;
+  };
 };
 
 const hasVisitInProgress = (state: {
@@ -320,6 +326,7 @@ const App: React.FC = () => {
           error: remote.syncError || null,
           sent: Number(remote.progress?.sent || 0),
           total: Number(remote.progress?.total || 0),
+          retry: remote.retry,
         });
       } catch {
         next.push({
@@ -335,6 +342,30 @@ const App: React.FC = () => {
 
     setPendingSyncs(next);
     if (queueChanged) notifyQueueChanged();
+  };
+
+  const retryPendingSync = async (sync: PendingSyncView) => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || !sync.retry?.available) return;
+
+    setPromptSyncError(null);
+    setPendingSyncs((current) => current.map((item) => item.visitId === sync.visitId
+      ? { ...item, status: 'enviando', error: null, retry: { ...item.retry!, available: false } }
+      : item));
+
+    try {
+      const result = await apiService.retrySync(sync.visitId);
+      await updateQueuedVisit(ownerId, sync.visitId, { status: 'syncing', error: null });
+      if (result.syncStatus === 'enviando') await apiService.startBackgroundSync(sync.visitId);
+      await refreshSyncStatus();
+      notifyQueueChanged();
+    } catch (error: any) {
+      await updateQueuedVisit(ownerId, sync.visitId, {
+        status: 'error',
+        error: error.message || 'Nao foi possivel tentar novamente.',
+      });
+      await refreshSyncStatus();
+    }
   };
 
   const syncPendingQueueFromPrompt = async () => {
@@ -418,22 +449,6 @@ const App: React.FC = () => {
       window.removeEventListener('criativa-sync-queue-updated', handleResume);
     };
   }, [visitState.user?.id]);
-
-  const clearCurrentUserQueue = async () => {
-    const ownerId = visitState.user?.id;
-    if (!ownerId || promptSyncing) return;
-    const confirmed = window.confirm(
-      'Limpar os envios pendentes deste usuário neste aparelho? Visitas ainda não enviadas deixarão de aparecer para reenvio local.',
-    );
-    if (!confirmed) return;
-
-    await clearQueuedVisits(ownerId);
-    setPromptQueueCount(0);
-    setPromptSyncError(null);
-    setPromptSyncMessage('Fila local deste usuário limpa.');
-    setShowPendingSyncPrompt(false);
-    notifyQueueChanged();
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -560,7 +575,7 @@ const App: React.FC = () => {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-3">
               {!promptSyncError && (
                 <button
                   disabled={promptSyncing}
@@ -570,24 +585,20 @@ const App: React.FC = () => {
                   {promptSyncing ? 'Sincronizando' : 'Sincronizar agora'}
                 </button>
               )}
-              {promptSyncError && (
+              {!promptSyncing && (
                 <button
-                  disabled={promptSyncing}
                   onClick={() => setShowPendingSyncPrompt(false)}
                   className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
                 >
-                  Depois
-                </button>
-              )}
-              {!promptSyncing && (
-                <button
-                  onClick={clearCurrentUserQueue}
-                  className="flex-1 bg-white border border-slate-200 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
-                >
-                  Limpar minha fila
+                  Continuar trabalhando
                 </button>
               )}
             </div>
+            {!promptSyncing && (
+              <p className="text-center text-[10px] font-bold text-slate-400">
+                Os registros permanecem salvos e podem continuar enviando em segundo plano.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -646,6 +657,20 @@ const App: React.FC = () => {
                         <span className="text-slate-400">{sync.sent}/{sync.total || '--'}</span>
                       </div>
                       {sync.error && <p className="text-[10px] font-bold text-orange-700 leading-relaxed">{sync.error}</p>}
+                      {hasError && sync.retry?.retryable && (
+                        <button
+                          type="button"
+                          disabled={!sync.retry.available}
+                          onClick={() => void retryPendingSync(sync)}
+                          className="w-full bg-orange-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          {sync.retry.remaining === 0
+                            ? 'Necessita suporte'
+                            : sync.retry.retryAfterSeconds > 0
+                              ? `Aguarde ${sync.retry.retryAfterSeconds}s`
+                              : 'Tentar novamente'}
+                        </button>
+                      )}
                     </div>
                   );
                 })}

@@ -14,6 +14,14 @@ import {
   type MakePhotoBatchEvent,
 } from './make-contract-v2.ts';
 import { buildGooglePhotoBatchIngress } from './google-contract.ts';
+import {
+  buildGoogleRecoveryId,
+  getGoogleManualRetryCount,
+  getGoogleRetryState,
+  type GoogleSyncRetryState,
+} from './google-retry.ts';
+
+export { getGoogleRetryState } from './google-retry.ts';
 
 type GoogleSyncResult = {
   visitId: string;
@@ -22,10 +30,13 @@ type GoogleSyncResult = {
   progress?: { sent: number; total: number };
 };
 
-type GoogleSyncState = {
-  pendingBatchId?: string;
-  pendingFinalizeId?: string;
+type GoogleSyncState = GoogleSyncRetryState;
+
+type GoogleSyncOptions = {
+  recoverDeadLetter?: boolean;
 };
+
+const GOOGLE_DEFAULT_PHOTOS_PER_BATCH = 10;
 
 const createManifest = (visit: VisitRecord, totalPhotos: number): DriveSyncManifest => ({
   contractVersion: MAKE_CONTRACT_VERSION,
@@ -41,10 +52,10 @@ const createManifest = (visit: VisitRecord, totalPhotos: number): DriveSyncManif
 });
 
 const getBatchSize = () => {
-  const configured = Number(getEnv('BACKEND_GOOGLE_PHOTO_BATCH_SIZE') || MAKE_MAX_PHOTOS_PER_BATCH);
+  const configured = Number(getEnv('BACKEND_GOOGLE_PHOTO_BATCH_SIZE') || GOOGLE_DEFAULT_PHOTOS_PER_BATCH);
   return Number.isInteger(configured) && configured >= 1 && configured <= MAKE_MAX_PHOTOS_PER_BATCH
     ? configured
-    : MAKE_MAX_PHOTOS_PER_BATCH;
+    : GOOGLE_DEFAULT_PHOTOS_PER_BATCH;
 };
 
 export const requestGoogle = async (path: string, init: RequestInit = {}) => {
@@ -92,7 +103,10 @@ const applyReceipts = (manifest: DriveSyncManifest, receipts: DrivePhotoReceipt[
   };
 };
 
-export const syncVisitRecordGoogle = async (visit: VisitRecord): Promise<GoogleSyncResult> => {
+export const syncVisitRecordGoogle = async (
+  visit: VisitRecord,
+  options: GoogleSyncOptions = {},
+): Promise<GoogleSyncResult> => {
   const events = buildMakePhotoEvents(visit.payload);
   let manifest = createManifest(visit, events.length);
   let googleSync: GoogleSyncState = { ...(visit.payload?.googleSync || {}) };
@@ -111,7 +125,47 @@ export const syncVisitRecordGoogle = async (visit: VisitRecord): Promise<GoogleS
       let response: Record<string, any>;
       if (googleSync.pendingBatchId) {
         response = await requestGoogle(`/v1/ingress/jobs/${encodeURIComponent(googleSync.pendingBatchId)}`);
-        if (response.state === 'dead_letter') throw new Error('Lote Google excedeu o limite de tentativas.');
+        if (response.state === 'dead_letter') {
+          if (!options.recoverDeadLetter) throw new Error('Lote Google excedeu o limite de tentativas.');
+
+          const retryState = getGoogleRetryState(current);
+          if (retryState.remaining === 0) {
+            throw new Error('Lote Google requer suporte apos duas tentativas manuais.');
+          }
+          if (retryState.retryAfterSeconds > 0) {
+            throw new Error(`Aguarde ${retryState.retryAfterSeconds}s antes de tentar novamente.`);
+          }
+
+          const deadLetterId = googleSync.pendingBatchId;
+          const retryNumber = getGoogleManualRetryCount(googleSync, deadLetterId) + 1;
+          const recoveryId = buildGoogleRecoveryId(deadLetterId, retryNumber);
+          const recoveryBatch = { ...batch, EVENT_ID: recoveryId, BATCH_ID: recoveryId };
+          response = await requestGoogle('/v1/ingress/photo-batch', {
+            method: 'POST',
+            body: JSON.stringify(buildGooglePhotoBatchIngress(recoveryBatch)),
+          });
+          googleSync = {
+            ...googleSync,
+            pendingBatchId: response.state === 'completed' ? undefined : recoveryId,
+            manualRetryCount: retryNumber,
+            manualRetryAt: getBrasiliaISO(),
+            lastDeadLetterId: deadLetterId,
+          };
+          await saveVisit({
+            ...current,
+            syncStatus: 'enviando',
+            syncError: null,
+            payload: { ...current.payload, driveSync: manifest, googleSync },
+            updatedAt: getBrasiliaISO(),
+          });
+          if (response.state !== 'completed') {
+            return { visitId: current.visitId, syncStatus: 'enviando', progress: {
+              sent: Object.keys(manifest.photos).length, total: events.length,
+            } };
+          }
+          response = { ...response, receipts: response.receipts };
+          Object.assign(batch, recoveryBatch);
+        }
         if (response.state !== 'completed') {
           return { visitId: current.visitId, syncStatus: 'enviando', progress: {
             sent: Object.keys(manifest.photos).length, total: events.length,
@@ -155,7 +209,49 @@ export const syncVisitRecordGoogle = async (visit: VisitRecord): Promise<GoogleS
       let response: Record<string, any>;
       if (googleSync.pendingFinalizeId) {
         response = await requestGoogle(`/v1/ingress/jobs/${encodeURIComponent(googleSync.pendingFinalizeId)}`);
-        if (response.state === 'dead_letter') throw new Error('Finalizacao Google excedeu o limite de tentativas.');
+        if (response.state === 'dead_letter') {
+          if (!options.recoverDeadLetter) throw new Error('Finalizacao Google excedeu o limite de tentativas.');
+
+          const retryState = getGoogleRetryState(current);
+          if (retryState.remaining === 0) {
+            throw new Error('Finalizacao Google requer suporte apos duas tentativas manuais.');
+          }
+          if (retryState.retryAfterSeconds > 0) {
+            throw new Error(`Aguarde ${retryState.retryAfterSeconds}s antes de tentar novamente.`);
+          }
+
+          const deadLetterId = googleSync.pendingFinalizeId;
+          const retryNumber = getGoogleManualRetryCount(googleSync, deadLetterId) + 1;
+          const recoveryId = buildGoogleRecoveryId(deadLetterId, retryNumber);
+          response = await requestGoogle('/v1/ingress/finalize', {
+            method: 'POST',
+            body: JSON.stringify({
+              eventType: 'VISIT_FINALIZE',
+              eventId: recoveryId,
+              idempotencyKey: recoveryId,
+              visitId: finalizeEvent.ID_VISITA,
+              row: finalizeEvent,
+            }),
+          });
+          googleSync = {
+            ...googleSync,
+            pendingFinalizeId: response.state === 'completed' ? undefined : recoveryId,
+            manualRetryCount: retryNumber,
+            manualRetryAt: getBrasiliaISO(),
+            lastDeadLetterId: deadLetterId,
+          };
+          await saveVisit({
+            ...current,
+            syncStatus: 'enviando',
+            syncError: null,
+            payload: { ...current.payload, driveSync: manifest, googleSync },
+            updatedAt: getBrasiliaISO(),
+          });
+          if (response.state !== 'completed') {
+            return { visitId: current.visitId, syncStatus: 'enviando', progress: { sent, total: events.length } };
+          }
+          response = { ...response, ...(response.receipt || {}) };
+        }
         if (response.state !== 'completed') {
           return { visitId: current.visitId, syncStatus: 'enviando', progress: { sent, total: events.length } };
         }

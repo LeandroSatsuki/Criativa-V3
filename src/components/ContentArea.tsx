@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { analyzeProductPhoto } from '../services/geminiService';
-import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
+import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
 import { classifyQueuedSyncFailure } from '../services/syncPolicy';
 import { generateVisitId } from '../services/visitId';
 import {
@@ -591,19 +591,6 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     } finally {
       setIsSyncing(false);
     }
-  };
-
-  const handleClearQueue = async () => {
-    if (!queueOwnerId) return;
-    const confirmed = window.confirm(
-      'Limpar os envios pendentes deste usuário neste aparelho? Visitas ainda não enviadas deixarão de aparecer para reenvio local.',
-    );
-    if (!confirmed) return;
-
-    await clearQueuedVisits(queueOwnerId);
-    setQueueCount(0);
-    setSyncError(null);
-    window.dispatchEvent(new Event('criativa-sync-queue-updated'));
   };
 
   const renderSection = () => {
@@ -1568,20 +1555,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 </button>
 
                 {queueCount > 0 && (
-                  <>
-                    <button
-                      onClick={handleRetryQueue}
-                      className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
-                    >
-                      Reenviar Fila Local ({queueCount})
-                    </button>
-                    <button
-                      onClick={handleClearQueue}
-                      className="text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-red-500 transition-colors"
-                    >
-                      Limpar minha fila
-                    </button>
-                  </>
+                  <button
+                    onClick={handleRetryQueue}
+                    className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
+                  >
+                    Reenviar Fila Local ({queueCount})
+                  </button>
                 )}
 
                 <button
