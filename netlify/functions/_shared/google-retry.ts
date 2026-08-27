@@ -1,5 +1,6 @@
 export type GoogleSyncRetryState = {
   pendingBatchId?: string;
+  pendingPhotoIds?: string[];
   pendingFinalizeId?: string;
   manualRetryCount?: number;
   manualRetryAt?: string;
@@ -29,7 +30,7 @@ export const getGoogleRetryState = (visit: RetryVisit, now = Date.now()) => {
   const pendingId = googleSync.pendingBatchId || googleSync.pendingFinalizeId || '';
   const retryable = visit.syncStatus === 'erro'
     && Boolean(pendingId)
-    && /(Google excedeu o limite de tentativas|Google requer suporte|Aguarde \d+s)/i.test(String(visit.syncError || ''));
+    && /(Google excedeu o limite de tentativas|Google requer suporte|Aguarde \d+s|(?:Make|Google) n(?:ao|ão) confirmou todas as fotos do lote no Google Drive)/i.test(String(visit.syncError || ''));
   const used = getGoogleManualRetryCount(googleSync, pendingId);
   const lastRetryAt = googleSync.manualRetryAt ? Date.parse(googleSync.manualRetryAt) : 0;
   const retryAfterMs = Number.isFinite(lastRetryAt)

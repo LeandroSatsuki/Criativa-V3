@@ -7,13 +7,12 @@ import {
   buildMakeVisitFinalizeEvent,
   MAKE_CONTRACT_VERSION,
   MAKE_MAX_PHOTOS_PER_BATCH,
-  validatePhotoBatchUploadResponse,
   validateVisitFinalizeResponse,
   type DrivePhotoReceipt,
   type DriveSyncManifest,
-  type MakePhotoBatchEvent,
 } from './make-contract-v2.ts';
 import { buildGooglePhotoBatchIngress } from './google-contract.ts';
+import { getPendingBatchEvents, resolveGooglePhotoReceipts } from './google-receipts.ts';
 import {
   buildGoogleRecoveryId,
   getGoogleManualRetryCount,
@@ -82,15 +81,6 @@ export const requestGoogle = async (path: string, init: RequestInit = {}) => {
   }
 };
 
-const validateReceipts = (receipts: unknown, batch: MakePhotoBatchEvent) =>
-  validatePhotoBatchUploadResponse(JSON.stringify({
-    success: true,
-    eventType: 'PHOTO_BATCH_UPLOADED',
-    eventId: batch.EVENT_ID,
-    batchId: batch.BATCH_ID,
-    receipts,
-  }), batch);
-
 const applyReceipts = (manifest: DriveSyncManifest, receipts: DrivePhotoReceipt[]) => {
   const photos = { ...manifest.photos };
   receipts.forEach((receipt) => { photos[receipt.photoId] = receipt; });
@@ -121,7 +111,7 @@ export const syncVisitRecordGoogle = async (
   try {
     const pendingEvents = events.filter((event) => !manifest.photos[event.ID_FOTO]);
     if (pendingEvents.length) {
-      const batch = buildMakePhotoBatches(pendingEvents, getBatchSize())[0];
+      let batch = buildMakePhotoBatches(pendingEvents, getBatchSize())[0];
       let response: Record<string, any>;
       if (googleSync.pendingBatchId) {
         response = await requestGoogle(`/v1/ingress/jobs/${encodeURIComponent(googleSync.pendingBatchId)}`);
@@ -139,7 +129,11 @@ export const syncVisitRecordGoogle = async (
           const deadLetterId = googleSync.pendingBatchId;
           const retryNumber = getGoogleManualRetryCount(googleSync, deadLetterId) + 1;
           const recoveryId = buildGoogleRecoveryId(deadLetterId, retryNumber);
-          const recoveryBatch = { ...batch, EVENT_ID: recoveryId, BATCH_ID: recoveryId };
+          const savedBatchEvents = getPendingBatchEvents(pendingEvents, googleSync.pendingPhotoIds);
+          const recoverySource = savedBatchEvents
+            ? buildMakePhotoBatches(savedBatchEvents, MAKE_MAX_PHOTOS_PER_BATCH)[0]
+            : batch;
+          const recoveryBatch = { ...recoverySource, EVENT_ID: recoveryId, BATCH_ID: recoveryId };
           response = await requestGoogle('/v1/ingress/photo-batch', {
             method: 'POST',
             body: JSON.stringify(buildGooglePhotoBatchIngress(recoveryBatch)),
@@ -147,6 +141,9 @@ export const syncVisitRecordGoogle = async (
           googleSync = {
             ...googleSync,
             pendingBatchId: response.state === 'completed' ? undefined : recoveryId,
+            pendingPhotoIds: response.state === 'completed'
+              ? undefined
+              : recoveryBatch.PHOTOS.map((photo) => photo.ID_FOTO),
             manualRetryCount: retryNumber,
             manualRetryAt: getBrasiliaISO(),
             lastDeadLetterId: deadLetterId,
@@ -164,7 +161,7 @@ export const syncVisitRecordGoogle = async (
             } };
           }
           response = { ...response, receipts: response.receipts };
-          Object.assign(batch, recoveryBatch);
+          batch = recoveryBatch;
         }
         if (response.state !== 'completed') {
           return { visitId: current.visitId, syncStatus: 'enviando', progress: {
@@ -178,7 +175,11 @@ export const syncVisitRecordGoogle = async (
           body: JSON.stringify(buildGooglePhotoBatchIngress(batch)),
         });
         if (response.state !== 'completed') {
-          googleSync = { ...googleSync, pendingBatchId: batch.BATCH_ID };
+          googleSync = {
+            ...googleSync,
+            pendingBatchId: batch.BATCH_ID,
+            pendingPhotoIds: batch.PHOTOS.map((photo) => photo.ID_FOTO),
+          };
           await saveVisit({
             ...current,
             payload: { ...current.payload, driveSync: manifest, googleSync },
@@ -190,8 +191,16 @@ export const syncVisitRecordGoogle = async (
         }
       }
 
-      manifest = applyReceipts(manifest, validateReceipts(response.receipts, batch));
-      googleSync = { ...googleSync, pendingBatchId: undefined };
+      const completedJobId = googleSync.pendingBatchId || batch.BATCH_ID;
+      const resolved = resolveGooglePhotoReceipts({
+        visitId: current.visitId,
+        jobId: completedJobId,
+        pendingEvents,
+        pendingPhotoIds: googleSync.pendingPhotoIds,
+        receipts: response.receipts,
+      });
+      manifest = applyReceipts(manifest, resolved.receipts);
+      googleSync = { ...googleSync, pendingBatchId: undefined, pendingPhotoIds: undefined };
       current = await saveVisit({
         ...current,
         payload: { ...current.payload, driveSync: manifest, googleSync },

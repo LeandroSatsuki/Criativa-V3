@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## [2026-08-27] - Recuperacao retrocompativel de lotes Google antigos
+
+### Causa
+- Lotes criados antes da reducao do tamanho de 20 para 5 fotos guardavam apenas o ID da tarefa, sem a lista exata de fotos.
+- Ao consultar uma tarefa antiga concluida, o backend reconstruia a expectativa com o limite novo e rejeitava comprovantes validos ja gravados no Drive.
+- A mensagem de erro ainda mencionava Make, embora o provedor ativo fosse o Google Cloud.
+
+### Solucao aplicada
+- Novos trabalhos agora persistem os IDs exatos das fotos enquanto estiverem pendentes.
+- Trabalhos antigos sao conciliados pelos comprovantes retornados pelo Google, limitados a fotos ainda pendentes da mesma visita.
+- Erros legados de confirmacao passam a permitir uma nova tentativa segura no aplicativo.
+- A validacao continua exigindo IDs unicos, arquivo, URL e correspondencia integral do lote antes da finalizacao da visita.
+- O hotfix foi publicado de forma atomica no deploy de producao `6a90984e140dd4a714264711`.
+- Sete visitas antigas foram recuperadas e finalizadas, totalizando 172 fotos reconhecidas nos manifestos.
+
+### Checklist
+- [x] Fluxo novo de cinco fotos preservado.
+- [x] Compatibilidade adicionada somente para trabalhos antigos sem composicao persistida.
+- [x] Nenhuma fila ou foto e removida automaticamente.
+- [x] Finalizacao continua condicionada a conciliacao integral das fotos.
+
+### Seguranca
+- Comprovantes de outra visita, desconhecidos, duplicados, parciais ou sem arquivo/URL sao rejeitados.
+- O ID da tarefa deve pertencer a visita em processamento.
+- A operacao permanece idempotente e nao recria fotos que ja existem no Google Drive.
+
+### Testes realizados
+- Testes automatizados de reconciliacao legada e composicao persistida.
+- Testes negativos para duplicidade, foto desconhecida, resposta parcial e tarefa de outra visita.
+- Suite completa com 103 testes, tipagem, build e deploy de preview `6a9097e448fd9a78fc22da98` executados antes da producao.
+- Health check produtivo, protecao `401` sem sessao e auditoria de 482 visitas validados apos a publicacao.
+
 ## [2026-08-25] - Recuperacao manual de lotes Google
 
 ### Causa
