@@ -13,6 +13,7 @@
 - Reenvios carregam apenas uma visita completa por vez.
 - Inclusao, atualizacao e remocao alteram somente o registro selecionado, sem regravar a fila inteira.
 - Salvamentos rapidos do rascunho sao consolidados e sempre preservam o estado mais recente.
+- Correcao publicada no deploy produtivo `6a95c8bf81e5a1051d211cec`.
 
 ### Checklist
 - [x] Estrutura do payload e fotos offline preservadas.
@@ -30,6 +31,7 @@
 - Contagem por usuario, atualizacao isolada, remocao isolada e reenvio unitario.
 - Consolidacao de tres salvamentos rapidos com restauracao do ultimo rascunho.
 - Suite completa com 116 testes, TypeScript e build de producao aprovados.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 no preview; dominio produtivo validado com o bundle novo.
 
 ## [2026-08-31] - Recuperacao automatica da sincronizacao Google
 
