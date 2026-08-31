@@ -7,7 +7,14 @@ import React, { useState, useEffect } from 'react';
 import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { analyzeProductPhoto } from '../services/geminiService';
-import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
+import {
+  getQueuedVisit,
+  getQueuedVisitCount,
+  listQueuedVisitSummaries,
+  removeQueuedVisit,
+  upsertQueuedVisit,
+  updateQueuedVisit,
+} from '../services/syncQueue';
 import { classifyQueuedSyncFailure } from '../services/syncPolicy';
 import { generateVisitId } from '../services/visitId';
 import {
@@ -572,7 +579,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const handleRetryQueue = async () => {
-    const queuedVisits = await listQueuedVisits(queueOwnerId);
+    const queuedVisits = await listQueuedVisitSummaries(queueOwnerId);
     if (queuedVisits.length === 0) {
       setSyncError('Não há visitas na fila local para reenviar.');
       return;
@@ -583,7 +590,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     setSyncSuccess(false);
 
     try {
-      for (const queuedVisit of queuedVisits) {
+      for (const queuedSummary of queuedVisits) {
+        const queuedVisit = await getQueuedVisit(queueOwnerId, queuedSummary.visitId);
+        if (!queuedVisit) continue;
         setSyncMessage(`Reenviando ${queuedVisit.visitId}...`);
         const attempt = await syncQueuedVisit(queuedVisit.payload, queuedVisit.visitId, true);
         if (!attempt.started) throw new Error(attempt.error);

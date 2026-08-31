@@ -15,3 +15,14 @@ test('fila pendente permite continuar trabalhando sem apagar registros', async (
   assert.doesNotMatch(contentArea, /Limpar minha fila|handleClearQueue/);
   assert.doesNotMatch(queue, /clearQueuedVisits/);
 });
+
+test('consultas recorrentes usam indice leve e carregam uma visita por vez', async () => {
+  const app = await readSource('../src/App.tsx');
+  const contentArea = await readSource('../src/components/ContentArea.tsx');
+
+  assert.match(app, /listQueuedVisitSummaries/);
+  assert.match(app, /getQueuedVisit\(ownerId, queuedSummary\.visitId\)/);
+  assert.doesNotMatch(app, /listQueuedVisits/);
+  assert.match(contentArea, /getQueuedVisit\(queueOwnerId, queuedSummary\.visitId\)/);
+  assert.doesNotMatch(contentArea, /listQueuedVisits/);
+});

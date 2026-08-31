@@ -13,7 +13,13 @@ import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X } from 'lucide-
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT, type SessionEndReason } from './services/session';
 import { HttpRequestError } from './services/httpClient';
-import { getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
+import {
+  getQueuedVisit,
+  getQueuedVisitCount,
+  listQueuedVisitSummaries,
+  removeQueuedVisit,
+  updateQueuedVisit,
+} from './services/syncQueue';
 import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
 
@@ -298,7 +304,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const queuedVisits = await listQueuedVisits(ownerId);
+    const queuedVisits = await listQueuedVisitSummaries(ownerId);
     const next: PendingSyncView[] = [];
     let queueChanged = false;
 
@@ -321,7 +327,7 @@ const App: React.FC = () => {
 
         next.push({
           visitId: queuedVisit.visitId,
-          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          store: queuedVisit.store,
           status: remote.syncStatus,
           error: remote.syncError || null,
           sent: Number(remote.progress?.sent || 0),
@@ -331,7 +337,7 @@ const App: React.FC = () => {
       } catch {
         next.push({
           visitId: queuedVisit.visitId,
-          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          store: queuedVisit.store,
           status: queuedVisit.status,
           error: queuedVisit.error,
           sent: 0,
@@ -371,7 +377,7 @@ const App: React.FC = () => {
   const syncPendingQueueFromPrompt = async () => {
     const ownerId = visitState.user?.id;
     if (!ownerId) return;
-    const queuedVisits = await listQueuedVisits(ownerId);
+    const queuedVisits = await listQueuedVisitSummaries(ownerId);
     if (queuedVisits.length === 0) {
       setShowPendingSyncPrompt(false);
       return;
@@ -382,7 +388,9 @@ const App: React.FC = () => {
 
     try {
       for (let index = 0; index < queuedVisits.length; index += 1) {
-        const queuedVisit = queuedVisits[index];
+        const queuedSummary = queuedVisits[index];
+        const queuedVisit = await getQueuedVisit(ownerId, queuedSummary.visitId);
+        if (!queuedVisit) continue;
         setPromptSyncMessage(`Sincronizando ${index + 1}/${queuedVisits.length}...`);
         await updateQueuedVisit(ownerId, queuedVisit.visitId, {
           status: 'syncing',

@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2026-08-31] - Reducao de memoria da fila offline
+
+### Causa
+- A consulta executada a cada 15 segundos carregava todas as visitas pendentes com suas fotos em base64 apenas para montar contadores e status.
+- Cada atualizacao de uma visita limpava e regravava a fila inteira no IndexedDB.
+- Alteracoes rapidas no rascunho podiam manter varias copias completas da visita aguardando gravacao.
+
+### Solucao aplicada
+- O IndexedDB recebeu um indice leve por usuario, sem payload ou fotos, usado em contagens e consultas recorrentes.
+- Filas existentes migram automaticamente para a versao nova, preservando os registros e todas as fotos.
+- Reenvios carregam apenas uma visita completa por vez.
+- Inclusao, atualizacao e remocao alteram somente o registro selecionado, sem regravar a fila inteira.
+- Salvamentos rapidos do rascunho sao consolidados e sempre preservam o estado mais recente.
+
+### Checklist
+- [x] Estrutura do payload e fotos offline preservadas.
+- [x] Compatibilidade com filas antigas sem `ownerId` mantida.
+- [x] Nenhum botao de exclusao ou limpeza de fila adicionado.
+- [x] Fluxos de envio Google e painel supervisor mantidos sem alteracao.
+
+### Seguranca
+- O indice armazena somente ID, usuario, loja, status, erro e datas.
+- A leitura completa valida o dono da visita antes de devolver o payload.
+- Atualizacoes nao podem trocar o ID nem sobrescrever fila pertencente a outro usuario.
+
+### Testes realizados
+- Migracao real de IndexedDB v1 para v2 com foto preservada.
+- Contagem por usuario, atualizacao isolada, remocao isolada e reenvio unitario.
+- Consolidacao de tres salvamentos rapidos com restauracao do ultimo rascunho.
+- Suite completa com 116 testes, TypeScript e build de producao aprovados.
+
 ## [2026-08-31] - Recuperacao automatica da sincronizacao Google
 
 ### Causa
