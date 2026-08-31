@@ -10,10 +10,12 @@
 ### Solucao aplicada
 - O IndexedDB recebeu um indice leve por usuario, sem payload ou fotos, usado em contagens e consultas recorrentes.
 - Filas existentes migram automaticamente para a versao nova, preservando os registros e todas as fotos.
+- O indice de filas antigas e criado uma visita por vez, cedendo processamento entre registros para evitar bloquear celulares com muitos arquivos locais.
 - Reenvios carregam apenas uma visita completa por vez.
 - Inclusao, atualizacao e remocao alteram somente o registro selecionado, sem regravar a fila inteira.
 - Salvamentos rapidos do rascunho sao consolidados e sempre preservam o estado mais recente.
-- Correcao publicada no deploy produtivo `6a95c8bf81e5a1051d211cec`.
+- O deploy inicial `6a95c8bf81e5a1051d211cec` foi revertido preventivamente apos um relato de travamento, posteriormente confirmado como referente ao chat e nao ao aplicativo.
+- A versao final, com migracao gradual adicional, foi publicada no deploy produtivo `6a95d327702381cb61133f58`.
 
 ### Checklist
 - [x] Estrutura do payload e fotos offline preservadas.
@@ -27,11 +29,12 @@
 - Atualizacoes nao podem trocar o ID nem sobrescrever fila pertencente a outro usuario.
 
 ### Testes realizados
-- Migracao real de IndexedDB v1 para v2 com foto preservada.
+- Migracao real de IndexedDB v1 para v2 com quatro filas antigas e aproximadamente 1 MB de fotos preservadas.
 - Contagem por usuario, atualizacao isolada, remocao isolada e reenvio unitario.
 - Consolidacao de tres salvamentos rapidos com restauracao do ultimo rascunho.
 - Suite completa com 116 testes, TypeScript e build de producao aprovados.
-- Aplicativo, health, manifesto e service worker responderam HTTP 200 no preview; dominio produtivo validado com o bundle novo.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 no preview `6a95d2540869cdd269103706` e no dominio produtivo.
+- Tela de login carregada no navegador sem erros ou avisos no console.
 
 ## [2026-08-31] - Recuperacao automatica da sincronizacao Google
 
