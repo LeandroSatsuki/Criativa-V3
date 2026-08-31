@@ -62,17 +62,6 @@ const openDatabase = () => new Promise<IDBDatabase>((resolve, reject) => {
     if (!database.objectStoreNames.contains(SUMMARY_STORE_NAME)) {
       const summaryStore = database.createObjectStore(SUMMARY_STORE_NAME, { keyPath: 'visitId' });
       summaryStore.createIndex(OWNER_INDEX_NAME, 'ownerId', { unique: false });
-
-      const sourceStore = request.transaction?.objectStore(STORE_NAME);
-      const cursorRequest = sourceStore?.openCursor();
-      if (cursorRequest) {
-        cursorRequest.onsuccess = () => {
-          const cursor = cursorRequest.result;
-          if (!cursor) return;
-          summaryStore.put(toQueuedVisitSummary(cursor.value as QueuedVisit));
-          cursor.continue();
-        };
-      }
     }
   };
   request.onsuccess = () => resolve(request.result);
@@ -97,6 +86,17 @@ const readIndexedQueueCount = async () => {
     const request = transaction.objectStore(STORE_NAME).count();
     request.onerror = () => reject(request.error || new Error('Falha ao contar a fila local.'));
     request.onsuccess = () => resolve(request.result);
+    transaction.oncomplete = () => database.close();
+  });
+};
+
+const readIndexedKeys = async (storeName: string) => {
+  const database = await openDatabase();
+  return new Promise<string[]>((resolve, reject) => {
+    const transaction = database.transaction(storeName, 'readonly');
+    const request = transaction.objectStore(storeName).getAllKeys();
+    request.onerror = () => reject(request.error || new Error('Falha ao ler as chaves da fila local.'));
+    request.onsuccess = () => resolve(request.result.map(String));
     transaction.oncomplete = () => database.close();
   });
 };
@@ -145,6 +145,20 @@ const writeIndexedVisit = async (visit: QueuedVisit) => {
     transaction.objectStore(SUMMARY_STORE_NAME).put(toQueuedVisitSummary(visit));
     transaction.onerror = () => reject(transaction.error || new Error('Falha ao salvar a visita na fila.'));
     transaction.onabort = () => reject(transaction.error || new Error('O salvamento da visita foi interrompido.'));
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+  });
+};
+
+const writeIndexedSummary = async (visit: QueuedVisit) => {
+  const database = await openDatabase();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(SUMMARY_STORE_NAME, 'readwrite');
+    transaction.objectStore(SUMMARY_STORE_NAME).put(toQueuedVisitSummary(visit));
+    transaction.onerror = () => reject(transaction.error || new Error('Falha ao indexar a visita local.'));
+    transaction.onabort = () => reject(transaction.error || new Error('A indexacao da visita foi interrompida.'));
     transaction.oncomplete = () => {
       database.close();
       resolve();
@@ -220,6 +234,30 @@ const migrateLegacyQueue = async () => {
 };
 
 let mutationSequence: Promise<void> = Promise.resolve();
+let summaryBackfillPromise: Promise<void> | null = null;
+
+const yieldToBrowser = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+const ensureSummaryIndex = () => {
+  if (summaryBackfillPromise) return summaryBackfillPromise;
+  summaryBackfillPromise = (async () => {
+    const [visitIds, summaryIds] = await Promise.all([
+      readIndexedKeys(STORE_NAME),
+      readIndexedKeys(SUMMARY_STORE_NAME),
+    ]);
+    const indexed = new Set(summaryIds);
+    for (const visitId of visitIds) {
+      if (indexed.has(visitId)) continue;
+      const visit = await readIndexedVisit(visitId);
+      if (visit) await writeIndexedSummary(visit);
+      await yieldToBrowser();
+    }
+  })().catch((error) => {
+    summaryBackfillPromise = null;
+    throw error;
+  });
+  return summaryBackfillPromise;
+};
 
 const generateId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -246,12 +284,14 @@ export const listQueuedVisits = async (ownerId: string) =>
 export const listQueuedVisitSummaries = async (ownerId: string) => {
   await migrateLegacyQueue();
   await mutationSequence.catch(() => undefined);
+  await ensureSummaryIndex();
   return readIndexedSummaries(ownerId);
 };
 
 export const getQueuedVisitCount = async (ownerId: string) => {
   await migrateLegacyQueue();
   await mutationSequence.catch(() => undefined);
+  await ensureSummaryIndex();
   return countIndexedSummaries(ownerId);
 };
 
