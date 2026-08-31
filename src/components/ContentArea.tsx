@@ -485,7 +485,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       }
 
       setSyncMessage(useRetryEndpoint ? 'Reenvio iniciado em segundo plano.' : 'Envio iniciado em segundo plano.');
-      const result = await apiService.startBackgroundSync(serverVisitId);
+      const result = draft.syncStarted
+        ? {
+          visitId: serverVisitId,
+          syncStatus: 'enviando',
+          syncError: null,
+        }
+        : await apiService.startBackgroundSync(serverVisitId);
       await updateQueuedVisit(queueOwnerId, serverVisitId, {
         status: 'syncing',
         error: null,

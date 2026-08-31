@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## [2026-08-31] - Recuperacao automatica da sincronizacao Google
+
+### Causa
+- A credencial de producao do Netlify nao correspondia ao segredo ativo do servico Google Cloud, fazendo chamadas autenticadas retornarem HTTP 401.
+- Uma visita podia ser gravada no Netlify Blobs sem iniciar a funcao de sincronizacao quando o celular perdia a resposta entre essas duas requisicoes.
+- Jobs antigos que falharam no Google podiam continuar aparentando `processing`, impedindo a recuperacao de tarefas expiradas.
+
+### Solucao aplicada
+- A credencial permanente do Google Cloud foi alinhada no contexto de producao do Netlify e mantida como segredo restrito a Functions.
+- Clientes compativeis solicitam o inicio da sincronizacao na mesma gravacao da visita; clientes antigos continuam usando o fluxo anterior.
+- Foi adicionada reconciliacao programada a cada cinco minutos, limitada a uma visita antiga por execucao e somente para o provedor `google-v1`.
+- Jobs Google pendentes ha mais de 30 minutos podem receber uma nova geracao idempotente durante a recuperacao autenticada.
+- Foi criado um indice leve de visitas pendentes para evitar carregar fotos em base64 durante a reconciliacao.
+
+### Checklist
+- [x] Nenhuma fila local do celular e removida ou alterada automaticamente.
+- [x] Visitas novas e sem fotos nao entram na reconciliacao.
+- [x] Erros legados do Make ficam fora da recuperacao automatica.
+- [x] Fluxo anterior permanece como fallback para versoes antigas do aplicativo.
+
+### Seguranca
+- A credencial permanece secreta, restrita a Functions e nao foi gravada no repositorio.
+- A recuperacao reutiliza IDs e comprovantes para preservar a idempotencia no Google Drive.
+- O reconciliador executa apenas uma etapa de uma visita por ciclo para limitar carga e impacto em producao.
+
+### Testes realizados
+- 111 testes automatizados, lint, TypeScript e build de producao aprovados.
+- 22 testes do worker Google e respectivo build aprovados.
+- Autenticacao entre Netlify e Google validada sem expor o valor da credencial.
+
 ## [2026-08-31] - Estabilidade do painel supervisor e leituras operacionais
 
 ### Causa

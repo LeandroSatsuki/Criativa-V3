@@ -4,6 +4,7 @@ import { authenticate } from './_shared/auth';
 import { json } from './_shared/json';
 import { getJsonStore } from './_shared/storage';
 import { canAccessVisit } from './_shared/visit-access';
+import { startBackgroundSync } from './_shared/background-sync-trigger';
 import { generateVisitId, getVisit, upsertVisit } from './_shared/visits';
 import { getUtf8ByteLength, VISIT_PAYLOAD_CHUNK_MAX_BYTES } from '../../src/services/visitPayload';
 
@@ -151,12 +152,14 @@ export default async (request: Request, _context: Context) => {
   });
 
   await removeUploadChunks(auth.sub, uploadId, total);
+  const syncStarted = await startBackgroundSync(request, record.visitId);
 
   return json({
     visitId: record.visitId,
     syncStatus: record.syncStatus,
     updatedAt: record.updatedAt,
     chunked: true,
+    syncStarted,
   }, 201);
 };
 

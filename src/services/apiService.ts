@@ -130,6 +130,7 @@ const createChunkedVisit = async (payload: any, serializedPayload: string) => {
 
   return requestJson<any>('/visits/upload', {
     method: 'POST',
+    headers: { 'X-Criativa-Start-Sync': 'background' },
     body: toJsonBody({
       action: 'finalize',
       uploadId,
@@ -266,6 +267,7 @@ export const apiService = {
 
     return requestJson<any>('/visits', {
       method: 'POST',
+      headers: { 'X-Criativa-Start-Sync': 'background' },
       body: serializedPayload,
     });
   },

@@ -13,7 +13,13 @@ const isVercelRuntime = () => Boolean((globalThis as typeof globalThis & { VERCE
 
 type NetlifyStoreFactory = (name: string) => Store;
 
-const createNetlifyStore: NetlifyStoreFactory = (name) => getStore({ name, consistency: 'strong' });
+const createNetlifyStore: NetlifyStoreFactory = (name) => {
+  const siteID = process.env.NETLIFY_BLOBS_SITE_ID;
+  const token = process.env.NETLIFY_BLOBS_TOKEN;
+  return siteID && token
+    ? getStore({ name, siteID, token, consistency: 'strong' })
+    : getStore({ name, consistency: 'strong' });
+};
 
 export const isExpiredNetlifyBlobTokenError = (error: unknown) =>
   error instanceof Error && error.message.includes('Failed to decode token: Token expired');

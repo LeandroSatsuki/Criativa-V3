@@ -36,6 +36,14 @@ type GoogleSyncOptions = {
 };
 
 const GOOGLE_DEFAULT_PHOTOS_PER_BATCH = 10;
+const GOOGLE_STALE_JOB_AGE_MS = 30 * 60 * 1000;
+
+const hasStalePendingGoogleJob = (visit: VisitRecord, now = Date.now()) => {
+  const googleSync = visit.payload?.googleSync || {};
+  if (!googleSync.pendingBatchId && !googleSync.pendingFinalizeId) return false;
+  const updatedAt = Date.parse(visit.updatedAt);
+  return Number.isFinite(updatedAt) && now - updatedAt >= GOOGLE_STALE_JOB_AGE_MS;
+};
 
 const createManifest = (visit: VisitRecord, totalPhotos: number): DriveSyncManifest => ({
   contractVersion: MAKE_CONTRACT_VERSION,
@@ -97,6 +105,7 @@ export const syncVisitRecordGoogle = async (
   visit: VisitRecord,
   options: GoogleSyncOptions = {},
 ): Promise<GoogleSyncResult> => {
+  const stalePendingJobAtStart = hasStalePendingGoogleJob(visit);
   const events = buildMakePhotoEvents(visit.payload);
   let manifest = createManifest(visit, events.length);
   let googleSync: GoogleSyncState = { ...(visit.payload?.googleSync || {}) };
@@ -115,7 +124,7 @@ export const syncVisitRecordGoogle = async (
       let response: Record<string, any>;
       if (googleSync.pendingBatchId) {
         response = await requestGoogle(`/v1/ingress/jobs/${encodeURIComponent(googleSync.pendingBatchId)}`);
-        if (response.state === 'dead_letter') {
+        if (response.state === 'dead_letter' || (options.recoverDeadLetter && stalePendingJobAtStart)) {
           if (!options.recoverDeadLetter) throw new Error('Lote Google excedeu o limite de tentativas.');
 
           const retryState = getGoogleRetryState(current);
@@ -218,7 +227,7 @@ export const syncVisitRecordGoogle = async (
       let response: Record<string, any>;
       if (googleSync.pendingFinalizeId) {
         response = await requestGoogle(`/v1/ingress/jobs/${encodeURIComponent(googleSync.pendingFinalizeId)}`);
-        if (response.state === 'dead_letter') {
+        if (response.state === 'dead_letter' || (options.recoverDeadLetter && stalePendingJobAtStart)) {
           if (!options.recoverDeadLetter) throw new Error('Finalizacao Google excedeu o limite de tentativas.');
 
           const retryState = getGoogleRetryState(current);

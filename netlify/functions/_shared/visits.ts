@@ -29,6 +29,7 @@ export type VisitRecord = {
 
 const visitStore = getJsonStore('criativa-visits');
 const visitSummaryStore = getJsonStore('criativa-visit-summaries');
+const pendingVisitSummaryStore = getJsonStore('criativa-pending-visit-summaries');
 
 const keyFor = (visitId: string) => `visits/${visitId}`;
 const summaryKeyFor = (visitId: string) => `visits/${visitId}`;
@@ -49,16 +50,37 @@ export const getVisit = async (visitId: string) => {
 
 export const saveVisit = async (record: VisitRecord) => {
   await visitStore.set(keyFor(record.visitId), record);
-  try {
-    await visitSummaryStore.set(summaryKeyFor(record.visitId), buildVisitSummary(record));
-  } catch (error) {
-    console.error(JSON.stringify({
-      event: 'visit_summary_write_failed',
-      visitId: record.visitId,
-      errorType: error instanceof Error ? error.name : 'UnknownError',
-    }));
-  }
+  const summary = buildVisitSummary(record);
+  await Promise.all([
+    visitSummaryStore.set(summaryKeyFor(record.visitId), summary).catch((error) => {
+      console.error(JSON.stringify({
+        event: 'visit_summary_write_failed',
+        visitId: record.visitId,
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      }));
+    }),
+    (record.syncStatus === 'enviado'
+      ? pendingVisitSummaryStore.remove(summaryKeyFor(record.visitId))
+      : pendingVisitSummaryStore.set(summaryKeyFor(record.visitId), summary)
+    ).catch((error) => {
+      console.error(JSON.stringify({
+        event: 'pending_visit_summary_write_failed',
+        visitId: record.visitId,
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      }));
+    }),
+  ]);
   return record;
+};
+
+export const listPendingVisitSummaries = async () => {
+  const keys = await pendingVisitSummaryStore.list('visits/');
+  const summaries = await mapWithConcurrency(
+    keys,
+    SUMMARY_READ_CONCURRENCY,
+    (key) => pendingVisitSummaryStore.get<VisitSummary>(key),
+  );
+  return summaries.filter(Boolean) as VisitSummary[];
 };
 
 export const upsertVisit = async (payload: any, syncStatus: VisitRecord['syncStatus'] = 'pendente') => {
