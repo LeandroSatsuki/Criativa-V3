@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## [2026-08-31] - Estabilidade do painel supervisor e leituras operacionais
+
+### Causa
+- O painel carregava centenas de resumos do Netlify Blobs em paralelo; com 559 visitas, execucoes chegaram a 20 segundos e ao limite de 1.024 MB de memoria.
+- Eventos de foco, retorno da internet e `pageshow` podiam iniciar mais de uma atualizacao do painel ao mesmo tempo.
+- A fila de sincronizacao consultava visitas completas, incluindo fotos em base64, embora precisasse apenas de status, loja e promotor.
+
+### Solucao aplicada
+- Leituras de resumos e visitas passaram a usar concorrencia limitada e preservar a ordem dos resultados.
+- O painel ganhou cache autenticado de 60 segundos e reaproveitamento da mesma construcao em chamadas simultaneas no mesmo processo.
+- O aplicativo impede uma segunda atualizacao enquanto a primeira ainda estiver em andamento.
+- A fila de sincronizacao passou a usar somente o indice leve de resumos, sem carregar fotos.
+- Correcao publicada de forma atomica no deploy produtivo `6a959a7dcf34d7c42fde4cac`.
+
+### Checklist
+- [x] Fluxos de fotos, visitas e Google Sync mantidos sem alteracao.
+- [x] Painel, detalhe do promotor, saude operacional e fila validados com 559 registros.
+- [x] Nenhum registro produtivo foi removido ou regravado durante os testes.
+- [x] Rota legada `GET /api/visits` mantida compativel e com concorrencia limitada.
+
+### Seguranca
+- O cache continua protegido pela autenticacao e nao e enviado com cabecalhos publicos de cache.
+- O cache expira em 60 segundos e rejeita datas invalidas ou futuras.
+- A limitacao de concorrencia reduz picos de memoria sem alterar os dados retornados.
+
+### Testes realizados
+- 107 testes automatizados, TypeScript e build de producao aprovados.
+- Preview `6a95995dccc035aee349a15a`: painel frio em 4,1 segundos e chamadas em cache entre 0,37 e 1,76 segundos.
+- Detalhe do promotor, saude operacional e fila retornaram HTTP 200 no preview.
+
 ## [2026-08-27] - Recuperacao retrocompativel de lotes Google antigos
 
 ### Causa

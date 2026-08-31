@@ -11,6 +11,7 @@ import {
   completeVisitSummaryIndex,
   type VisitSummary,
 } from './visit-summary';
+import { mapWithConcurrency } from './async-pool';
 
 export type VisitRecord = {
   visitId: string;
@@ -32,6 +33,8 @@ const visitSummaryStore = getJsonStore('criativa-visit-summaries');
 const keyFor = (visitId: string) => `visits/${visitId}`;
 const summaryKeyFor = (visitId: string) => `visits/${visitId}`;
 const SUMMARY_MIGRATION_BATCH_SIZE = 4;
+const SUMMARY_READ_CONCURRENCY = 24;
+const FULL_VISIT_READ_CONCURRENCY = 4;
 
 export const generateVisitId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -107,8 +110,10 @@ export const updateVisit = async (visitId: string, patch: any) => {
 
 export const listVisits = async () => {
   const keys = await visitStore.list('visits/');
-  const visits = await Promise.all(
-    keys.map(async (key) => visitStore.get<VisitRecord>(key)),
+  const visits = await mapWithConcurrency(
+    keys,
+    FULL_VISIT_READ_CONCURRENCY,
+    (key) => visitStore.get<VisitRecord>(key),
   );
   return visits.filter(Boolean) as VisitRecord[];
 };
@@ -120,8 +125,10 @@ export const listVisitSummaries = async () => {
   ]);
   const visitKeySet = new Set(visitKeys);
   const validSummaryKeys = summaryKeys.filter((key) => visitKeySet.has(key));
-  const summaries = (await Promise.all(
-    validSummaryKeys.map((key) => visitSummaryStore.get<VisitSummary>(key)),
+  const summaries = (await mapWithConcurrency(
+    validSummaryKeys,
+    SUMMARY_READ_CONCURRENCY,
+    (key) => visitSummaryStore.get<VisitSummary>(key),
   )).filter(Boolean) as VisitSummary[];
   const missingCount = visitKeys.length - summaries.length;
   if (missingCount > 0) {

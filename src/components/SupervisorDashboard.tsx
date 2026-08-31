@@ -99,8 +99,9 @@ const SupervisorDashboard: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
+    let pendingLoad: Promise<void> | null = null;
 
-    const loadDashboard = async () => {
+    const performDashboardLoad = async () => {
       try {
         const response = await apiService.getSupervisorDashboard();
         if (cancelled) return;
@@ -114,6 +115,15 @@ const SupervisorDashboard: React.FC = () => {
       } finally {
         if (!cancelled) setLoading(false);
       }
+    };
+
+    const loadDashboard = () => {
+      if (!pendingLoad) {
+        pendingLoad = performDashboardLoad().finally(() => {
+          pendingLoad = null;
+        });
+      }
+      return pendingLoad;
     };
 
     void loadDashboard();
