@@ -9,10 +9,13 @@
 
 ### Solucao aplicada
 - A credencial permanente do Google Cloud foi alinhada no contexto de producao do Netlify e mantida como segredo restrito a Functions.
+- O Cloud Run recebeu a revisao `criativa-sync-ingress-prod-00002-5jg`, com troca atomica e 100% do trafego somente depois de ficar pronta.
 - Clientes compativeis solicitam o inicio da sincronizacao na mesma gravacao da visita; clientes antigos continuam usando o fluxo anterior.
 - Foi adicionada reconciliacao programada a cada cinco minutos, limitada a uma visita antiga por execucao e somente para o provedor `google-v1`.
 - Jobs Google pendentes ha mais de 30 minutos podem receber uma nova geracao idempotente durante a recuperacao autenticada.
 - Foi criado um indice leve de visitas pendentes para evitar carregar fotos em base64 durante a reconciliacao.
+- Correcao publicada no deploy produtivo `6a95b9bf404d46cc591294d2`.
+- Treze visitas Google preservadas no servidor foram conciliadas e finalizadas; a auditoria terminou com 573 de 579 visitas enviadas.
 
 ### Checklist
 - [x] Nenhuma fila local do celular e removida ou alterada automaticamente.
@@ -28,7 +31,9 @@
 ### Testes realizados
 - 111 testes automatizados, lint, TypeScript e build de producao aprovados.
 - 22 testes do worker Google e respectivo build aprovados.
-- Autenticacao entre Netlify e Google validada sem expor o valor da credencial.
+- Autenticacao entre Netlify e Google validada pela rota protegida sem expor o valor da credencial.
+- Aplicativo e `/api/health` responderam HTTP 200 depois do deploy.
+- As seis pendencias restantes foram confirmadas como falhas legadas do Make, entre julho e 17 de agosto, e nao foram alteradas.
 
 ## [2026-08-31] - Estabilidade do painel supervisor e leituras operacionais
 
