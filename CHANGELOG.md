@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## [2026-09-01] - Retorno seguro durante visita ativa
+
+### Causa
+- Depois de confirmar a foto de entrada, o painel da visita nao oferecia uma forma segura de voltar para a lista de PDVs.
+- Uma navegacao direta para outro PDV poderia substituir os dados identificadores da visita que ainda estava em andamento.
+
+### Solucao aplicada
+- O painel geral recebeu um botao `Voltar` no topo quando existe uma visita ativa.
+- O botao abre uma escolha entre voltar mantendo todo o registro, cancelar o registro atual ou permanecer na visita.
+- Ao voltar sem cancelar, o PDV atual aparece como `Registro em andamento` e pode ser retomado no ponto salvo.
+- Outros PDVs nao podem substituir uma visita ativa; o usuario precisa retomar ou cancelar o registro primeiro.
+- Correcao publicada no deploy produtivo `6a972a16ae93f44688b628d6`.
+
+### Checklist
+- [x] Fotos e progresso preservados na opcao de apenas voltar.
+- [x] Cancelamento limitado ao rascunho atual.
+- [x] Fila de visitas pendentes nao e removida nem alterada.
+- [x] Fluxos de upload, Google Sync e painel supervisor mantidos sem alteracao.
+
+### Seguranca
+- O cancelamento reutiliza apenas a limpeza controlada do estado da visita atual.
+- Nenhuma API de exclusao do servidor ou da fila offline e chamada pelo novo dialogo.
+- A troca para outro PDV fica bloqueada enquanto existir um registro ativo.
+
+### Testes realizados
+- Suite completa com 117 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Preview `6a9729c393021d4d6aa15520` validado antes da publicacao.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 no dominio produtivo com o bundle `index-BLSBXHs5.js`.
+
 ## [2026-08-31] - Reducao de memoria da fila offline
 
 ### Causa
