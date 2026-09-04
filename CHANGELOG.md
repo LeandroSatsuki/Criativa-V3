@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## [2026-09-04] - Visita iniciada somente pela foto de entrada
+
+### Causa
+- A selecao de um PDV criava imediatamente o ID e o horario da visita, antes de qualquer foto de entrada.
+- Esse rascunho incompleto era restaurado como `Visita em andamento`, inclusive no dia seguinte.
+- Como o cancelamento aparecia somente depois da entrada, um clique acidental podia bloquear outro PDV e levar o usuario a reinstalar o aplicativo.
+
+### Solucao aplicada
+- Selecionar um PDV agora apenas abre provisoriamente a tela da fachada, sem criar visita ou horario de entrada.
+- O ID e o horario passam a ser criados somente depois que a foto de entrada e processada com sucesso.
+- O retorno antes da foto volta diretamente para a lista de PDVs e permite escolher outra loja.
+- Se a foto ja foi registrada, o retorno oferece preservar ou cancelar o registro tambem na tela da fachada.
+- Rascunhos antigos que possuem apenas ID, loja ou horario, mas nenhuma foto de entrada nem check-in confirmado, sao liberados automaticamente.
+- Correcao publicada no deploy produtivo `6a9ab5ac637396b153070a2b`.
+
+### Checklist
+- [x] Clique isolado no PDV nao cria uma visita em andamento.
+- [x] Visitas reais com foto de entrada permanecem preservadas.
+- [x] Rascunhos antigos sem foto sao recuperados sem reinstalacao.
+- [x] Fila offline, uploads, Google Sync e painel supervisor nao foram alterados.
+
+### Seguranca
+- A recuperacao exige ausencia simultanea de foto de entrada, tarefa de check-in e confirmacao de entrada.
+- Nenhuma visita enviada, foto registrada ou item da fila offline e removido.
+- A atualizacao do PWA continua aguardando o fechamento das telas abertas, evitando interromper visitas em execucao.
+
+### Testes realizados
+- Suite completa com 121 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Preview `6a9ab5159792795fa4c614dd` validado antes da publicacao e sem erros no console.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao com o bundle `index-B7eYqlu6.js`.
+
 ## [2026-09-01] - Retorno seguro durante visita ativa
 
 ### Causa
