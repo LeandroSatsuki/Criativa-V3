@@ -37,3 +37,13 @@ test('voltar da visita preserva o rascunho e cancelar nao remove a fila de envio
   assert.match(contentArea, /hasActiveVisit && !isCurrentStore/);
   assert.doesNotMatch(contentArea, /showVisitExitDialog[\s\S]{0,4000}removeQueuedVisit/);
 });
+
+test('selecionar PDV nao inicia visita antes da foto de entrada', async () => {
+  const app = await readSource('../src/App.tsx');
+  const contentArea = await readSource('../src/components/ContentArea.tsx');
+
+  assert.match(contentArea, /const handleCheckIn[\s\S]*?updateVisit\('visitId', null\)/);
+  assert.match(contentArea, /section === SectionId\.Facade[\s\S]*?generateVisitId\(\)/);
+  assert.match(contentArea, /sectionId === SectionId\.Facade && hasStartedVisit\(visitState\)/);
+  assert.match(app, /recoverUnstartedVisit\(saved\)/);
+});

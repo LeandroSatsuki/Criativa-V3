@@ -22,6 +22,7 @@ import {
 } from './services/syncQueue';
 import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
+import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -45,14 +46,6 @@ type PendingSyncView = {
   };
 };
 
-const hasVisitInProgress = (state: {
-  visitId?: string | null;
-  checkInDone?: boolean;
-  currentStoreId?: string;
-}) => Boolean(
-  state.visitId || state.checkInDone || state.currentStoreId,
-);
-
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
@@ -68,9 +61,10 @@ const App: React.FC = () => {
       if (saved) {
         const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
         const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
+        const restored = sessionMatchesDraft ? recoverUnstartedVisit(saved) : {};
         return {
           ...INITIAL_STATE,
-          ...(sessionMatchesDraft ? saved : {}),
+          ...restored,
           user: session?.user || null,
           draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
         };
@@ -83,7 +77,7 @@ const App: React.FC = () => {
   });
 
   const [activeSection, setActiveSection] = useState<SectionId>(() =>
-    resolveSessionSection(visitState.user?.role, visitState.step, hasVisitInProgress(visitState)),
+    resolveSessionSection(visitState.user?.role, visitState.step, hasStartedVisit(visitState)),
   );
 
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
@@ -110,17 +104,17 @@ const App: React.FC = () => {
       if (saved) {
         const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
         const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
-        const restored = sessionMatchesDraft ? saved : {};
+        const restored = sessionMatchesDraft ? recoverUnstartedVisit(saved) : null;
         setVisitState({
           ...INITIAL_STATE,
-          ...restored,
+          ...(restored || {}),
           user: session?.user || null,
           draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
         });
         setActiveSection(resolveSessionSection(
           session?.user.role,
-          sessionMatchesDraft ? saved.step : SectionId.Dashboard,
-          sessionMatchesDraft && hasVisitInProgress(saved),
+          restored?.step || SectionId.Dashboard,
+          Boolean(restored && hasStartedVisit(restored)),
         ));
       } else if (session?.user) {
         setActiveSection(resolveSessionSection(session.user.role));
@@ -469,7 +463,7 @@ const App: React.FC = () => {
       const userData = await apiService.login(loginForm);
       setLoginForm({ user: userData.user, pass: '' });
       const sameDraftOwner = !visitState.draftOwnerId || visitState.draftOwnerId === userData.id;
-      const hasActiveVisit = sameDraftOwner && hasVisitInProgress(visitState);
+      const hasActiveVisit = sameDraftOwner && hasStartedVisit(visitState);
       setVisitState((prev: any) => sameDraftOwner
         ? { ...prev, user: userData, draftOwnerId: userData.id }
         : { ...INITIAL_STATE, user: userData, draftOwnerId: userData.id });

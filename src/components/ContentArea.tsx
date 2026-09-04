@@ -17,6 +17,7 @@ import {
 } from '../services/syncQueue';
 import { classifyQueuedSyncFailure } from '../services/syncPolicy';
 import { generateVisitId } from '../services/visitId';
+import { hasStartedVisit } from '../services/visitLifecycle';
 import {
   buildPortraitPhotoLayout,
   compressStampedPhoto,
@@ -95,7 +96,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   }, [sectionId, queueOwnerId]);
 
   const handleCheckIn = (store: any) => {
-    const hasActiveVisit = Boolean(visitState.visitId && visitState.currentStoreId);
+    const hasActiveVisit = hasStartedVisit(visitState);
     const isCurrentStore = String(store.id) === String(visitState.currentStoreId);
 
     if (hasActiveVisit && !isCurrentStore) {
@@ -108,12 +109,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       return;
     }
 
-    if (!visitState.visitId) {
-      updateVisit('visitId', generateVisitId());
-    }
+    updateVisit('visitId', null);
     updateVisit('currentStore', store.name);
     updateVisit('currentStoreId', store.id);
-    updateVisit('checkInTime', getBrasiliaISO());
+    updateVisit('checkInTime', null);
     navigateTo(SectionId.Facade);
   };
 
@@ -274,7 +273,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
     return (
       <button
-        onClick={() => navigateTo(target)}
+        onClick={() => {
+          if (sectionId === SectionId.Facade && hasStartedVisit(visitState)) {
+            setShowVisitExitDialog(true);
+            return;
+          }
+          navigateTo(target);
+        }}
         className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-white border border-slate-100 shadow-sm text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-[#E65C5C] hover:border-[#E65C5C]/20 transition-all"
       >
         <ArrowLeft size={14} />
@@ -384,6 +389,11 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     } catch (error: any) {
       alert(error.message || 'Não foi possível processar a foto.');
       return;
+    }
+
+    if (section === SectionId.Facade) {
+      if (!visitState.visitId) updateVisit('visitId', generateVisitId());
+      if (!visitState.checkInTime) updateVisit('checkInTime', getBrasiliaISO());
     }
         
     if (isIndustryStep(section) && activeIndustry) {
@@ -679,70 +689,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       case SectionId.Dashboard:
         return (
           <div className="space-y-8 animate-in">
-            <AnimatePresence>
-              {showVisitExitDialog && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[90] bg-[#0F172A]/55 backdrop-blur-sm flex items-center justify-center p-5"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="visit-exit-title"
-                >
-                  <motion.div
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 16 }}
-                    className="w-full max-w-md bg-white rounded-[32px] p-7 shadow-2xl border border-slate-100 space-y-6"
-                  >
-                    <div className="space-y-2">
-                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-500">Registro em andamento</p>
-                      <h3 id="visit-exit-title" className="text-2xl font-black uppercase tracking-tight text-[#0F172A]">
-                        O que deseja fazer?
-                      </h3>
-                      <p className="text-xs font-bold text-slate-500 leading-relaxed">
-                        Você pode voltar para a lista sem perder as fotos ou cancelar este registro.
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowVisitExitDialog(false);
-                          navigateTo(SectionId.CheckIn);
-                        }}
-                        className="w-full flex items-center justify-center gap-2 bg-[#0F172A] text-white px-5 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
-                      >
-                        <ArrowLeft size={16} />
-                        Voltar mantendo o registro
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowVisitExitDialog(false);
-                          onReset();
-                        }}
-                        className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-100 px-5 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
-                      >
-                        <Trash2 size={16} />
-                        Cancelar registro
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowVisitExitDialog(false)}
-                        className="w-full px-5 py-3 text-slate-500 font-black uppercase tracking-widest text-[10px]"
-                      >
-                        Continuar na visita
-                      </button>
-                    </div>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {Boolean(visitState.visitId || visitState.currentStoreId || visitState.checkInDone) && (
+            {hasStartedVisit(visitState) && (
               <button
                 type="button"
                 onClick={() => setShowVisitExitDialog(true)}
@@ -926,7 +873,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     <div className="text-left">
                       <p className="font-black uppercase text-lg tracking-tight text-[#0F172A] group-hover:text-[#E65C5C] transition-colors">{store.name}</p>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{store.region}</p>
-                      {visitState.currentStoreId === store.id && visitState.visitId && (
+                      {String(visitState.currentStoreId) === String(store.id) && hasStartedVisit(visitState) && (
                         <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mt-2">Registro em andamento</p>
                       )}
                     </div>
@@ -1702,6 +1649,68 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto">
+      <AnimatePresence>
+        {showVisitExitDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[90] bg-[#0F172A]/55 backdrop-blur-sm flex items-center justify-center p-5"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="visit-exit-title"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              className="w-full max-w-md bg-white rounded-[32px] p-7 shadow-2xl border border-slate-100 space-y-6"
+            >
+              <div className="space-y-2">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-500">Registro em andamento</p>
+                <h3 id="visit-exit-title" className="text-2xl font-black uppercase tracking-tight text-[#0F172A]">
+                  O que deseja fazer?
+                </h3>
+                <p className="text-xs font-bold text-slate-500 leading-relaxed">
+                  Você pode voltar para a lista sem perder as fotos ou cancelar este registro.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVisitExitDialog(false);
+                    navigateTo(SectionId.CheckIn);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-[#0F172A] text-white px-5 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
+                >
+                  <ArrowLeft size={16} />
+                  Voltar mantendo o registro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVisitExitDialog(false);
+                    onReset();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-100 px-5 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
+                >
+                  <Trash2 size={16} />
+                  Cancelar registro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowVisitExitDialog(false)}
+                  className="w-full px-5 py-3 text-slate-500 font-black uppercase tracking-widest text-[10px]"
+                >
+                  Continuar na visita
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence mode="wait">
         <motion.div
           key={sectionId}
