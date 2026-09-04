@@ -162,6 +162,23 @@ test('preserva o horario de Brasilia em filas antigas sem fuso', () => {
   assert.equal(finalize.TEMPO_PERMANENCIA, '0h 1m');
 });
 
+test('mantem a data da visita pelo check-in quando o envio ocorre no dia seguinte', () => {
+  const delayedPayload = {
+    ...payload,
+    timestamp: '2026-07-18T08:45:00-03:00',
+  };
+  const events = buildMakePhotoEvents(delayedPayload);
+  const manifest: DriveSyncManifest = {
+    contractVersion: '2.1',
+    totalPhotos: events.length,
+    photos: {},
+  };
+  const finalize = buildMakeVisitFinalizeEvent(delayedPayload, events, manifest);
+
+  assert.ok(events.every((event) => event.PASTA_VISITA_NOME === '17-07-2026'));
+  assert.equal(finalize.DATA_VISITA, '17/07/2026');
+});
+
 test('não aceita HTTP 200 genérico como confirmação de upload', () => {
   const event = buildMakePhotoEvents(payload)[0];
   assert.throws(() => validatePhotoUploadResponse('Accepted', event));

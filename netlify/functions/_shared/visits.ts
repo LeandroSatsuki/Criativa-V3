@@ -199,8 +199,8 @@ export const buildTransformedPayload = (payload: any) => {
   };
 
   const storeNameClean = cleanText(payload.currentStore || 'LOJA', 'LOJA').replace(/\s+/g, '_').toUpperCase();
-  const fileDate = formatFileDate(payload.timestamp || payload.checkInTime);
-  const dataVisita = formatBrasiliaDate(payload.timestamp || payload.checkInTime);
+  const fileDate = formatFileDate(payload.checkInTime || payload.timestamp);
+  const dataVisita = formatBrasiliaDate(payload.checkInTime || payload.timestamp);
   const idVisita = payload.visitId || generateVisitId();
   const nomePromotor = cleanText(payload.user?.name, 'Promotor');
   const nomeLoja = cleanText(payload.currentStore, 'Loja');

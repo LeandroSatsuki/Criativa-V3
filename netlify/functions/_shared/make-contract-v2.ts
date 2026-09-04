@@ -240,7 +240,7 @@ const collectPhotoCandidates = (payload: any) => {
 
 export const buildMakePhotoEvents = (payload: any): MakePhotoEvent[] => {
   const visitId = normalizeText(payload.visitId, 'VISIT-SEM-ID');
-  const fileDate = formatFileDate(payload.timestamp || payload.checkInTime);
+  const fileDate = formatFileDate(payload.checkInTime || payload.timestamp);
   const storeName = normalizeText(payload.currentStore, 'Loja');
   const promoterName = normalizeText(payload.user?.name, 'Promotor');
   const storeSlug = safeName(storeName, 'LOJA');
@@ -414,7 +414,7 @@ export const buildMakeVisitFinalizeEvent = (
     IDEMPOTENCY_KEY: visitId,
     ROW_MODE: 'UPSERT_BY_ID_VISITA',
     ID_VISITA: visitId,
-    DATA_VISITA: formatBrasiliaDate(payload.timestamp || payload.checkInTime),
+    DATA_VISITA: formatBrasiliaDate(payload.checkInTime || payload.timestamp),
     NOME_PROMOTOR: normalizeText(payload.user?.name, 'Promotor'),
     NOME_LOJA: normalizeText(payload.currentStore, 'Loja'),
     'HORA_ENTRADA_CHECK-IN': formatBrasiliaTime(payload.checkInTime),

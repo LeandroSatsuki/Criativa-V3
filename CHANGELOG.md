@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## [2026-09-04] - Data operacional preservada em reenvios offline
+
+### Causa
+- Visitas iniciadas em um dia e sincronizadas no dia seguinte priorizavam o horario do reenvio ao montar a data da planilha e das pastas no Drive.
+- A visita permanecia idempotente, mas podia ser arquivada na data de sincronizacao em vez da data real do check-in.
+
+### Solucao aplicada
+- A data operacional agora prioriza `checkInTime` nos eventos de fotos, na finalizacao e no transformador legado.
+- `timestamp` permanece como fallback somente quando a visita nao possui horario de entrada.
+- Correcao publicada no deploy produtivo `6a9abbae2706936c8b103fd4`.
+
+### Checklist
+- [x] Visita offline reenviada no dia seguinte permanece na data do check-in.
+- [x] Nome da pasta da visita e data da linha usam a mesma referencia.
+- [x] Chave idempotente, fotos, fila local e processamento em segundo plano nao foram alterados.
+
+### Seguranca
+- Nenhum registro produtivo foi editado ou removido durante a auditoria.
+- A alteracao e restrita a escolha de uma data ja presente no payload autenticado.
+- O fallback anterior foi mantido para compatibilidade com registros legados sem check-in.
+
+### Testes realizados
+- Suite completa com 122 testes aprovados, incluindo regressao de envio no dia seguinte.
+- TypeScript e build de producao aprovados.
+- Preview `6a9abb52672d40f47b330a26` validado antes da publicacao.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao.
+
 ## [2026-09-04] - Visita iniciada somente pela foto de entrada
 
 ### Causa
