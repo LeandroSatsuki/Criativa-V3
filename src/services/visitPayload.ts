@@ -5,6 +5,17 @@ const encoder = new TextEncoder();
 
 export const getUtf8ByteLength = (value: string) => encoder.encode(value).byteLength;
 
+export const getMissingChunkIndexes = (total: number, receivedIndexes: unknown) => {
+  const received = new Set(
+    Array.isArray(receivedIndexes)
+      ? receivedIndexes.filter((index): index is number => Number.isInteger(index) && index >= 0 && index < total)
+      : [],
+  );
+
+  return Array.from({ length: total }, (_, index) => index)
+    .filter((index) => !received.has(index));
+};
+
 const avoidSplittingSurrogatePair = (value: string, index: number) => {
   if (index <= 0 || index >= value.length) return index;
 

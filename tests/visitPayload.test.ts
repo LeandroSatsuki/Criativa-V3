@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  getMissingChunkIndexes,
   getUtf8ByteLength,
   splitUtf8Text,
   VISIT_PAYLOAD_CHUNK_MAX_BYTES,
@@ -28,5 +29,10 @@ test('mantém payload pequeno em um único fragmento', () => {
 
 test('rejeita limite de fragmento inválido', () => {
   assert.throws(() => splitUtf8Text('payload', 0));
+});
+
+test('retoma upload enviando somente fragmentos ausentes', () => {
+  assert.deepEqual(getMissingChunkIndexes(5, [0, 2, 2, 9, -1]), [1, 3, 4]);
+  assert.deepEqual(getMissingChunkIndexes(3, undefined), [0, 1, 2]);
 });
 

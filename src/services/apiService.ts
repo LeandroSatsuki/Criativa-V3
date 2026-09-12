@@ -14,6 +14,7 @@ import {
 import { isNetworkRequestFailure } from './networkStatus';
 import {
   DIRECT_VISIT_PAYLOAD_MAX_BYTES,
+  getMissingChunkIndexes,
   getUtf8ByteLength,
   splitUtf8Text,
 } from './visitPayload';
@@ -113,10 +114,22 @@ const createChunkedVisit = async (payload: any, serializedPayload: string) => {
   const visitId = String(payload.visitId || buildVisitName('VISIT'));
   const chunks = splitUtf8Text(serializedPayload);
   const uploadId = await buildUploadId(serializedPayload);
+  const uploadStatus = await requestJson<{ receivedIndexes?: number[] }>('/visits/upload', {
+    method: 'POST',
+    retries: 1,
+    body: toJsonBody({
+      action: 'status',
+      uploadId,
+      visitId,
+      total: chunks.length,
+    }),
+  });
+  const missingIndexes = getMissingChunkIndexes(chunks.length, uploadStatus.receivedIndexes);
 
-  for (let index = 0; index < chunks.length; index += 1) {
+  for (const index of missingIndexes) {
     await requestJson('/visits/upload', {
       method: 'POST',
+      retries: 2,
       body: toJsonBody({
         action: 'chunk',
         uploadId,

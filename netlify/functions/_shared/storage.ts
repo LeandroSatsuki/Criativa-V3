@@ -3,6 +3,7 @@ import { getStore, type Store } from '@netlify/blobs';
 
 type JsonStore = {
   get<T = unknown>(key: string): Promise<T | null>;
+  exists(key: string): Promise<boolean>;
   set(key: string, value: unknown): Promise<void>;
   list(prefix: string): Promise<string[]>;
   remove(key: string): Promise<void>;
@@ -41,6 +42,8 @@ const netlifyStore = (name: string): JsonStore => {
   return {
     get: async <T = unknown>(key: string) =>
       withFreshNetlifyStore(name, (store) => store.get(key, { type: 'json' }) as Promise<T | null>),
+    exists: async (key: string) =>
+      withFreshNetlifyStore(name, async (store) => Boolean(await store.getMetadata(key))),
     set: async (key: string, value: unknown) => {
       await withFreshNetlifyStore(name, (store) => store.setJSON(key, value));
     },
@@ -62,6 +65,7 @@ const vercelStore = (name: string): JsonStore => ({
     if (!blob) return null;
     return JSON.parse(await new Response(blob.stream).text()) as T;
   },
+  exists: async (key: string) => Boolean(await getBlob(vercelPath(name, key), { access: 'private' })),
   set: async (key: string, value: unknown) => {
     await putBlob(vercelPath(name, key), JSON.stringify(value), {
       access: 'private',

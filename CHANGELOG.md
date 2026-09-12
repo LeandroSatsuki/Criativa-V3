@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## [2026-09-12] - Retomada de upload fragmentado
+
+### Causa
+- Em conexoes interrompidas, o envio de uma visita grande podia parar depois de gravar apenas os primeiros fragmentos.
+- Uma nova tentativa recomecava no primeiro fragmento, aumentando o tempo e a chance de outra interrupcao antes da finalizacao.
+
+### Solucao aplicada
+- O servidor agora oferece uma consulta autenticada dos indices de fragmentos ja recebidos.
+- O aplicativo retoma somente os fragmentos ausentes e repete cada gravacao idempotente em falhas transitorias.
+- A visita continua sendo criada apenas depois da remontagem e verificacao criptografica do payload completo.
+- Correcao publicada no deploy produtivo `6aa589429e2cb9e300a0a9fa`.
+
+### Checklist
+- [x] Fragmentos existentes sao preservados e reutilizados.
+- [x] Fragmentos ausentes continuam obrigatorios antes da finalizacao.
+- [x] Aplicativos anteriores permanecem compativeis com a rota.
+- [x] Nenhuma estrutura de fotos, pastas ou filas foi alterada.
+
+### Seguranca
+- A consulta exige a sessao do promotor e usa o ID autenticado na chave do armazenamento.
+- Um usuario nao consegue consultar nem reutilizar fragmentos pertencentes a outro usuario.
+- A validacao SHA-256 integral permanece ativa antes de aceitar a visita.
+
+### Testes realizados
+- Suite completa com 123 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Preview `6aa588e3875c3a3074f75ef0` validado antes da publicacao.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao com o bundle `index-qF5FnZ4C.js`.
+- A rota de consulta recusou requisicao sem sessao com HTTP 401.
+
 ## [2026-09-04] - Data operacional preservada em reenvios offline
 
 ### Causa

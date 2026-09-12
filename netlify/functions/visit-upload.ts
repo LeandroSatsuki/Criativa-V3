@@ -9,7 +9,7 @@ import { generateVisitId, getVisit, upsertVisit } from './_shared/visits';
 import { getUtf8ByteLength, VISIT_PAYLOAD_CHUNK_MAX_BYTES } from '../../src/services/visitPayload';
 
 type UploadRequest = {
-  action?: 'chunk' | 'finalize';
+  action?: 'status' | 'chunk' | 'finalize';
   uploadId?: string;
   visitId?: string;
   index?: number;
@@ -73,6 +73,18 @@ export default async (request: Request, _context: Context) => {
   const uploadId = body.uploadId as string;
   const visitId = body.visitId as string;
   const total = body.total as number;
+
+  if (body.action === 'status') {
+    const metadata = await Promise.all(
+      Array.from({ length: total }, (_, index) =>
+        uploadStore.exists(chunkKey(auth.sub, uploadId, index))),
+    );
+    const receivedIndexes = metadata
+      .map((value, index) => value ? index : -1)
+      .filter((index) => index >= 0);
+
+    return json({ receivedIndexes, total }, 200);
+  }
 
   if (body.action === 'chunk') {
     const index = Number(body.index);
