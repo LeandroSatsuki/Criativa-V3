@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## [2026-09-12] - Reducao da espera entre capturas
+
+### Causa
+- Cada foto podia executar ate cinco buscas adicionais de qualidade JPEG mesmo depois de atingir a faixa segura de tamanho.
+- O aplicativo permitia iniciar outra captura enquanto a foto anterior ainda estava sendo processada, elevando o pico de memoria em celulares.
+- Canvas temporarios permaneciam alocados ate a coleta automatica de memoria e miniaturas eram decodificadas de forma imediata.
+- A lentidao ocorre no processamento local; nenhuma API e chamada entre uma captura e outra e o cache do PWA nao armazena fotos.
+
+### Solucao aplicada
+- A busca de qualidade foi reduzida de cinco para duas etapas, preservando o alvo de 100 KB e o teto obrigatorio de 120 KB.
+- Todas as telas de captura agora impedem compressoes simultaneas e exibem o estado `Processando foto`.
+- O canvas e liberado imediatamente apos gerar a foto comprimida.
+- Miniaturas usam carregamento tardio e decodificacao assincrona.
+- O seletor da camera e limpo depois da escolha para permitir nova captura do mesmo nome de arquivo.
+- Correcao publicada no deploy produtivo `6aa5efc12ef6300fe5973b25`.
+
+### Checklist
+- [x] Resolucao, limite de tamanho, carimbo e formato JPEG preservados.
+- [x] Fachada, antes, estoque, depois, trocas e checkout protegidos contra processamento simultaneo.
+- [x] Estrutura da fila offline e do rascunho IndexedDB mantida sem alteracao.
+- [x] Upload, Google Drive, pastas e painel supervisor mantidos sem alteracao.
+
+### Seguranca
+- Nenhuma foto ou visita existente e migrada, removida ou regravada pelo deploy.
+- A protecao atua somente enquanto uma nova foto esta sendo processada.
+- O teto de 120 KB e a falha segura para imagens acima do limite permanecem ativos.
+
+### Testes realizados
+- Suite completa com 125 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Testes de regressao verificam bloqueio concorrente, liberacao do canvas, recaptura e decodificacao assincrona.
+- Preview `6aa5ef60fa364161ab84ecbd` validado antes da publicacao e sem erros no console.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao com o bundle `index-wQpzsITU.js`.
+- Dominio produtivo validado ate a tela de acesso e sem erros no console.
+
 ## [2026-09-12] - Retomada de upload fragmentado
 
 ### Causa

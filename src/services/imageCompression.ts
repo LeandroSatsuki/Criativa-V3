@@ -5,7 +5,7 @@ export const PHOTO_INITIAL_MAX_LONG_EDGE = 832;
 const MAX_QUALITY = 0.62;
 const MIN_QUALITY = 0.38;
 const EMERGENCY_QUALITIES = [0.28, 0.18];
-const QUALITY_SEARCH_STEPS = 5;
+export const PHOTO_QUALITY_SEARCH_STEPS = 2;
 const FALLBACK_LONG_EDGES = [749, 666, 624, 582, 520];
 
 export type CompressedPhoto = {
@@ -118,7 +118,7 @@ const encodeAtBestQuality = async (canvas: HTMLCanvasElement): Promise<EncodedPh
   let lowerQuality = MIN_QUALITY;
   let upperQuality = MAX_QUALITY;
 
-  for (let attempt = 0; attempt < QUALITY_SEARCH_STEPS; attempt += 1) {
+  for (let attempt = 0; attempt < PHOTO_QUALITY_SEARCH_STEPS; attempt += 1) {
     const quality = (lowerQuality + upperQuality) / 2;
     const blob = await canvasToJpeg(canvas, quality);
     if (blob.size <= PHOTO_TARGET_BYTES) {

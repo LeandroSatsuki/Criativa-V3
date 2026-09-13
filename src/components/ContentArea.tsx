@@ -69,6 +69,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const [queueCount, setQueueCount] = useState(0);
   const [stockIndustry, setStockIndustry] = useState('');
   const [showVisitExitDialog, setShowVisitExitDialog] = useState(false);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const photoProcessingRef = React.useRef(false);
   const queueOwnerId = String(visitState.user?.id || '');
 
   React.useEffect(() => {
@@ -338,8 +340,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     };
     img.onload = async () => {
       URL.revokeObjectURL(imageUrl);
+      let canvas: HTMLCanvasElement | null = null;
       try {
-        const canvas = document.createElement('canvas');
+        canvas = document.createElement('canvas');
         const layout = buildPortraitPhotoLayout(img.width, img.height);
         canvas.width = layout.canvasWidth;
         canvas.height = layout.canvasHeight;
@@ -375,93 +378,104 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         resolve(compressed.base64);
       } catch (error) {
         reject(error);
+      } finally {
+        if (canvas) {
+          canvas.width = 1;
+          canvas.height = 1;
+        }
+        img.onload = null;
+        img.onerror = null;
+        img.removeAttribute('src');
       }
     };
     img.src = imageUrl;
   });
 
-  const handlePhotoCapture = async (section: string, file: File) => {
-    const activeIndustry = selectedIndustry;
-    let compressedBase64 = '';
-
+  const handlePhotoCapture = async (section: string, file: File, industryOverride?: string) => {
+    if (photoProcessingRef.current) return;
+    photoProcessingRef.current = true;
+    setIsProcessingPhoto(true);
     try {
-      compressedBase64 = await processPhotoForReport(file);
-    } catch (error: any) {
-      alert(error.message || 'Não foi possível processar a foto.');
-      return;
-    }
+      const activeIndustry = industryOverride || selectedIndustry;
+      const compressedBase64 = await processPhotoForReport(file);
 
-    if (section === SectionId.Facade) {
-      if (!visitState.visitId) updateVisit('visitId', generateVisitId());
-      if (!visitState.checkInTime) updateVisit('checkInTime', getBrasiliaISO());
-    }
+      if (section === SectionId.Facade) {
+        if (!visitState.visitId) updateVisit('visitId', generateVisitId());
+        if (!visitState.checkInTime) updateVisit('checkInTime', getBrasiliaISO());
+      }
         
-    if (isIndustryStep(section) && activeIndustry) {
-      if (section === SectionId.Estoque) {
-        updateVisit('stockQuantities', (prev: any) => ({ ...prev }));
+      if (isIndustryStep(section) && activeIndustry) {
+        if (section === SectionId.Estoque) {
+          updateVisit('stockQuantities', (prev: any) => ({ ...prev }));
+          updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+            const existing = prev[activeIndustry];
+            if (!existing) return prev;
+            const currentCategoryPhotos = existing.photos?.[section] || [];
+            return {
+              ...prev,
+              [activeIndustry]: {
+                ...existing,
+                photos: {
+                  ...existing.photos,
+                  [section]: [...currentCategoryPhotos, compressedBase64],
+                },
+              },
+            };
+          });
+          updateVisit('photos', (prevPhotos: any = {}) => {
+            const currentCategoryPhotos = prevPhotos[section] || [];
+            return {
+              ...prevPhotos,
+              [section]: [...currentCategoryPhotos, compressedBase64],
+            };
+          });
+          return;
+        }
+
         updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-          const existing = prev[activeIndustry];
-          if (!existing) return prev;
-          const currentCategoryPhotos = existing.photos?.[section] || [];
+          const current = createIndustryExecution(activeIndustry, prev[activeIndustry]);
+          const currentCategoryPhotos = current.photos?.[section] || [];
+          const updated = getExecutionWithStatus({
+            ...current,
+            tasks: {
+              ...current.tasks,
+              [section]: true,
+            },
+            photos: {
+              ...current.photos,
+              [section]: [...currentCategoryPhotos, compressedBase64],
+            },
+          });
           return {
             ...prev,
-            [activeIndustry]: {
-              ...existing,
-              photos: {
-                ...existing.photos,
-                [section]: [...currentCategoryPhotos, compressedBase64],
-              },
-            },
+            [activeIndustry]: updated,
           };
         });
-        updateVisit('photos', (prevPhotos: any = {}) => {
-          const currentCategoryPhotos = prevPhotos[section] || [];
-          return {
-            ...prevPhotos,
-            [section]: [...currentCategoryPhotos, compressedBase64],
-          };
-        });
+        if (section === SectionId.Trocas) {
+          updateVisit('returnsPhotosByIndustry', (prev: Record<string, string[]> = {}) => ({
+            ...prev,
+            [activeIndustry]: [
+              ...(prev[activeIndustry] || []),
+              compressedBase64,
+            ],
+          }));
+        }
         return;
       }
 
-      updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-        const current = createIndustryExecution(activeIndustry, prev[activeIndustry]);
-        const currentCategoryPhotos = current.photos?.[section] || [];
-        const updated = getExecutionWithStatus({
-          ...current,
-          tasks: {
-            ...current.tasks,
-            [section]: true,
-          },
-          photos: {
-            ...current.photos,
-            [section]: [...currentCategoryPhotos, compressedBase64],
-          },
-        });
+      updateVisit('photos', (prevPhotos: any = {}) => {
+        const currentCategoryPhotos = prevPhotos[section] || [];
         return {
-          ...prev,
-          [activeIndustry]: updated,
+          ...prevPhotos,
+          [section]: [...currentCategoryPhotos, compressedBase64],
         };
       });
-      if (section === SectionId.Trocas) {
-        updateVisit('returnsPhotosByIndustry', (prev: Record<string, string[]> = {}) => ({
-          ...prev,
-          [activeIndustry]: [
-            ...(prev[activeIndustry] || []),
-            compressedBase64,
-          ],
-        }));
-      }
-      return;
+    } catch (error: any) {
+      alert(error.message || 'Não foi possível processar a foto.');
+    } finally {
+      photoProcessingRef.current = false;
+      setIsProcessingPhoto(false);
     }
-
-    updateVisit('photos', (prevPhotos: any = {}) => {
-      const currentCategoryPhotos = prevPhotos[section] || [];
-      return {
-        ...prevPhotos,
-        [section]: [...currentCategoryPhotos, compressedBase64],
-      };
-    });
   };
 
   const [syncSuccess, setSyncSuccess] = useState(false);
@@ -653,7 +667,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             <div className="max-w-md mx-auto space-y-6">
               <div className="aspect-[4/3] bg-slate-100 rounded-[32px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden relative group">
                 {facadePhotos[0] ? (
-                  <img src={`data:image/jpeg;base64,${facadePhotos[0]}`} className="w-full h-full object-cover" alt="Fachada" />
+                  <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${facadePhotos[0]}`} className="w-full h-full object-cover" alt="Fachada" />
                 ) : (
                   <Camera className="w-16 h-16 text-slate-300" />
                 )}
@@ -661,11 +675,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   type="file" 
                   accept="image/*" 
                   capture="environment"
+                  disabled={isProcessingPhoto}
                   className="absolute inset-0 opacity-0 cursor-pointer"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
+                    e.currentTarget.value = '';
                     if (file) {
-                      handlePhotoCapture(SectionId.Facade, file);
+                      void handlePhotoCapture(SectionId.Facade, file);
                     }
                   }}
                 />
@@ -975,7 +991,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   </div>
                   <div className="relative shrink-0">
                     <button 
-                      disabled={currentPhotos.length >= MAX_PHOTOS_PER_SECTION}
+                      disabled={isProcessingPhoto || currentPhotos.length >= MAX_PHOTOS_PER_SECTION}
                       className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${currentPhotos.length >= MAX_PHOTOS_PER_SECTION ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Plus size={16} /> Adicionar Foto
@@ -984,11 +1000,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       type="file" 
                       accept="image/*" 
                       capture="environment"
+                      disabled={isProcessingPhoto || currentPhotos.length >= MAX_PHOTOS_PER_SECTION}
                       className="absolute inset-0 opacity-0 cursor-pointer"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
+                        e.currentTarget.value = '';
                         if (file && currentPhotos.length < MAX_PHOTOS_PER_SECTION) {
-                          handlePhotoCapture(sectionId, file);
+                          void handlePhotoCapture(sectionId, file);
                         }
                       }}
                     />
@@ -1000,7 +1018,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {currentPhotos.map((photo, idx) => (
                 <div key={idx} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
-                  <img src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Captura" />
+                  <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Captura" />
                   <button 
                     onClick={() => {
                       const newPhotos = currentPhotos.filter((_, i) => i !== idx);
@@ -1204,7 +1222,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   </div>
                   <div className="relative shrink-0">
                     <button 
-                      disabled={estoquePhotos.length >= MAX_PHOTOS_PER_SECTION}
+                      disabled={isProcessingPhoto || estoquePhotos.length >= MAX_PHOTOS_PER_SECTION}
                       className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${estoquePhotos.length >= MAX_PHOTOS_PER_SECTION ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Plus size={16} /> Adicionar Foto
@@ -1213,36 +1231,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       type="file" 
                       accept="image/*" 
                       capture="environment"
+                      disabled={isProcessingPhoto || estoquePhotos.length >= MAX_PHOTOS_PER_SECTION}
                       className="absolute inset-0 opacity-0 cursor-pointer"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
+                        e.currentTarget.value = '';
                         if (file && estoquePhotos.length < MAX_PHOTOS_PER_SECTION) {
-                          const previousStockIndustry = stockIndustry;
-                          processPhotoForReport(file)
-                            .then((compressedBase64) => {
-                              updateVisit('photos', (prev: any = {}) => {
-                                const currentCategoryPhotos = prev[SectionId.Estoque] || [];
-                                return { ...prev, [SectionId.Estoque]: [...currentCategoryPhotos, compressedBase64] };
-                              });
-                              updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-                                const existing = prev[previousStockIndustry];
-                                if (!existing) return prev;
-                                const currentCategoryPhotos = existing.photos?.[SectionId.Estoque] || [];
-                                return {
-                                  ...prev,
-                                  [previousStockIndustry]: {
-                                    ...existing,
-                                    photos: {
-                                      ...existing.photos,
-                                      [SectionId.Estoque]: [...currentCategoryPhotos, compressedBase64],
-                                    },
-                                  },
-                                };
-                              });
-                            })
-                            .catch((error) => {
-                              alert(error.message || 'Não foi possível processar a foto.');
-                            });
+                          void handlePhotoCapture(SectionId.Estoque, file, stockIndustry);
                         }
                       }}
                     />
@@ -1254,7 +1249,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             <div className="grid grid-cols-3 gap-3">
               {estoquePhotos.map((photo, idx) => (
                 <div key={idx} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
-                  <img src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Estoque" />
+                  <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Estoque" />
                   <button 
                     onClick={() => {
                       const newPhotos = estoquePhotos.filter((_, i) => i !== idx);
@@ -1418,7 +1413,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fotos das Trocas ({returnsPhotos.length}/{MAX_PHOTOS_PER_SECTION})</p>
                     <div className="relative">
                       <button 
-                        disabled={returnsPhotos.length >= MAX_PHOTOS_PER_SECTION}
+                        disabled={isProcessingPhoto || returnsPhotos.length >= MAX_PHOTOS_PER_SECTION}
                         className={`bg-orange-500 text-white px-5 py-3 rounded-xl font-black uppercase text-[9px] tracking-widest flex items-center gap-2 ${returnsPhotos.length >= MAX_PHOTOS_PER_SECTION ? 'opacity-50' : ''}`}
                       >
                         <Camera size={14} /> Capturar
@@ -1427,11 +1422,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                         type="file" 
                         accept="image/*" 
                         capture="environment"
+                        disabled={isProcessingPhoto || returnsPhotos.length >= MAX_PHOTOS_PER_SECTION}
                         className="absolute inset-0 opacity-0 cursor-pointer"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
+                          e.currentTarget.value = '';
                           if (file && returnsPhotos.length < MAX_PHOTOS_PER_SECTION) {
-                            handlePhotoCapture(SectionId.Trocas, file);
+                            void handlePhotoCapture(SectionId.Trocas, file);
                           }
                         }}
                       />
@@ -1441,7 +1438,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   <div className="grid grid-cols-5 gap-2">
                     {returnsPhotos.map((photo, idx) => (
                       <div key={idx} className="aspect-square bg-slate-100 rounded-xl overflow-hidden relative">
-                        <img src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Troca" />
+                        <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Troca" />
                       </div>
                     ))}
                   </div>
@@ -1527,7 +1524,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Foto de Saída</p>
                 <div className="max-w-xs mx-auto aspect-[4/3] bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden relative group">
                   {checkoutPhoto ? (
-                    <img src={`data:image/jpeg;base64,${checkoutPhoto}`} className="w-full h-full object-cover" alt="Saída" />
+                    <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${checkoutPhoto}`} className="w-full h-full object-cover" alt="Saída" />
                   ) : (
                     <Camera className="w-12 h-12 text-slate-300" />
                   )}
@@ -1535,10 +1532,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     type="file" 
                     accept="image/*" 
                     capture="environment"
+                    disabled={isProcessingPhoto}
                     className="absolute inset-0 opacity-0 cursor-pointer"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handlePhotoCapture(SectionId.CheckOut, file);
+                      e.currentTarget.value = '';
+                      if (file) void handlePhotoCapture(SectionId.CheckOut, file);
                     }}
                   />
                 </div>
@@ -1649,6 +1648,16 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto">
+      {isProcessingPhoto && (
+        <div
+          className="fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-xl bg-[#0F172A] px-5 py-3 text-white shadow-xl pointer-events-none"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-[10px] font-black uppercase tracking-widest">Processando foto</span>
+        </div>
+      )}
       <AnimatePresence>
         {showVisitExitDialog && (
           <motion.div
