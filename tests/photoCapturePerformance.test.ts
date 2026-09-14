@@ -6,11 +6,14 @@ const readSource = (path: string) => readFile(new URL(path, import.meta.url), 'u
 
 test('captura impede compressoes simultaneas e libera o canvas', async () => {
   const contentArea = await readSource('../src/components/ContentArea.tsx');
+  const imageCompression = await readSource('../src/services/imageCompression.ts');
 
   assert.match(contentArea, /if \(photoProcessingRef\.current\) return/);
   assert.match(contentArea, /photoProcessingRef\.current = true/);
   assert.match(contentArea, /finally \{[\s\S]*?photoProcessingRef\.current = false/);
   assert.match(contentArea, /canvas\.width = 1;[\s\S]*?canvas\.height = 1/);
+  assert.match(contentArea, /drawPhotoInPortrait\(ctx, img, layout\);[\s\S]*?releaseSourceImage\(\);/);
+  assert.match(imageCompression, /finally \{[\s\S]*?releaseTemporaryCanvas\(lastCanvas, sourceCanvas\)/);
 });
 
 test('seletores podem recapturar e miniaturas usam decodificacao assincrona', async () => {

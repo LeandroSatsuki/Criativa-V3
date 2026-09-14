@@ -409,8 +409,14 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const processPhotoForReport = (file: File) => new Promise<string>((resolve, reject) => {
     const imageUrl = URL.createObjectURL(file);
     const img = new Image();
+    const releaseSourceImage = () => {
+      img.onload = null;
+      img.onerror = null;
+      img.removeAttribute('src');
+    };
     img.onerror = () => {
       URL.revokeObjectURL(imageUrl);
+      releaseSourceImage();
       reject(new Error('Não foi possível processar a foto.'));
     };
     img.onload = async () => {
@@ -429,6 +435,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         }
 
         drawPhotoInPortrait(ctx, img, layout);
+        releaseSourceImage();
 
         const padding = Math.max(18, Math.round(canvas.width * 0.035));
         const fontSize = Math.max(18, Math.round(canvas.width * 0.036));
@@ -458,9 +465,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
           canvas.width = 1;
           canvas.height = 1;
         }
-        img.onload = null;
-        img.onerror = null;
-        img.removeAttribute('src');
+        releaseSourceImage();
       }
     };
     img.src = imageUrl;

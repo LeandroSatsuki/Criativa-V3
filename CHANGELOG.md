@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2026-09-14] - Liberacao imediata de memoria da camera
+
+### Causa
+- A imagem original selecionada da camera permanecia decodificada durante todas as tentativas de compactacao.
+- Canvases temporarios de redimensionamento dependiam da coleta automatica de memoria do navegador.
+- Em aparelhos com menos RAM, esses recursos podiam permanecer simultaneamente na memoria entre capturas.
+
+### Solucao aplicada
+- A imagem original agora e desconectada imediatamente depois de ser desenhada no canvas de trabalho.
+- Canvases intermediarios agora sao liberados de forma deterministica ao trocar de resolucao e ao finalizar a compactacao.
+- O caminho de erro tambem libera a imagem e os canvases temporarios.
+
+### Checklist
+- [x] Resolucao, qualidade, carimbo, formato JPEG e limite de 120 KB preservados.
+- [x] Fachada, antes, estoque, depois, trocas e checkout usam o mesmo fluxo protegido.
+- [x] Rascunho, fila offline, APIs, Google Drive e finalizacao sem alteracao.
+- [x] Navegadores continuam com o mesmo caminho de captura, sem requisito novo de compatibilidade.
+
+### Seguranca
+- Nenhuma foto existente e modificada, migrada ou excluida.
+- A liberacao ocorre somente depois que os pixels ja foram copiados para o canvas usado na compactacao.
+- O canvas principal permanece sob responsabilidade da captura e tambem e liberado no bloco final existente.
+
+### Testes realizados
+- Suite completa com 128 testes aprovados.
+- TypeScript, lint e build de producao aprovados.
+- Teste de regressao confirma a liberacao antecipada da imagem e a limpeza final dos canvases temporarios.
+- Preview `6aa82f75e40d4a28170fcc07` validado antes da publicacao.
+
 ## [2026-09-14] - Reducao de memoria durante visitas
 
 ### Causa

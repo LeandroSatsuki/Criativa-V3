@@ -107,6 +107,15 @@ const resizeCanvas = (source: HTMLCanvasElement, targetLongEdge: number) => {
   return canvas;
 };
 
+const releaseTemporaryCanvas = (
+  canvas: HTMLCanvasElement,
+  sourceCanvas: HTMLCanvasElement,
+) => {
+  if (canvas === sourceCanvas) return;
+  canvas.width = 1;
+  canvas.height = 1;
+};
+
 const encodeAtBestQuality = async (canvas: HTMLCanvasElement): Promise<EncodedPhoto> => {
   const high = await canvasToJpeg(canvas, MAX_QUALITY);
   if (high.size <= PHOTO_TARGET_BYTES) return { blob: high, quality: MAX_QUALITY };
@@ -141,37 +150,42 @@ export const compressStampedPhoto = async (
   let lastCanvas = sourceCanvas;
   let lastEncoded: EncodedPhoto | null = null;
 
-  for (const longEdge of longEdges) {
-    const canvas = resizeCanvas(sourceCanvas, longEdge);
-    const encoded = await encodeAtBestQuality(canvas);
-    lastCanvas = canvas;
-    lastEncoded = encoded;
-    if (encoded.blob.size <= PHOTO_MAX_BYTES) {
-      return {
-        base64: await blobToBase64(encoded.blob),
-        bytes: encoded.blob.size,
-        width: canvas.width,
-        height: canvas.height,
-        quality: encoded.quality,
-      };
+  try {
+    for (const longEdge of longEdges) {
+      const canvas = resizeCanvas(sourceCanvas, longEdge);
+      releaseTemporaryCanvas(lastCanvas, sourceCanvas);
+      lastCanvas = canvas;
+      const encoded = await encodeAtBestQuality(canvas);
+      lastEncoded = encoded;
+      if (encoded.blob.size <= PHOTO_MAX_BYTES) {
+        return {
+          base64: await blobToBase64(encoded.blob),
+          bytes: encoded.blob.size,
+          width: canvas.width,
+          height: canvas.height,
+          quality: encoded.quality,
+        };
+      }
     }
-  }
 
-  for (const quality of EMERGENCY_QUALITIES) {
-    const blob = await canvasToJpeg(lastCanvas, quality);
-    lastEncoded = { blob, quality };
-    if (blob.size <= PHOTO_MAX_BYTES) break;
-  }
+    for (const quality of EMERGENCY_QUALITIES) {
+      const blob = await canvasToJpeg(lastCanvas, quality);
+      lastEncoded = { blob, quality };
+      if (blob.size <= PHOTO_MAX_BYTES) break;
+    }
 
-  if (!lastEncoded || lastEncoded.blob.size > PHOTO_MAX_BYTES) {
-    throw new Error('A foto ficou acima do limite seguro. Tente capturar novamente.');
-  }
+    if (!lastEncoded || lastEncoded.blob.size > PHOTO_MAX_BYTES) {
+      throw new Error('A foto ficou acima do limite seguro. Tente capturar novamente.');
+    }
 
-  return {
-    base64: await blobToBase64(lastEncoded.blob),
-    bytes: lastEncoded.blob.size,
-    width: lastCanvas.width,
-    height: lastCanvas.height,
-    quality: lastEncoded.quality,
-  };
+    return {
+      base64: await blobToBase64(lastEncoded.blob),
+      bytes: lastEncoded.blob.size,
+      width: lastCanvas.width,
+      height: lastCanvas.height,
+      quality: lastEncoded.quality,
+    };
+  } finally {
+    releaseTemporaryCanvas(lastCanvas, sourceCanvas);
+  }
 };
