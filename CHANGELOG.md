@@ -12,6 +12,7 @@
 - Os controles permitem consultar todas as paginas e a exclusao preserva o indice original da foto.
 - O painel supervisor passou a ser carregado sob demanda somente quando essa area e acessada.
 - O pacote inicial do promotor foi reduzido de aproximadamente 798 KB para 420 KB sem alterar o formato das fotos.
+- Correcao publicada no deploy produtivo `6aa82af62f76feff6bd2a644`.
 
 ### Checklist
 - [x] Todas as fotos do rascunho continuam disponiveis e enviadas normalmente.
@@ -30,6 +31,9 @@
 - TypeScript, lint e build de producao aprovados.
 - Testes de regressao validam paginacao, indices originais e carregamento sob demanda.
 - Em uma secao cheia, o limite visual caiu de 30 para seis miniaturas montadas por vez.
+- Preview `6aa829f29ab5f56d7f348c4d` validado antes da publicacao.
+- Aplicativo, health, manifesto, service worker e pacotes responderam HTTP 200 em producao.
+- Dominio produtivo validado ate a tela de acesso e sem erros no console.
 
 ## [2026-09-12] - Reducao da espera entre capturas
 
