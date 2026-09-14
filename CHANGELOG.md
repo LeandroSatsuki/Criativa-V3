@@ -11,6 +11,7 @@
 - A imagem original agora e desconectada imediatamente depois de ser desenhada no canvas de trabalho.
 - Canvases intermediarios agora sao liberados de forma deterministica ao trocar de resolucao e ao finalizar a compactacao.
 - O caminho de erro tambem libera a imagem e os canvases temporarios.
+- Correcao publicada no deploy produtivo `6aa82ff755d8dd780cb60766`.
 
 ### Checklist
 - [x] Resolucao, qualidade, carimbo, formato JPEG e limite de 120 KB preservados.
@@ -28,6 +29,8 @@
 - TypeScript, lint e build de producao aprovados.
 - Teste de regressao confirma a liberacao antecipada da imagem e a limpeza final dos canvases temporarios.
 - Preview `6aa82f75e40d4a28170fcc07` validado antes da publicacao.
+- Aplicativo, health, manifesto, service worker e pacotes responderam HTTP 200 em producao.
+- Artefato produtivo validado ate a tela de acesso e sem erros no console.
 
 ## [2026-09-14] - Reducao de memoria durante visitas
 
