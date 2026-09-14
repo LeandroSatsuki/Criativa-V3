@@ -7,15 +7,23 @@ import React, { useState, useEffect } from 'react';
 import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { analyzeProductPhoto } from '../services/geminiService';
-import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, upsertQueuedVisit, updateQueuedVisit } from '../services/syncQueue';
+import {
+  getQueuedVisit,
+  getQueuedVisitCount,
+  listQueuedVisitSummaries,
+  removeQueuedVisit,
+  upsertQueuedVisit,
+  updateQueuedVisit,
+} from '../services/syncQueue';
 import { classifyQueuedSyncFailure } from '../services/syncPolicy';
 import { generateVisitId } from '../services/visitId';
+import { hasStartedVisit } from '../services/visitLifecycle';
+import { getPhotoPreviewPage, PHOTO_PREVIEW_PAGE_SIZE } from '../services/photoGallery';
 import {
   buildPortraitPhotoLayout,
   compressStampedPhoto,
   drawPhotoInPortrait,
 } from '../services/imageCompression';
-import SupervisorDashboard from './SupervisorDashboard';
 import CriativaIcon from './CriativaIcon';
 import { 
   MapPin, 
@@ -35,6 +43,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const SupervisorDashboard = React.lazy(() => import('./SupervisorDashboard'));
+
 interface ContentAreaProps {
   sectionId: SectionId;
   visitState: VisitState;
@@ -44,6 +54,79 @@ interface ContentAreaProps {
 }
 
 const MAX_PHOTOS_PER_SECTION = 30;
+
+type PhotoGalleryProps = {
+  photos: string[];
+  alt: string;
+  columnsClassName: string;
+  onRemove?: (index: number) => void;
+};
+
+const PhotoGallery: React.FC<PhotoGalleryProps> = ({
+  photos,
+  alt,
+  columnsClassName,
+  onRemove,
+}) => {
+  const latestPage = Math.max(0, Math.ceil(photos.length / PHOTO_PREVIEW_PAGE_SIZE) - 1);
+  const [requestedPage, setRequestedPage] = useState(latestPage);
+  const preview = getPhotoPreviewPage(photos, requestedPage);
+
+  useEffect(() => {
+    setRequestedPage(latestPage);
+  }, [photos.length, latestPage]);
+
+  if (photos.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className={columnsClassName}>
+        {preview.items.map(({ photo, originalIndex }) => {
+          return (
+            <div key={originalIndex} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
+              <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt={alt} />
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(originalIndex)}
+                  className="absolute top-2 right-2 bg-slate-900/55 p-1.5 rounded-lg text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                  aria-label={`Excluir foto ${originalIndex + 1}`}
+                  title="Excluir foto"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {preview.totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            disabled={preview.page === 0}
+            onClick={() => setRequestedPage((current) => Math.max(0, current - 1))}
+            className="flex items-center gap-2 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 disabled:opacity-30"
+          >
+            <ArrowLeft size={14} /> Anteriores
+          </button>
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+            {preview.page + 1}/{preview.totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={preview.page >= preview.totalPages - 1}
+            onClick={() => setRequestedPage((current) => Math.min(preview.totalPages - 1, current + 1))}
+            className="flex items-center gap-2 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 disabled:opacity-30"
+          >
+            Recentes <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ContentArea: React.FC<ContentAreaProps> = ({ 
   sectionId, 
@@ -60,6 +143,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
   const [stockIndustry, setStockIndustry] = useState('');
+  const [showVisitExitDialog, setShowVisitExitDialog] = useState(false);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const photoProcessingRef = React.useRef(false);
   const queueOwnerId = String(visitState.user?.id || '');
 
   React.useEffect(() => {
@@ -87,12 +173,23 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   }, [sectionId, queueOwnerId]);
 
   const handleCheckIn = (store: any) => {
-    if (!visitState.visitId) {
-      updateVisit('visitId', generateVisitId());
+    const hasActiveVisit = hasStartedVisit(visitState);
+    const isCurrentStore = String(store.id) === String(visitState.currentStoreId);
+
+    if (hasActiveVisit && !isCurrentStore) {
+      alert(`Existe um registro em andamento para ${visitState.currentStore}. Retome essa visita ou cancele o registro antes de selecionar outro PDV.`);
+      return;
     }
+
+    if (hasActiveVisit && isCurrentStore) {
+      navigateTo(visitState.checkInDone ? SectionId.Dashboard : SectionId.Facade);
+      return;
+    }
+
+    updateVisit('visitId', null);
     updateVisit('currentStore', store.name);
     updateVisit('currentStoreId', store.id);
-    updateVisit('checkInTime', getBrasiliaISO());
+    updateVisit('checkInTime', null);
     navigateTo(SectionId.Facade);
   };
 
@@ -253,7 +350,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
     return (
       <button
-        onClick={() => navigateTo(target)}
+        onClick={() => {
+          if (sectionId === SectionId.Facade && hasStartedVisit(visitState)) {
+            setShowVisitExitDialog(true);
+            return;
+          }
+          navigateTo(target);
+        }}
         className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-white border border-slate-100 shadow-sm text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-[#E65C5C] hover:border-[#E65C5C]/20 transition-all"
       >
         <ArrowLeft size={14} />
@@ -306,14 +409,21 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const processPhotoForReport = (file: File) => new Promise<string>((resolve, reject) => {
     const imageUrl = URL.createObjectURL(file);
     const img = new Image();
+    const releaseSourceImage = () => {
+      img.onload = null;
+      img.onerror = null;
+      img.removeAttribute('src');
+    };
     img.onerror = () => {
       URL.revokeObjectURL(imageUrl);
+      releaseSourceImage();
       reject(new Error('Não foi possível processar a foto.'));
     };
     img.onload = async () => {
       URL.revokeObjectURL(imageUrl);
+      let canvas: HTMLCanvasElement | null = null;
       try {
-        const canvas = document.createElement('canvas');
+        canvas = document.createElement('canvas');
         const layout = buildPortraitPhotoLayout(img.width, img.height);
         canvas.width = layout.canvasWidth;
         canvas.height = layout.canvasHeight;
@@ -325,6 +435,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         }
 
         drawPhotoInPortrait(ctx, img, layout);
+        releaseSourceImage();
 
         const padding = Math.max(18, Math.round(canvas.width * 0.035));
         const fontSize = Math.max(18, Math.round(canvas.width * 0.036));
@@ -349,88 +460,102 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         resolve(compressed.base64);
       } catch (error) {
         reject(error);
+      } finally {
+        if (canvas) {
+          canvas.width = 1;
+          canvas.height = 1;
+        }
+        releaseSourceImage();
       }
     };
     img.src = imageUrl;
   });
 
-  const handlePhotoCapture = async (section: string, file: File) => {
-    const activeIndustry = selectedIndustry;
-    let compressedBase64 = '';
-
+  const handlePhotoCapture = async (section: string, file: File, industryOverride?: string) => {
+    if (photoProcessingRef.current) return;
+    photoProcessingRef.current = true;
+    setIsProcessingPhoto(true);
     try {
-      compressedBase64 = await processPhotoForReport(file);
-    } catch (error: any) {
-      alert(error.message || 'Não foi possível processar a foto.');
-      return;
-    }
+      const activeIndustry = industryOverride || selectedIndustry;
+      const compressedBase64 = await processPhotoForReport(file);
+
+      if (section === SectionId.Facade) {
+        if (!visitState.visitId) updateVisit('visitId', generateVisitId());
+        if (!visitState.checkInTime) updateVisit('checkInTime', getBrasiliaISO());
+      }
         
-    if (isIndustryStep(section) && activeIndustry) {
-      if (section === SectionId.Estoque) {
-        updateVisit('stockQuantities', (prev: any) => ({ ...prev }));
+      if (isIndustryStep(section) && activeIndustry) {
+        if (section === SectionId.Estoque) {
+          updateVisit('stockQuantities', (prev: any) => ({ ...prev }));
+          updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+            const existing = prev[activeIndustry];
+            if (!existing) return prev;
+            const currentCategoryPhotos = existing.photos?.[section] || [];
+            return {
+              ...prev,
+              [activeIndustry]: {
+                ...existing,
+                photos: {
+                  ...existing.photos,
+                  [section]: [...currentCategoryPhotos, compressedBase64],
+                },
+              },
+            };
+          });
+          updateVisit('photos', (prevPhotos: any = {}) => {
+            const currentCategoryPhotos = prevPhotos[section] || [];
+            return {
+              ...prevPhotos,
+              [section]: [...currentCategoryPhotos, compressedBase64],
+            };
+          });
+          return;
+        }
+
         updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-          const existing = prev[activeIndustry];
-          if (!existing) return prev;
-          const currentCategoryPhotos = existing.photos?.[section] || [];
+          const current = createIndustryExecution(activeIndustry, prev[activeIndustry]);
+          const currentCategoryPhotos = current.photos?.[section] || [];
+          const updated = getExecutionWithStatus({
+            ...current,
+            tasks: {
+              ...current.tasks,
+              [section]: true,
+            },
+            photos: {
+              ...current.photos,
+              [section]: [...currentCategoryPhotos, compressedBase64],
+            },
+          });
           return {
             ...prev,
-            [activeIndustry]: {
-              ...existing,
-              photos: {
-                ...existing.photos,
-                [section]: [...currentCategoryPhotos, compressedBase64],
-              },
-            },
+            [activeIndustry]: updated,
           };
         });
-        updateVisit('photos', (prevPhotos: any = {}) => {
-          const currentCategoryPhotos = prevPhotos[section] || [];
-          return {
-            ...prevPhotos,
-            [section]: [...currentCategoryPhotos, compressedBase64],
-          };
-        });
+        if (section === SectionId.Trocas) {
+          updateVisit('returnsPhotosByIndustry', (prev: Record<string, string[]> = {}) => ({
+            ...prev,
+            [activeIndustry]: [
+              ...(prev[activeIndustry] || []),
+              compressedBase64,
+            ],
+          }));
+        }
         return;
       }
 
-      updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-        const current = createIndustryExecution(activeIndustry, prev[activeIndustry]);
-        const currentCategoryPhotos = current.photos?.[section] || [];
-        const updated = getExecutionWithStatus({
-          ...current,
-          tasks: {
-            ...current.tasks,
-            [section]: true,
-          },
-          photos: {
-            ...current.photos,
-            [section]: [...currentCategoryPhotos, compressedBase64],
-          },
-        });
+      updateVisit('photos', (prevPhotos: any = {}) => {
+        const currentCategoryPhotos = prevPhotos[section] || [];
         return {
-          ...prev,
-          [activeIndustry]: updated,
+          ...prevPhotos,
+          [section]: [...currentCategoryPhotos, compressedBase64],
         };
       });
-      if (section === SectionId.Trocas) {
-        updateVisit('returnsPhotosByIndustry', (prev: Record<string, string[]> = {}) => ({
-          ...prev,
-          [activeIndustry]: [
-            ...(prev[activeIndustry] || []),
-            compressedBase64,
-          ],
-        }));
-      }
-      return;
+    } catch (error: any) {
+      alert(error.message || 'Não foi possível processar a foto.');
+    } finally {
+      photoProcessingRef.current = false;
+      setIsProcessingPhoto(false);
     }
-
-    updateVisit('photos', (prevPhotos: any = {}) => {
-      const currentCategoryPhotos = prevPhotos[section] || [];
-      return {
-        ...prevPhotos,
-        [section]: [...currentCategoryPhotos, compressedBase64],
-      };
-    });
   };
 
   const [syncSuccess, setSyncSuccess] = useState(false);
@@ -485,7 +610,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       }
 
       setSyncMessage(useRetryEndpoint ? 'Reenvio iniciado em segundo plano.' : 'Envio iniciado em segundo plano.');
-      const result = await apiService.startBackgroundSync(serverVisitId);
+      const result = draft.syncStarted
+        ? {
+          visitId: serverVisitId,
+          syncStatus: 'enviando',
+          syncError: null,
+        }
+        : await apiService.startBackgroundSync(serverVisitId);
       await updateQueuedVisit(queueOwnerId, serverVisitId, {
         status: 'syncing',
         error: null,
@@ -566,7 +697,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const handleRetryQueue = async () => {
-    const queuedVisits = await listQueuedVisits(queueOwnerId);
+    const queuedVisits = await listQueuedVisitSummaries(queueOwnerId);
     if (queuedVisits.length === 0) {
       setSyncError('Não há visitas na fila local para reenviar.');
       return;
@@ -577,7 +708,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     setSyncSuccess(false);
 
     try {
-      for (const queuedVisit of queuedVisits) {
+      for (const queuedSummary of queuedVisits) {
+        const queuedVisit = await getQueuedVisit(queueOwnerId, queuedSummary.visitId);
+        if (!queuedVisit) continue;
         setSyncMessage(`Reenviando ${queuedVisit.visitId}...`);
         const attempt = await syncQueuedVisit(queuedVisit.payload, queuedVisit.visitId, true);
         if (!attempt.started) throw new Error(attempt.error);
@@ -593,23 +726,18 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     }
   };
 
-  const handleClearQueue = async () => {
-    if (!queueOwnerId) return;
-    const confirmed = window.confirm(
-      'Limpar os envios pendentes deste usuário neste aparelho? Visitas ainda não enviadas deixarão de aparecer para reenvio local.',
-    );
-    if (!confirmed) return;
-
-    await clearQueuedVisits(queueOwnerId);
-    setQueueCount(0);
-    setSyncError(null);
-    window.dispatchEvent(new Event('criativa-sync-queue-updated'));
-  };
-
   const renderSection = () => {
     switch (sectionId) {
       case SectionId.Supervisor:
-        return <SupervisorDashboard />;
+        return (
+          <React.Suspense fallback={(
+            <div className="min-h-[50vh] flex items-center justify-center" role="status" aria-live="polite">
+              <Loader2 className="animate-spin text-[#E65C5C]" size={32} />
+            </div>
+          )}>
+            <SupervisorDashboard />
+          </React.Suspense>
+        );
 
       case SectionId.Facade:
         const facadePhotos = photos[SectionId.Facade] || [];
@@ -627,7 +755,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             <div className="max-w-md mx-auto space-y-6">
               <div className="aspect-[4/3] bg-slate-100 rounded-[32px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden relative group">
                 {facadePhotos[0] ? (
-                  <img src={`data:image/jpeg;base64,${facadePhotos[0]}`} className="w-full h-full object-cover" alt="Fachada" />
+                  <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${facadePhotos[0]}`} className="w-full h-full object-cover" alt="Fachada" />
                 ) : (
                   <Camera className="w-16 h-16 text-slate-300" />
                 )}
@@ -635,11 +763,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   type="file" 
                   accept="image/*" 
                   capture="environment"
+                  disabled={isProcessingPhoto}
                   className="absolute inset-0 opacity-0 cursor-pointer"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
+                    e.currentTarget.value = '';
                     if (file) {
-                      handlePhotoCapture(SectionId.Facade, file);
+                      void handlePhotoCapture(SectionId.Facade, file);
                     }
                   }}
                 />
@@ -663,6 +793,17 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       case SectionId.Dashboard:
         return (
           <div className="space-y-8 animate-in">
+            {hasStartedVisit(visitState) && (
+              <button
+                type="button"
+                onClick={() => setShowVisitExitDialog(true)}
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-white border border-slate-100 shadow-sm text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-[#E65C5C] hover:border-[#E65C5C]/20 transition-all"
+              >
+                <ArrowLeft size={14} />
+                Voltar
+              </button>
+            )}
+
             <div className="flex items-end justify-between">
               <div>
                 <h2 className="text-4xl font-black uppercase tracking-tighter text-[#0F172A]">
@@ -836,6 +977,9 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     <div className="text-left">
                       <p className="font-black uppercase text-lg tracking-tight text-[#0F172A] group-hover:text-[#E65C5C] transition-colors">{store.name}</p>
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{store.region}</p>
+                      {String(visitState.currentStoreId) === String(store.id) && hasStartedVisit(visitState) && (
+                        <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mt-2">Registro em andamento</p>
+                      )}
                     </div>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-[#E65C5C] transition-all">
@@ -935,7 +1079,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   </div>
                   <div className="relative shrink-0">
                     <button 
-                      disabled={currentPhotos.length >= MAX_PHOTOS_PER_SECTION}
+                      disabled={isProcessingPhoto || currentPhotos.length >= MAX_PHOTOS_PER_SECTION}
                       className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${currentPhotos.length >= MAX_PHOTOS_PER_SECTION ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Plus size={16} /> Adicionar Foto
@@ -944,11 +1088,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       type="file" 
                       accept="image/*" 
                       capture="environment"
+                      disabled={isProcessingPhoto || currentPhotos.length >= MAX_PHOTOS_PER_SECTION}
                       className="absolute inset-0 opacity-0 cursor-pointer"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
+                        e.currentTarget.value = '';
                         if (file && currentPhotos.length < MAX_PHOTOS_PER_SECTION) {
-                          handlePhotoCapture(sectionId, file);
+                          void handlePhotoCapture(sectionId, file);
                         }
                       }}
                     />
@@ -957,32 +1103,26 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {currentPhotos.map((photo, idx) => (
-                <div key={idx} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
-                  <img src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Captura" />
-                  <button 
-                    onClick={() => {
-                      const newPhotos = currentPhotos.filter((_, i) => i !== idx);
-                      updateSelectedExecution(execution => ({
-                        ...execution,
-                        tasks: {
-                          ...execution.tasks,
-                          [sectionId]: newPhotos.length > 0 ? true : false,
-                        },
-                        photos: {
-                          ...execution.photos,
-                          [sectionId]: newPhotos,
-                        },
-                      }));
-                    }}
-                    className="absolute top-2 right-2 bg-white/20 backdrop-blur-md p-1.5 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <PhotoGallery
+              key={`${sectionId}:${visitState.selectedIndustry || ''}`}
+              photos={currentPhotos}
+              alt="Captura"
+              columnsClassName="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
+              onRemove={(index) => {
+                const newPhotos = currentPhotos.filter((_, photoIndex) => photoIndex !== index);
+                updateSelectedExecution(execution => ({
+                  ...execution,
+                  tasks: {
+                    ...execution.tasks,
+                    [sectionId]: newPhotos.length > 0,
+                  },
+                  photos: {
+                    ...execution.photos,
+                    [sectionId]: newPhotos,
+                  },
+                }));
+              }}
+            />
 
             <div className="flex flex-col gap-4 pt-4">
               <button 
@@ -1164,7 +1304,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   </div>
                   <div className="relative shrink-0">
                     <button 
-                      disabled={estoquePhotos.length >= MAX_PHOTOS_PER_SECTION}
+                      disabled={isProcessingPhoto || estoquePhotos.length >= MAX_PHOTOS_PER_SECTION}
                       className={`bg-[#E65C5C] text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-lg shadow-[#E65C5C]/20 ${estoquePhotos.length >= MAX_PHOTOS_PER_SECTION ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Plus size={16} /> Adicionar Foto
@@ -1173,36 +1313,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       type="file" 
                       accept="image/*" 
                       capture="environment"
+                      disabled={isProcessingPhoto || estoquePhotos.length >= MAX_PHOTOS_PER_SECTION}
                       className="absolute inset-0 opacity-0 cursor-pointer"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
+                        e.currentTarget.value = '';
                         if (file && estoquePhotos.length < MAX_PHOTOS_PER_SECTION) {
-                          const previousStockIndustry = stockIndustry;
-                          processPhotoForReport(file)
-                            .then((compressedBase64) => {
-                              updateVisit('photos', (prev: any = {}) => {
-                                const currentCategoryPhotos = prev[SectionId.Estoque] || [];
-                                return { ...prev, [SectionId.Estoque]: [...currentCategoryPhotos, compressedBase64] };
-                              });
-                              updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-                                const existing = prev[previousStockIndustry];
-                                if (!existing) return prev;
-                                const currentCategoryPhotos = existing.photos?.[SectionId.Estoque] || [];
-                                return {
-                                  ...prev,
-                                  [previousStockIndustry]: {
-                                    ...existing,
-                                    photos: {
-                                      ...existing.photos,
-                                      [SectionId.Estoque]: [...currentCategoryPhotos, compressedBase64],
-                                    },
-                                  },
-                                };
-                              });
-                            })
-                            .catch((error) => {
-                              alert(error.message || 'Não foi possível processar a foto.');
-                            });
+                          void handlePhotoCapture(SectionId.Estoque, file, stockIndustry);
                         }
                       }}
                     />
@@ -1211,36 +1328,30 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-3">
-              {estoquePhotos.map((photo, idx) => (
-                <div key={idx} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
-                  <img src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Estoque" />
-                  <button 
-                    onClick={() => {
-                      const newPhotos = estoquePhotos.filter((_, i) => i !== idx);
-                      updateVisit('photos', (prev: any = {}) => ({ ...prev, [SectionId.Estoque]: newPhotos }));
-                      updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-                        const existing = stockIndustry ? prev[stockIndustry] : null;
-                        if (!stockIndustry || !existing) return prev;
-                        return {
-                          ...prev,
-                          [stockIndustry]: {
-                            ...existing,
-                            photos: {
-                              ...existing.photos,
-                              [SectionId.Estoque]: newPhotos,
-                            },
-                          },
-                        };
-                      });
-                    }}
-                    className="absolute top-2 right-2 bg-white/20 backdrop-blur-md p-1 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <PhotoGallery
+              key={`estoque:${stockIndustry}`}
+              photos={estoquePhotos}
+              alt="Estoque"
+              columnsClassName="grid grid-cols-3 md:grid-cols-6 gap-3"
+              onRemove={(index) => {
+                const newPhotos = estoquePhotos.filter((_, photoIndex) => photoIndex !== index);
+                updateVisit('photos', (prev: any = {}) => ({ ...prev, [SectionId.Estoque]: newPhotos }));
+                updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+                  const existing = stockIndustry ? prev[stockIndustry] : null;
+                  if (!stockIndustry || !existing) return prev;
+                  return {
+                    ...prev,
+                    [stockIndustry]: {
+                      ...existing,
+                      photos: {
+                        ...existing.photos,
+                        [SectionId.Estoque]: newPhotos,
+                      },
+                    },
+                  };
+                });
+              }}
+            />
 
             <button 
               onClick={() => {
@@ -1378,7 +1489,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fotos das Trocas ({returnsPhotos.length}/{MAX_PHOTOS_PER_SECTION})</p>
                     <div className="relative">
                       <button 
-                        disabled={returnsPhotos.length >= MAX_PHOTOS_PER_SECTION}
+                        disabled={isProcessingPhoto || returnsPhotos.length >= MAX_PHOTOS_PER_SECTION}
                         className={`bg-orange-500 text-white px-5 py-3 rounded-xl font-black uppercase text-[9px] tracking-widest flex items-center gap-2 ${returnsPhotos.length >= MAX_PHOTOS_PER_SECTION ? 'opacity-50' : ''}`}
                       >
                         <Camera size={14} /> Capturar
@@ -1387,24 +1498,25 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                         type="file" 
                         accept="image/*" 
                         capture="environment"
+                        disabled={isProcessingPhoto || returnsPhotos.length >= MAX_PHOTOS_PER_SECTION}
                         className="absolute inset-0 opacity-0 cursor-pointer"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
+                          e.currentTarget.value = '';
                           if (file && returnsPhotos.length < MAX_PHOTOS_PER_SECTION) {
-                            handlePhotoCapture(SectionId.Trocas, file);
+                            void handlePhotoCapture(SectionId.Trocas, file);
                           }
                         }}
                       />
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-5 gap-2">
-                    {returnsPhotos.map((photo, idx) => (
-                      <div key={idx} className="aspect-square bg-slate-100 rounded-xl overflow-hidden relative">
-                        <img src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Troca" />
-                      </div>
-                    ))}
-                  </div>
+                  <PhotoGallery
+                    key={`trocas:${visitState.selectedIndustry || ''}`}
+                    photos={returnsPhotos}
+                    alt="Troca"
+                    columnsClassName="grid grid-cols-3 sm:grid-cols-6 gap-2"
+                  />
                 </div>
               )}
 
@@ -1487,7 +1599,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Foto de Saída</p>
                 <div className="max-w-xs mx-auto aspect-[4/3] bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden relative group">
                   {checkoutPhoto ? (
-                    <img src={`data:image/jpeg;base64,${checkoutPhoto}`} className="w-full h-full object-cover" alt="Saída" />
+                    <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${checkoutPhoto}`} className="w-full h-full object-cover" alt="Saída" />
                   ) : (
                     <Camera className="w-12 h-12 text-slate-300" />
                   )}
@@ -1495,10 +1607,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     type="file" 
                     accept="image/*" 
                     capture="environment"
+                    disabled={isProcessingPhoto}
                     className="absolute inset-0 opacity-0 cursor-pointer"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handlePhotoCapture(SectionId.CheckOut, file);
+                      e.currentTarget.value = '';
+                      if (file) void handlePhotoCapture(SectionId.CheckOut, file);
                     }}
                   />
                 </div>
@@ -1568,20 +1682,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 </button>
 
                 {queueCount > 0 && (
-                  <>
-                    <button
-                      onClick={handleRetryQueue}
-                      className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
-                    >
-                      Reenviar Fila Local ({queueCount})
-                    </button>
-                    <button
-                      onClick={handleClearQueue}
-                      className="text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-red-500 transition-colors"
-                    >
-                      Limpar minha fila
-                    </button>
-                  </>
+                  <button
+                    onClick={handleRetryQueue}
+                    className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all"
+                  >
+                    Reenviar Fila Local ({queueCount})
+                  </button>
                 )}
 
                 <button
@@ -1617,6 +1723,78 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto">
+      {isProcessingPhoto && (
+        <div
+          className="fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-xl bg-[#0F172A] px-5 py-3 text-white shadow-xl pointer-events-none"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-[10px] font-black uppercase tracking-widest">Processando foto</span>
+        </div>
+      )}
+      <AnimatePresence>
+        {showVisitExitDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[90] bg-[#0F172A]/55 backdrop-blur-sm flex items-center justify-center p-5"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="visit-exit-title"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              className="w-full max-w-md bg-white rounded-[32px] p-7 shadow-2xl border border-slate-100 space-y-6"
+            >
+              <div className="space-y-2">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-500">Registro em andamento</p>
+                <h3 id="visit-exit-title" className="text-2xl font-black uppercase tracking-tight text-[#0F172A]">
+                  O que deseja fazer?
+                </h3>
+                <p className="text-xs font-bold text-slate-500 leading-relaxed">
+                  Você pode voltar para a lista sem perder as fotos ou cancelar este registro.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVisitExitDialog(false);
+                    navigateTo(SectionId.CheckIn);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-[#0F172A] text-white px-5 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
+                >
+                  <ArrowLeft size={16} />
+                  Voltar mantendo o registro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVisitExitDialog(false);
+                    onReset();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-100 px-5 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
+                >
+                  <Trash2 size={16} />
+                  Cancelar registro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowVisitExitDialog(false)}
+                  className="w-full px-5 py-3 text-slate-500 font-black uppercase tracking-widest text-[10px]"
+                >
+                  Continuar na visita
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence mode="wait">
         <motion.div
           key={sectionId}

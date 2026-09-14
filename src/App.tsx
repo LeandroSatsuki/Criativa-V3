@@ -13,9 +13,16 @@ import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X } from 'lucide-
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT, type SessionEndReason } from './services/session';
 import { HttpRequestError } from './services/httpClient';
-import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
+import {
+  getQueuedVisit,
+  getQueuedVisitCount,
+  listQueuedVisitSummaries,
+  removeQueuedVisit,
+  updateQueuedVisit,
+} from './services/syncQueue';
 import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
+import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -31,15 +38,13 @@ type PendingSyncView = {
   error: string | null;
   sent: number;
   total: number;
+  retry?: {
+    retryable: boolean;
+    available: boolean;
+    remaining: number;
+    retryAfterSeconds: number;
+  };
 };
-
-const hasVisitInProgress = (state: {
-  visitId?: string | null;
-  checkInDone?: boolean;
-  currentStoreId?: string;
-}) => Boolean(
-  state.visitId || state.checkInDone || state.currentStoreId,
-);
 
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -56,9 +61,10 @@ const App: React.FC = () => {
       if (saved) {
         const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
         const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
+        const restored = sessionMatchesDraft ? recoverUnstartedVisit(saved) : {};
         return {
           ...INITIAL_STATE,
-          ...(sessionMatchesDraft ? saved : {}),
+          ...restored,
           user: session?.user || null,
           draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
         };
@@ -71,7 +77,7 @@ const App: React.FC = () => {
   });
 
   const [activeSection, setActiveSection] = useState<SectionId>(() =>
-    resolveSessionSection(visitState.user?.role, visitState.step, hasVisitInProgress(visitState)),
+    resolveSessionSection(visitState.user?.role, visitState.step, hasStartedVisit(visitState)),
   );
 
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
@@ -98,17 +104,17 @@ const App: React.FC = () => {
       if (saved) {
         const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
         const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
-        const restored = sessionMatchesDraft ? saved : {};
+        const restored = sessionMatchesDraft ? recoverUnstartedVisit(saved) : null;
         setVisitState({
           ...INITIAL_STATE,
-          ...restored,
+          ...(restored || {}),
           user: session?.user || null,
           draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
         });
         setActiveSection(resolveSessionSection(
           session?.user.role,
-          sessionMatchesDraft ? saved.step : SectionId.Dashboard,
-          sessionMatchesDraft && hasVisitInProgress(saved),
+          restored?.step || SectionId.Dashboard,
+          Boolean(restored && hasStartedVisit(restored)),
         ));
       } else if (session?.user) {
         setActiveSection(resolveSessionSection(session.user.role));
@@ -292,7 +298,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const queuedVisits = await listQueuedVisits(ownerId);
+    const queuedVisits = await listQueuedVisitSummaries(ownerId);
     const next: PendingSyncView[] = [];
     let queueChanged = false;
 
@@ -315,16 +321,17 @@ const App: React.FC = () => {
 
         next.push({
           visitId: queuedVisit.visitId,
-          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          store: queuedVisit.store,
           status: remote.syncStatus,
           error: remote.syncError || null,
           sent: Number(remote.progress?.sent || 0),
           total: Number(remote.progress?.total || 0),
+          retry: remote.retry,
         });
       } catch {
         next.push({
           visitId: queuedVisit.visitId,
-          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          store: queuedVisit.store,
           status: queuedVisit.status,
           error: queuedVisit.error,
           sent: 0,
@@ -337,10 +344,34 @@ const App: React.FC = () => {
     if (queueChanged) notifyQueueChanged();
   };
 
+  const retryPendingSync = async (sync: PendingSyncView) => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || !sync.retry?.available) return;
+
+    setPromptSyncError(null);
+    setPendingSyncs((current) => current.map((item) => item.visitId === sync.visitId
+      ? { ...item, status: 'enviando', error: null, retry: { ...item.retry!, available: false } }
+      : item));
+
+    try {
+      const result = await apiService.retrySync(sync.visitId);
+      await updateQueuedVisit(ownerId, sync.visitId, { status: 'syncing', error: null });
+      if (result.syncStatus === 'enviando') await apiService.startBackgroundSync(sync.visitId);
+      await refreshSyncStatus();
+      notifyQueueChanged();
+    } catch (error: any) {
+      await updateQueuedVisit(ownerId, sync.visitId, {
+        status: 'error',
+        error: error.message || 'Nao foi possivel tentar novamente.',
+      });
+      await refreshSyncStatus();
+    }
+  };
+
   const syncPendingQueueFromPrompt = async () => {
     const ownerId = visitState.user?.id;
     if (!ownerId) return;
-    const queuedVisits = await listQueuedVisits(ownerId);
+    const queuedVisits = await listQueuedVisitSummaries(ownerId);
     if (queuedVisits.length === 0) {
       setShowPendingSyncPrompt(false);
       return;
@@ -351,7 +382,9 @@ const App: React.FC = () => {
 
     try {
       for (let index = 0; index < queuedVisits.length; index += 1) {
-        const queuedVisit = queuedVisits[index];
+        const queuedSummary = queuedVisits[index];
+        const queuedVisit = await getQueuedVisit(ownerId, queuedSummary.visitId);
+        if (!queuedVisit) continue;
         setPromptSyncMessage(`Sincronizando ${index + 1}/${queuedVisits.length}...`);
         await updateQueuedVisit(ownerId, queuedVisit.visitId, {
           status: 'syncing',
@@ -419,22 +452,6 @@ const App: React.FC = () => {
     };
   }, [visitState.user?.id]);
 
-  const clearCurrentUserQueue = async () => {
-    const ownerId = visitState.user?.id;
-    if (!ownerId || promptSyncing) return;
-    const confirmed = window.confirm(
-      'Limpar os envios pendentes deste usuário neste aparelho? Visitas ainda não enviadas deixarão de aparecer para reenvio local.',
-    );
-    if (!confirmed) return;
-
-    await clearQueuedVisits(ownerId);
-    setPromptQueueCount(0);
-    setPromptSyncError(null);
-    setPromptSyncMessage('Fila local deste usuário limpa.');
-    setShowPendingSyncPrompt(false);
-    notifyQueueChanged();
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loginRequestInFlight.current) return;
@@ -446,7 +463,7 @@ const App: React.FC = () => {
       const userData = await apiService.login(loginForm);
       setLoginForm({ user: userData.user, pass: '' });
       const sameDraftOwner = !visitState.draftOwnerId || visitState.draftOwnerId === userData.id;
-      const hasActiveVisit = sameDraftOwner && hasVisitInProgress(visitState);
+      const hasActiveVisit = sameDraftOwner && hasStartedVisit(visitState);
       setVisitState((prev: any) => sameDraftOwner
         ? { ...prev, user: userData, draftOwnerId: userData.id }
         : { ...INITIAL_STATE, user: userData, draftOwnerId: userData.id });
@@ -560,7 +577,7 @@ const App: React.FC = () => {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-3">
               {!promptSyncError && (
                 <button
                   disabled={promptSyncing}
@@ -570,24 +587,20 @@ const App: React.FC = () => {
                   {promptSyncing ? 'Sincronizando' : 'Sincronizar agora'}
                 </button>
               )}
-              {promptSyncError && (
+              {!promptSyncing && (
                 <button
-                  disabled={promptSyncing}
                   onClick={() => setShowPendingSyncPrompt(false)}
                   className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
                 >
-                  Depois
-                </button>
-              )}
-              {!promptSyncing && (
-                <button
-                  onClick={clearCurrentUserQueue}
-                  className="flex-1 bg-white border border-slate-200 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
-                >
-                  Limpar minha fila
+                  Continuar trabalhando
                 </button>
               )}
             </div>
+            {!promptSyncing && (
+              <p className="text-center text-[10px] font-bold text-slate-400">
+                Os registros permanecem salvos e podem continuar enviando em segundo plano.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -646,6 +659,20 @@ const App: React.FC = () => {
                         <span className="text-slate-400">{sync.sent}/{sync.total || '--'}</span>
                       </div>
                       {sync.error && <p className="text-[10px] font-bold text-orange-700 leading-relaxed">{sync.error}</p>}
+                      {hasError && sync.retry?.retryable && (
+                        <button
+                          type="button"
+                          disabled={!sync.retry.available}
+                          onClick={() => void retryPendingSync(sync)}
+                          className="w-full bg-orange-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          {sync.retry.remaining === 0
+                            ? 'Necessita suporte'
+                            : sync.retry.retryAfterSeconds > 0
+                              ? `Aguarde ${sync.retry.retryAfterSeconds}s`
+                              : 'Tentar novamente'}
+                        </button>
+                      )}
                     </div>
                   );
                 })}

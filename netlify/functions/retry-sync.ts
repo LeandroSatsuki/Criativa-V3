@@ -28,7 +28,7 @@ export default async (request: Request, context: Context) => {
   const result = await syncVisitRecord({
     ...visit,
     syncStatus: 'reenviar',
-  });
+  }, { recoverDeadLetter: true });
 
   const status = result.syncStatus === 'enviando' ? 202 : 200;
   return json(result, status);

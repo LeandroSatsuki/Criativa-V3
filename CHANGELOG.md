@@ -1,5 +1,969 @@
 # CHANGELOG
 
+## [2026-09-14] - Liberacao imediata de memoria da camera
+
+### Causa
+- A imagem original selecionada da camera permanecia decodificada durante todas as tentativas de compactacao.
+- Canvases temporarios de redimensionamento dependiam da coleta automatica de memoria do navegador.
+- Em aparelhos com menos RAM, esses recursos podiam permanecer simultaneamente na memoria entre capturas.
+
+### Solucao aplicada
+- A imagem original agora e desconectada imediatamente depois de ser desenhada no canvas de trabalho.
+- Canvases intermediarios agora sao liberados de forma deterministica ao trocar de resolucao e ao finalizar a compactacao.
+- O caminho de erro tambem libera a imagem e os canvases temporarios.
+- Correcao publicada no deploy produtivo `6aa82ff755d8dd780cb60766`.
+
+### Checklist
+- [x] Resolucao, qualidade, carimbo, formato JPEG e limite de 120 KB preservados.
+- [x] Fachada, antes, estoque, depois, trocas e checkout usam o mesmo fluxo protegido.
+- [x] Rascunho, fila offline, APIs, Google Drive e finalizacao sem alteracao.
+- [x] Navegadores continuam com o mesmo caminho de captura, sem requisito novo de compatibilidade.
+
+### Seguranca
+- Nenhuma foto existente e modificada, migrada ou excluida.
+- A liberacao ocorre somente depois que os pixels ja foram copiados para o canvas usado na compactacao.
+- O canvas principal permanece sob responsabilidade da captura e tambem e liberado no bloco final existente.
+
+### Testes realizados
+- Suite completa com 128 testes aprovados.
+- TypeScript, lint e build de producao aprovados.
+- Teste de regressao confirma a liberacao antecipada da imagem e a limpeza final dos canvases temporarios.
+- Preview `6aa82f75e40d4a28170fcc07` validado antes da publicacao.
+- Aplicativo, health, manifesto, service worker e pacotes responderam HTTP 200 em producao.
+- Artefato produtivo validado ate a tela de acesso e sem erros no console.
+
+## [2026-09-14] - Reducao de memoria durante visitas
+
+### Causa
+- Galerias de antes, estoque e depois podiam manter ate 30 miniaturas decodificadas simultaneamente na tela.
+- O painel supervisor e seus graficos eram incluidos no pacote inicial mesmo para promotores, aumentando a memoria usada ao abrir o aplicativo.
+- As fotos continuavam protegidas no rascunho e na fila, mas a quantidade de elementos visuais montados elevava o pico de RAM em aparelhos com menos memoria.
+
+### Solucao aplicada
+- As galerias agora exibem paginas de ate seis miniaturas e iniciam pela pagina mais recente.
+- Os controles permitem consultar todas as paginas e a exclusao preserva o indice original da foto.
+- O painel supervisor passou a ser carregado sob demanda somente quando essa area e acessada.
+- O pacote inicial do promotor foi reduzido de aproximadamente 798 KB para 420 KB sem alterar o formato das fotos.
+- Correcao publicada no deploy produtivo `6aa82af62f76feff6bd2a644`.
+
+### Checklist
+- [x] Todas as fotos do rascunho continuam disponiveis e enviadas normalmente.
+- [x] Limite, compressao, qualidade e ordem das fotos preservados.
+- [x] Fila offline, APIs, Google Drive e finalizacao de visita sem alteracao.
+- [x] Fachada e checkout permanecem visiveis como imagens individuais.
+- [x] Painel supervisor preservado em um pacote carregado sob demanda.
+
+### Seguranca
+- A mudanca limita somente as miniaturas montadas no navegador; nao remove, migra nem regrava fotos existentes.
+- Nenhum contrato de dados, endpoint ou mecanismo de sincronizacao foi alterado.
+- A versao produtiva anterior permanece disponivel para reversao atomica no Netlify.
+
+### Testes realizados
+- Suite completa com 128 testes aprovados.
+- TypeScript, lint e build de producao aprovados.
+- Testes de regressao validam paginacao, indices originais e carregamento sob demanda.
+- Em uma secao cheia, o limite visual caiu de 30 para seis miniaturas montadas por vez.
+- Preview `6aa829f29ab5f56d7f348c4d` validado antes da publicacao.
+- Aplicativo, health, manifesto, service worker e pacotes responderam HTTP 200 em producao.
+- Dominio produtivo validado ate a tela de acesso e sem erros no console.
+
+## [2026-09-12] - Reducao da espera entre capturas
+
+### Causa
+- Cada foto podia executar ate cinco buscas adicionais de qualidade JPEG mesmo depois de atingir a faixa segura de tamanho.
+- O aplicativo permitia iniciar outra captura enquanto a foto anterior ainda estava sendo processada, elevando o pico de memoria em celulares.
+- Canvas temporarios permaneciam alocados ate a coleta automatica de memoria e miniaturas eram decodificadas de forma imediata.
+- A lentidao ocorre no processamento local; nenhuma API e chamada entre uma captura e outra e o cache do PWA nao armazena fotos.
+
+### Solucao aplicada
+- A busca de qualidade foi reduzida de cinco para duas etapas, preservando o alvo de 100 KB e o teto obrigatorio de 120 KB.
+- Todas as telas de captura agora impedem compressoes simultaneas e exibem o estado `Processando foto`.
+- O canvas e liberado imediatamente apos gerar a foto comprimida.
+- Miniaturas usam carregamento tardio e decodificacao assincrona.
+- O seletor da camera e limpo depois da escolha para permitir nova captura do mesmo nome de arquivo.
+- Correcao publicada no deploy produtivo `6aa5efc12ef6300fe5973b25`.
+
+### Checklist
+- [x] Resolucao, limite de tamanho, carimbo e formato JPEG preservados.
+- [x] Fachada, antes, estoque, depois, trocas e checkout protegidos contra processamento simultaneo.
+- [x] Estrutura da fila offline e do rascunho IndexedDB mantida sem alteracao.
+- [x] Upload, Google Drive, pastas e painel supervisor mantidos sem alteracao.
+
+### Seguranca
+- Nenhuma foto ou visita existente e migrada, removida ou regravada pelo deploy.
+- A protecao atua somente enquanto uma nova foto esta sendo processada.
+- O teto de 120 KB e a falha segura para imagens acima do limite permanecem ativos.
+
+### Testes realizados
+- Suite completa com 125 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Testes de regressao verificam bloqueio concorrente, liberacao do canvas, recaptura e decodificacao assincrona.
+- Preview `6aa5ef60fa364161ab84ecbd` validado antes da publicacao e sem erros no console.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao com o bundle `index-wQpzsITU.js`.
+- Dominio produtivo validado ate a tela de acesso e sem erros no console.
+
+## [2026-09-12] - Retomada de upload fragmentado
+
+### Causa
+- Em conexoes interrompidas, o envio de uma visita grande podia parar depois de gravar apenas os primeiros fragmentos.
+- Uma nova tentativa recomecava no primeiro fragmento, aumentando o tempo e a chance de outra interrupcao antes da finalizacao.
+
+### Solucao aplicada
+- O servidor agora oferece uma consulta autenticada dos indices de fragmentos ja recebidos.
+- O aplicativo retoma somente os fragmentos ausentes e repete cada gravacao idempotente em falhas transitorias.
+- A visita continua sendo criada apenas depois da remontagem e verificacao criptografica do payload completo.
+- Correcao publicada no deploy produtivo `6aa589429e2cb9e300a0a9fa`.
+
+### Checklist
+- [x] Fragmentos existentes sao preservados e reutilizados.
+- [x] Fragmentos ausentes continuam obrigatorios antes da finalizacao.
+- [x] Aplicativos anteriores permanecem compativeis com a rota.
+- [x] Nenhuma estrutura de fotos, pastas ou filas foi alterada.
+
+### Seguranca
+- A consulta exige a sessao do promotor e usa o ID autenticado na chave do armazenamento.
+- Um usuario nao consegue consultar nem reutilizar fragmentos pertencentes a outro usuario.
+- A validacao SHA-256 integral permanece ativa antes de aceitar a visita.
+
+### Testes realizados
+- Suite completa com 123 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Preview `6aa588e3875c3a3074f75ef0` validado antes da publicacao.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao com o bundle `index-qF5FnZ4C.js`.
+- A rota de consulta recusou requisicao sem sessao com HTTP 401.
+
+## [2026-09-04] - Data operacional preservada em reenvios offline
+
+### Causa
+- Visitas iniciadas em um dia e sincronizadas no dia seguinte priorizavam o horario do reenvio ao montar a data da planilha e das pastas no Drive.
+- A visita permanecia idempotente, mas podia ser arquivada na data de sincronizacao em vez da data real do check-in.
+
+### Solucao aplicada
+- A data operacional agora prioriza `checkInTime` nos eventos de fotos, na finalizacao e no transformador legado.
+- `timestamp` permanece como fallback somente quando a visita nao possui horario de entrada.
+- Correcao publicada no deploy produtivo `6a9abbae2706936c8b103fd4`.
+
+### Checklist
+- [x] Visita offline reenviada no dia seguinte permanece na data do check-in.
+- [x] Nome da pasta da visita e data da linha usam a mesma referencia.
+- [x] Chave idempotente, fotos, fila local e processamento em segundo plano nao foram alterados.
+
+### Seguranca
+- Nenhum registro produtivo foi editado ou removido durante a auditoria.
+- A alteracao e restrita a escolha de uma data ja presente no payload autenticado.
+- O fallback anterior foi mantido para compatibilidade com registros legados sem check-in.
+
+### Testes realizados
+- Suite completa com 122 testes aprovados, incluindo regressao de envio no dia seguinte.
+- TypeScript e build de producao aprovados.
+- Preview `6a9abb52672d40f47b330a26` validado antes da publicacao.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao.
+
+## [2026-09-04] - Visita iniciada somente pela foto de entrada
+
+### Causa
+- A selecao de um PDV criava imediatamente o ID e o horario da visita, antes de qualquer foto de entrada.
+- Esse rascunho incompleto era restaurado como `Visita em andamento`, inclusive no dia seguinte.
+- Como o cancelamento aparecia somente depois da entrada, um clique acidental podia bloquear outro PDV e levar o usuario a reinstalar o aplicativo.
+
+### Solucao aplicada
+- Selecionar um PDV agora apenas abre provisoriamente a tela da fachada, sem criar visita ou horario de entrada.
+- O ID e o horario passam a ser criados somente depois que a foto de entrada e processada com sucesso.
+- O retorno antes da foto volta diretamente para a lista de PDVs e permite escolher outra loja.
+- Se a foto ja foi registrada, o retorno oferece preservar ou cancelar o registro tambem na tela da fachada.
+- Rascunhos antigos que possuem apenas ID, loja ou horario, mas nenhuma foto de entrada nem check-in confirmado, sao liberados automaticamente.
+- Correcao publicada no deploy produtivo `6a9ab5ac637396b153070a2b`.
+
+### Checklist
+- [x] Clique isolado no PDV nao cria uma visita em andamento.
+- [x] Visitas reais com foto de entrada permanecem preservadas.
+- [x] Rascunhos antigos sem foto sao recuperados sem reinstalacao.
+- [x] Fila offline, uploads, Google Sync e painel supervisor nao foram alterados.
+
+### Seguranca
+- A recuperacao exige ausencia simultanea de foto de entrada, tarefa de check-in e confirmacao de entrada.
+- Nenhuma visita enviada, foto registrada ou item da fila offline e removido.
+- A atualizacao do PWA continua aguardando o fechamento das telas abertas, evitando interromper visitas em execucao.
+
+### Testes realizados
+- Suite completa com 121 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Preview `6a9ab5159792795fa4c614dd` validado antes da publicacao e sem erros no console.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao com o bundle `index-B7eYqlu6.js`.
+
+## [2026-09-01] - Retorno seguro durante visita ativa
+
+### Causa
+- Depois de confirmar a foto de entrada, o painel da visita nao oferecia uma forma segura de voltar para a lista de PDVs.
+- Uma navegacao direta para outro PDV poderia substituir os dados identificadores da visita que ainda estava em andamento.
+
+### Solucao aplicada
+- O painel geral recebeu um botao `Voltar` no topo quando existe uma visita ativa.
+- O botao abre uma escolha entre voltar mantendo todo o registro, cancelar o registro atual ou permanecer na visita.
+- Ao voltar sem cancelar, o PDV atual aparece como `Registro em andamento` e pode ser retomado no ponto salvo.
+- Outros PDVs nao podem substituir uma visita ativa; o usuario precisa retomar ou cancelar o registro primeiro.
+- Correcao publicada no deploy produtivo `6a972a16ae93f44688b628d6`.
+
+### Checklist
+- [x] Fotos e progresso preservados na opcao de apenas voltar.
+- [x] Cancelamento limitado ao rascunho atual.
+- [x] Fila de visitas pendentes nao e removida nem alterada.
+- [x] Fluxos de upload, Google Sync e painel supervisor mantidos sem alteracao.
+
+### Seguranca
+- O cancelamento reutiliza apenas a limpeza controlada do estado da visita atual.
+- Nenhuma API de exclusao do servidor ou da fila offline e chamada pelo novo dialogo.
+- A troca para outro PDV fica bloqueada enquanto existir um registro ativo.
+
+### Testes realizados
+- Suite completa com 117 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Preview `6a9729c393021d4d6aa15520` validado antes da publicacao.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 no dominio produtivo com o bundle `index-BLSBXHs5.js`.
+
+## [2026-08-31] - Reducao de memoria da fila offline
+
+### Causa
+- A consulta executada a cada 15 segundos carregava todas as visitas pendentes com suas fotos em base64 apenas para montar contadores e status.
+- Cada atualizacao de uma visita limpava e regravava a fila inteira no IndexedDB.
+- Alteracoes rapidas no rascunho podiam manter varias copias completas da visita aguardando gravacao.
+
+### Solucao aplicada
+- O IndexedDB recebeu um indice leve por usuario, sem payload ou fotos, usado em contagens e consultas recorrentes.
+- Filas existentes migram automaticamente para a versao nova, preservando os registros e todas as fotos.
+- O indice de filas antigas e criado uma visita por vez, cedendo processamento entre registros para evitar bloquear celulares com muitos arquivos locais.
+- Reenvios carregam apenas uma visita completa por vez.
+- Inclusao, atualizacao e remocao alteram somente o registro selecionado, sem regravar a fila inteira.
+- Salvamentos rapidos do rascunho sao consolidados e sempre preservam o estado mais recente.
+- O deploy inicial `6a95c8bf81e5a1051d211cec` foi revertido preventivamente apos um relato de travamento, posteriormente confirmado como referente ao chat e nao ao aplicativo.
+- A versao final, com migracao gradual adicional, foi publicada no deploy produtivo `6a95d327702381cb61133f58`.
+
+### Checklist
+- [x] Estrutura do payload e fotos offline preservadas.
+- [x] Compatibilidade com filas antigas sem `ownerId` mantida.
+- [x] Nenhum botao de exclusao ou limpeza de fila adicionado.
+- [x] Fluxos de envio Google e painel supervisor mantidos sem alteracao.
+
+### Seguranca
+- O indice armazena somente ID, usuario, loja, status, erro e datas.
+- A leitura completa valida o dono da visita antes de devolver o payload.
+- Atualizacoes nao podem trocar o ID nem sobrescrever fila pertencente a outro usuario.
+
+### Testes realizados
+- Migracao real de IndexedDB v1 para v2 com quatro filas antigas e aproximadamente 1 MB de fotos preservadas.
+- Contagem por usuario, atualizacao isolada, remocao isolada e reenvio unitario.
+- Consolidacao de tres salvamentos rapidos com restauracao do ultimo rascunho.
+- Suite completa com 116 testes, TypeScript e build de producao aprovados.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 no preview `6a95d2540869cdd269103706` e no dominio produtivo.
+- Tela de login carregada no navegador sem erros ou avisos no console.
+
+## [2026-08-31] - Recuperacao automatica da sincronizacao Google
+
+### Causa
+- A credencial de producao do Netlify nao correspondia ao segredo ativo do servico Google Cloud, fazendo chamadas autenticadas retornarem HTTP 401.
+- Uma visita podia ser gravada no Netlify Blobs sem iniciar a funcao de sincronizacao quando o celular perdia a resposta entre essas duas requisicoes.
+- Jobs antigos que falharam no Google podiam continuar aparentando `processing`, impedindo a recuperacao de tarefas expiradas.
+
+### Solucao aplicada
+- A credencial permanente do Google Cloud foi alinhada no contexto de producao do Netlify e mantida como segredo restrito a Functions.
+- O Cloud Run recebeu a revisao `criativa-sync-ingress-prod-00002-5jg`, com troca atomica e 100% do trafego somente depois de ficar pronta.
+- Clientes compativeis solicitam o inicio da sincronizacao na mesma gravacao da visita; clientes antigos continuam usando o fluxo anterior.
+- Foi adicionada reconciliacao programada a cada cinco minutos, limitada a uma visita antiga por execucao e somente para o provedor `google-v1`.
+- Jobs Google pendentes ha mais de 30 minutos podem receber uma nova geracao idempotente durante a recuperacao autenticada.
+- Foi criado um indice leve de visitas pendentes para evitar carregar fotos em base64 durante a reconciliacao.
+- Correcao publicada no deploy produtivo `6a95b9bf404d46cc591294d2`.
+- Treze visitas Google preservadas no servidor foram conciliadas e finalizadas; a auditoria terminou com 573 de 579 visitas enviadas.
+
+### Checklist
+- [x] Nenhuma fila local do celular e removida ou alterada automaticamente.
+- [x] Visitas novas e sem fotos nao entram na reconciliacao.
+- [x] Erros legados do Make ficam fora da recuperacao automatica.
+- [x] Fluxo anterior permanece como fallback para versoes antigas do aplicativo.
+
+### Seguranca
+- A credencial permanece secreta, restrita a Functions e nao foi gravada no repositorio.
+- A recuperacao reutiliza IDs e comprovantes para preservar a idempotencia no Google Drive.
+- O reconciliador executa apenas uma etapa de uma visita por ciclo para limitar carga e impacto em producao.
+
+### Testes realizados
+- 111 testes automatizados, lint, TypeScript e build de producao aprovados.
+- 22 testes do worker Google e respectivo build aprovados.
+- Autenticacao entre Netlify e Google validada pela rota protegida sem expor o valor da credencial.
+- Aplicativo e `/api/health` responderam HTTP 200 depois do deploy.
+- As seis pendencias restantes foram confirmadas como falhas legadas do Make, entre julho e 17 de agosto, e nao foram alteradas.
+
+## [2026-08-31] - Estabilidade do painel supervisor e leituras operacionais
+
+### Causa
+- O painel carregava centenas de resumos do Netlify Blobs em paralelo; com 559 visitas, execucoes chegaram a 20 segundos e ao limite de 1.024 MB de memoria.
+- Eventos de foco, retorno da internet e `pageshow` podiam iniciar mais de uma atualizacao do painel ao mesmo tempo.
+- A fila de sincronizacao consultava visitas completas, incluindo fotos em base64, embora precisasse apenas de status, loja e promotor.
+
+### Solucao aplicada
+- Leituras de resumos e visitas passaram a usar concorrencia limitada e preservar a ordem dos resultados.
+- O painel ganhou cache autenticado de 60 segundos e reaproveitamento da mesma construcao em chamadas simultaneas no mesmo processo.
+- O aplicativo impede uma segunda atualizacao enquanto a primeira ainda estiver em andamento.
+- A fila de sincronizacao passou a usar somente o indice leve de resumos, sem carregar fotos.
+- Correcao publicada de forma atomica no deploy produtivo `6a959a7dcf34d7c42fde4cac`.
+
+### Checklist
+- [x] Fluxos de fotos, visitas e Google Sync mantidos sem alteracao.
+- [x] Painel, detalhe do promotor, saude operacional e fila validados com 559 registros.
+- [x] Nenhum registro produtivo foi removido ou regravado durante os testes.
+- [x] Rota legada `GET /api/visits` mantida compativel e com concorrencia limitada.
+
+### Seguranca
+- O cache continua protegido pela autenticacao e nao e enviado com cabecalhos publicos de cache.
+- O cache expira em 60 segundos e rejeita datas invalidas ou futuras.
+- A limitacao de concorrencia reduz picos de memoria sem alterar os dados retornados.
+
+### Testes realizados
+- 107 testes automatizados, TypeScript e build de producao aprovados.
+- Preview `6a95995dccc035aee349a15a`: painel frio em 4,1 segundos e chamadas em cache entre 0,37 e 1,76 segundos.
+- Detalhe do promotor, saude operacional e fila retornaram HTTP 200 no preview.
+
+## [2026-08-27] - Recuperacao retrocompativel de lotes Google antigos
+
+### Causa
+- Lotes criados antes da reducao do tamanho de 20 para 5 fotos guardavam apenas o ID da tarefa, sem a lista exata de fotos.
+- Ao consultar uma tarefa antiga concluida, o backend reconstruia a expectativa com o limite novo e rejeitava comprovantes validos ja gravados no Drive.
+- A mensagem de erro ainda mencionava Make, embora o provedor ativo fosse o Google Cloud.
+
+### Solucao aplicada
+- Novos trabalhos agora persistem os IDs exatos das fotos enquanto estiverem pendentes.
+- Trabalhos antigos sao conciliados pelos comprovantes retornados pelo Google, limitados a fotos ainda pendentes da mesma visita.
+- Erros legados de confirmacao passam a permitir uma nova tentativa segura no aplicativo.
+- A validacao continua exigindo IDs unicos, arquivo, URL e correspondencia integral do lote antes da finalizacao da visita.
+- O hotfix foi publicado de forma atomica no deploy de producao `6a90984e140dd4a714264711`.
+- Sete visitas antigas foram recuperadas e finalizadas, totalizando 172 fotos reconhecidas nos manifestos.
+
+### Checklist
+- [x] Fluxo novo de cinco fotos preservado.
+- [x] Compatibilidade adicionada somente para trabalhos antigos sem composicao persistida.
+- [x] Nenhuma fila ou foto e removida automaticamente.
+- [x] Finalizacao continua condicionada a conciliacao integral das fotos.
+
+### Seguranca
+- Comprovantes de outra visita, desconhecidos, duplicados, parciais ou sem arquivo/URL sao rejeitados.
+- O ID da tarefa deve pertencer a visita em processamento.
+- A operacao permanece idempotente e nao recria fotos que ja existem no Google Drive.
+
+### Testes realizados
+- Testes automatizados de reconciliacao legada e composicao persistida.
+- Testes negativos para duplicidade, foto desconhecida, resposta parcial e tarefa de outra visita.
+- Suite completa com 103 testes, tipagem, build e deploy de preview `6a9097e448fd9a78fc22da98` executados antes da producao.
+- Health check produtivo, protecao `401` sem sessao e auditoria de 482 visitas validados apos a publicacao.
+
+## [2026-08-25] - Recuperacao manual de lotes Google
+
+### Causa
+- Lotes que atingiam cinco falhas no Cloud Tasks ficavam em `dead_letter` e o
+  retry existente apenas consultava novamente o mesmo job terminal.
+- O botao `Atualizar status` nao oferecia uma acao de recuperacao ao promotor,
+  embora a visita permanecesse preservada na fila local e no backend.
+
+### Solucao aplicada
+- Foi implementado localmente o modo autenticado de recuperacao de
+  `dead_letter`, criando uma nova geracao da tarefa e preservando os IDs das
+  fotos para reutilizar a deduplicacao do Drive.
+- A tela de envios passa a oferecer `Tentar novamente` apenas para esse erro,
+  com limite de duas tentativas manuais por lote e intervalo de 60 segundos.
+- Depois do limite, o aplicativo sinaliza `Necessita suporte` e nao cria loops
+  automaticos. A recuperacao foi publicada em producao.
+- Os logs mostraram `504` no limite de aproximadamente 300 segundos. O tamanho
+  padrao foi reduzido de 20 para 10 fotos por lote na homologacao, preservando
+  margem para variacoes de latencia do Google Drive.
+- A homologacao confirmou lote de cinco fotos em 32 segundos. A producao foi
+  configurada com lote 5 para manter margem do limite de 300 segundos.
+- O aviso de fila pendente passou a permitir `Continuar trabalhando` sem
+  remover os registros, e as duas opcoes de limpar a fila foram eliminadas.
+
+### Checklist
+- [x] Preservar o fluxo normal e o polling automatico existentes.
+- [x] Exigir sessao e permissao de acesso a visita no endpoint de retry.
+- [x] Limitar e espaçar as recuperacoes manuais por lote.
+- [x] Manter IDs de foto estaveis para impedir duplicidade no Drive.
+- [x] Adicionar testes unitarios, TypeScript e build.
+- [x] Identificar o timeout real de 300 segundos nos logs do worker produtivo.
+- [x] Publicar preview isolado com lote 10 e ingresso de homologacao.
+- [x] Alinhar o token do ingresso no contexto `deploy-preview`.
+- [x] Validar lote 10 e recuperacao idempotente em homologacao.
+- [x] Validar lote 5 abaixo do limite operacional.
+- [x] Remover da interface e do servico a exclusao integral da fila local.
+- [x] Permitir abrir outro PDV mantendo os envios pendentes salvos.
+- [x] Publicar a mitigacao produtiva de forma atomica no Netlify.
+
+### Seguranca
+- Nenhum job terminal e reaberto e nenhuma tarefa e apagada. Cada recuperacao
+  recebe uma identidade nova e mantem o job original para auditoria.
+- O retry nao e automatico e nao pode ser acionado por outro promotor.
+- A mudanca produtiva ficou limitada ao lote 5 e ao deploy atomico; nenhum
+  registro operacional foi apagado ou reaberto.
+- O contexto `deploy-preview` foi configurado com lote 10 durante a validacao;
+  a producao foi promovida somente depois do teste com lote 5.
+- O segredo foi transferido sem ser gravado no repositorio ou em arquivo local,
+  e somente o contexto `deploy-preview` foi atualizado no Netlify.
+- Os lotes sinteticos foram enviados exclusivamente aos servicos e destinos de
+  homologacao; a producao recebeu somente codigo e configuracao validados.
+- A publicacao produtiva nao reiniciou nem removeu visitas. O Netlify manteve a
+  versao anterior ativa ate a troca atomica pelo novo deploy.
+
+### Testes realizados
+- Aplicativo: `99/99` testes aprovados, incluindo a politica que impede excluir
+  a fila e permite continuar trabalhando em outro PDV.
+- TypeScript: `tsc --noEmit` aprovado.
+- Build Vite de producao concluido; permanece apenas o aviso preexistente de
+  bundle principal acima de 500 kB.
+- Preview `6a8dfd567016c9f48fdba9a7` confirmou o provedor `google-v1`, manteve a
+  sonda interna protegida com `401` sem credencial e usou lote 10.
+- O token de `deploy-preview` foi alinhado ao segredo
+  `criativa-sync-ingress-secret`; a leitura autenticada do ingresso retornou o
+  job de controle `completed` com dois recibos.
+- Um lote sintetico com 10 fotos concluiu com 10 recibos. A conclusao foi
+  observada entre 243 e 308 segundos, faixa ainda muito proxima do timeout.
+- O reenvio com identidade `:RETRY:1` concluiu em ate 222 segundos, retornou 10
+  recibos e reutilizou os mesmos 10 IDs de arquivo e a mesma pasta do PDV.
+- A deduplicacao foi aprovada; como o lote 10 ficou proximo do timeout, a
+  promocao produtiva utilizou o lote 5 validado com margem operacional.
+- Um lote adicional de cinco fotos concluiu na homologacao em 32 segundos.
+- A base produtiva confirmou que `VISIT-BEAE0D3A` concluiu 8/8, enquanto
+  `VISIT-9F78346B` (15 fotos) e `VISIT-62DAA44B` (19 fotos) chegaram a
+  `dead_letter` sem recibos. As tres visitas foram criadas entre 15:57:58 e
+  15:58:02, confirmando concorrencia de jobs grandes e nao interferencia dos
+  testes isolados de homologacao.
+- Deploy produtivo `6a8e02c2124360d7e7dc7a86` publicado com lote 5 e
+  recuperacao manual idempotente. Health respondeu `200`, o provedor permaneceu
+  `google-v1` e rotas de sincronizacao sem sessao continuaram retornando `401`.
+- Deploy produtivo final `6a8e0613124360ebc1dc7947` publicou a fila nao
+  bloqueante e removeu a exclusao. O bundle publico e o deploy imutavel possuem
+  o mesmo SHA-256; `Continuar trabalhando` esta presente e `Limpar minha fila`
+  nao existe no JavaScript entregue aos usuarios.
+
+## [2026-08-19] - Migracao produtiva do Make para Google Sync
+
+### Causa
+- O saldo do Make chegou a `75 / 16.000` creditos, com risco imediato de
+  interromper os envios de campo.
+- O fluxo por foto e as confirmacoes do Make continuavam consumindo operacoes,
+  mesmo depois da reducao de qualidade e do agrupamento em lotes.
+
+### Solucao aplicada
+- Foi implementada a ingestao autenticada em lotes de ate 20 fotos, com corpo
+  temporario no Cloud Storage e somente referencias pequenas no Cloud Tasks.
+- O worker privado passou a criar e reutilizar
+  `INDUSTRIA/DATA/PDV[/DEVOLUCOES]` e a finalizar a visita por upsert de
+  `ID_VISITA` na aba `RELATORIO_VISITAS`.
+- Foram criados servicos produtivos separados, fila propria e segredos
+  distintos para a pasta `FOTOS SISTEMA CRIATIVA` e a planilha
+  `Sistema Criativa`.
+- A Netlify recebeu `BACKEND_SYNC_PROVIDER`, URL e token do Google somente no
+  backend. O corte foi publicado no deploy `6a85cd9390a9e46dc390e106`.
+- A funcao em segundo plano passou a aguardar dois segundos entre consultas ao
+  Google, evitando esgotar tentativas enquanto um lote ainda esta processando.
+- A sonda de homologacao foi mantida desabilitada em producao e corrigida para
+  responder `404` quando sua variavel nao existe.
+- Foi criado o orcamento mensal `Criativa - Controle mensal R$ 30`, limitado ao
+  projeto `make-criativa`, com alertas de gasto real em 25%, 50%, 75%, 90% e
+  100%, alem de alerta de previsao em 100%.
+
+### Checklist
+- [x] Homologacao completa sem Make: ingresso, staging, Cloud Tasks, worker,
+  Drive, devolucoes, Sheets e limpeza do staging.
+- [x] Destinos produtivos validados em modo somente leitura.
+- [x] Servicos produtivos criados sem receber trafego durante a preparacao.
+- [x] Camada compativel publicada primeiro com `provider=make`.
+- [x] Frontend produtivo preservado byte a byte durante os deploys do backend.
+- [x] Feature flag alterada para `google-v1` somente depois dos gates anteriores.
+- [x] Conferir as primeiras visitas reais completas pelos recibos persistidos.
+- [x] Configurar orcamento e alertas progressivos de custo no Google Cloud.
+- [ ] Manter observacao reforcada de erros e fila durante o primeiro dia.
+
+### Seguranca
+- O worker produtivo continua privado e aceita somente a identidade da fila.
+- O ingresso publico exige token constante em Secret Manager; chamadas sem
+  token e com token invalido retornaram `401`.
+- Credenciais OAuth e tokens nao foram gravados no repositorio ou nos logs.
+- Nenhuma visita sintetica foi escrita na pasta ou planilha produtiva.
+- O Make nao foi desligado nem alterado e permanece como rollback imediato. O
+  deploy validado anterior ao corte e `6a85cc51880b7360cf530f8e`.
+- O orcamento usa somente notificacoes; nenhum limite automatico de gastos ou
+  desligamento de servico foi habilitado.
+
+### Testes realizados
+- Aplicativo: `96/96` testes, TypeScript e build aprovados.
+- Google Sync: `22/22` testes, build aprovado e `npm audit` sem vulnerabilidades.
+- Homologacao ponta a ponta criou foto normal e devolucao, retornou dois
+  recibos, finalizou a visita e removeu o staging sem duplicidade no retry.
+- Preview Netlify confirmou `google-v1`; a sonda protegida retornou `401` sem
+  token, `401` com token invalido e `200` com token valido.
+- OAuth produtivo listou seis pastas na raiz e leu
+  `RELATORIO_VISITAS!A1:A2` com HTTP `200`, sem escrita.
+- Depois do corte, `/api/health` retornou `provider=google-v1`, rotas sem sessao
+  continuaram em `401`, a sonda interna retornou `404` e os hashes do HTML,
+  service worker, manifesto, JavaScript e CSS permaneceram iguais.
+- Cloud Run registrou zero erros nos servicos produtivos. Depois do corte, oito
+  lotes com 96 fotos e tres finalizacoes reais foram processados; os 11 jobs
+  ficaram `completed`, sem `processing`, `pending` ou `dead_letter`, e a fila
+  voltou a zero.
+- O Google Cloud confirmou a criacao do orcamento em `make-criativa`, no valor
+  de R$ 30,00, exibindo os seis gatilhos configurados e gasto atual de R$ 0,00.
+- O Google Auth Platform do projeto `make-criativa` foi conferido com a conta
+  proprietaria: OAuth externo com status `Em producao`, usando 1 de 100
+  usuarios. O refresh token nao esta sujeito a expiracao semanal de teste.
+
+## [2026-08-19] - Preparacao da migracao Make para Google Cloud
+
+### Causa
+- O processamento produtivo ainda depende de operacoes do Make por foto e pode
+  repetir lotes quando uma resposta ultrapassa o timeout do backend.
+- A migracao precisava comecar sem chamar webhooks, consumir creditos do Make
+  ou interferir nas visitas em andamento.
+
+### Solucao aplicada
+- Projeto `make-criativa`, conta, faturamento, APIs e credenciais existentes
+  foram inventariados em modo somente leitura.
+- Cloud Run, Cloud Tasks, Secret Manager, Artifact Registry, Sheets, Firestore
+  e Cloud Build foram habilitados para a homologacao.
+- Foi criada uma base local isolada com lease, idempotencia, recibo persistido,
+  limite de tentativas, `dead_letter` e nomes deterministas de tarefas.
+- O desenho usa Cloud Storage para o corpo das fotos e envia ao Cloud Tasks
+  somente referencias pequenas, evitando limite de payload e reenvio de base64.
+- Foi criada a conta de runtime sem chave JSON e com acesso minimo a Firestore,
+  Secret Manager, logs e enfileiramento.
+- Firestore, bucket privado, fila limitada, repositorio Docker e recipientes
+  vazios de segredos foram criados em `southamerica-east1`.
+- O primeiro container permanece local, oferece somente `/health` e responde
+  `404` para ingestao, impedindo trafego antes da autenticacao.
+- A imagem `health:20260819-1` foi publicada pelo Cloud Build e implantada no
+  Cloud Run privado `criativa-sync-homolog`, com escala de zero a uma instancia.
+- O bucket temporario recebeu lifecycle de sete dias, mantendo acesso publico
+  bloqueado e controle uniforme de acesso.
+- O cenario produtivo `Criativa Field Ops - Upload V2` foi exportado e
+  conferido em modo somente leitura, sem `Run once`, salvamento ou chamada de
+  webhook. A pasta raiz, a aba `RELATORIO_VISITAS` e as rotas individuais e de
+  lote foram confirmadas contra a implementacao Google.
+- Um cliente OAuth dedicado foi autorizado com somente `drive.file` e
+  `spreadsheets`; o refresh token foi gravado diretamente no Secret Manager.
+- O worker passou a criar a arvore `INDUSTRIA/DATA/PDV[/DEVOLUCOES]`, enviar
+  lotes de ate 20 fotos e fazer upsert por `ID_VISITA`.
+- A limpeza do staging foi movida para depois da persistencia do recibo final.
+  Uma falha parcial agora preserva todos os objetos necessarios para o retry, e
+  falha de limpeza nao transforma um lote ja concluido em erro.
+- Foi implantado o servico privado `criativa-sync-worker-homolog`, apontado
+  somente para pasta e planilha exclusivas de homologacao.
+
+### Testes realizados
+- Projeto Google Cloud e Drive API confirmados pela conta administrativa.
+- Operacao de habilitacao das sete APIs concluiu com sucesso.
+- Testes locais anti-loop adicionados ao servico isolado.
+- Dezessete testes do servico Google aprovados, build TypeScript concluido e
+  `npm audit --omit=dev` sem vulnerabilidades.
+- A conta de runtime foi confirmada sem chaves gerenciadas pelo usuario.
+- Cloud Build `a1184509-8fdc-4c15-88b7-6649d91433c5` terminou com `SUCCESS` em
+  52 segundos.
+- Acesso anonimo ao Cloud Run retornou `403`; health autenticado retornou `200`
+  com `acceptsTraffic=false` e `makeCalled=false`.
+- POST autenticado em `/v1/events` retornou `404`, confirmando que a ingestao
+  ainda nao foi exposta.
+- Lifecycle foi relido no bucket com acao `Delete`, idade sete dias, protecao
+  publica `enforced` e uniform bucket-level access ativo.
+- Cloud Build `3b28062e-31c2-42fc-9825-4d26c3d9f06e` terminou com `SUCCESS` e
+  publicou a imagem do worker pelo digest
+  `sha256:6a35beeaae8e3af1828a1f6292a8327be1d0472f0b7ff2e2083702ddf561cccc`.
+- O worker retornou `403` anonimo e `/health` autenticado retornou `200`, com
+  `role=worker` e `makeCalled=false`.
+- Um lote isolado com foto normal e devolucao criou dois arquivos unicos em
+  `HOMOLOG INDUSTRIA/19-08-2026/PDV TESTE GOOGLE[/DEVOLUCOES]`.
+- A repeticao do mesmo lote retornou o mesmo recibo com HTTP `200`, sem reler o
+  staging e sem duplicar os arquivos; os objetos temporarios foram removidos.
+- A finalizacao isolada retornou `created`, o retry devolveu o mesmo recibo e
+  um novo evento da mesma visita retornou `updated`; a planilha permaneceu com
+  uma unica linha de dados.
+- O dominio produtivo e `/api/health` continuaram respondendo HTTP `200`, com
+  Make V2 ativo no modo `visit-v2`.
+
+### Seguranca
+- Make, Netlify, webhooks e aplicativo produtivo nao foram alterados.
+- A leitura do Make foi limitada ao blueprint e ao painel; nenhum cenario foi
+  executado ou salvo e nenhum credito foi consumido por essa conferencia.
+- Client secret e refresh token ficam apenas no Secret Manager e nao foram
+  gravados no repositorio, no blueprint ou nos logs da aplicacao.
+- A conta de servico nao possui chave JSON gerenciada pelo usuario.
+- Nenhuma rota do Netlify aponta para os recursos novos.
+- O servico de bootstrap OAuth e sua conta temporaria foram removidos depois
+  da autorizacao; o worker permanece privado e com escala maxima de uma
+  instancia.
+- O teste escreveu somente em pasta e planilha de homologacao. A pasta e a
+  planilha produtivas nao receberam dados sinteticos.
+- A ingestao e a feature flag do Netlify continuam desligadas; nao houve corte
+  de trafego e o rollback operacional permanece sendo o Make.
+
+## [2026-08-18] - Lote otimizado e repeticao por timeout interrompida
+
+### Causa
+- Lotes produtivos de 20 fotos consumiam `90` creditos e levavam cerca de um
+  minuto, acima do timeout de `45s` do backend.
+- Dois processamentos consecutivos foram comparados por assinatura e tinham o
+  mesmo `BATCH_ID` e a mesma visita. O Make concluia com `Success`, mas o
+  backend encerrava a espera e reenfileirava todo o lote.
+- O consumo do cenario produtivo nas ultimas 24 horas subiu de `5.449` para
+  `7.488` creditos durante a investigacao.
+
+### Solucao aplicada
+- O lote foi temporariamente desligado pelo rollback documentado e publicado
+  no deploy `6a84a710d8a336a4e181c5e3`; o envio individual permaneceu funcionando
+  sem indisponibilidade.
+- Na homologacao, os arquivos passaram a nascer diretamente dentro do PDV e de
+  `PDV/DEVOLUCOES`. Os modulos 90 e 91, que moviam cada arquivo depois do
+  upload, foram removidos sem retirar a busca idempotente ou a confirmacao HTTP.
+- O blueprint produtivo foi gerado preservando integralmente o webhook original,
+  reexportado e auditado com 74 modulos, pais diretos e sem os modulos 90 e 91.
+- O cenario produtivo permaneceu `Active` e com agendamento
+  `Immediately as data arrives` durante a promocao.
+- O lote foi reativado com tamanho `10` e timeout de `60s` no deploy final
+  `6a84ab1cb1f442e553fc2be6`.
+
+### Testes realizados
+- Foto normal em arvore nova: `Success`, 13 creditos; o ID pai informado na
+  criacao do arquivo foi exatamente o ID retornado pela pasta do PDV.
+- Reenvio da foto normal: `Success` em quatro segundos e 13 creditos; o modulo
+  de arquivo usou `GET`, confirmando reutilizacao sem duplicidade.
+- Devolucao em arvore nova: 15 creditos; o ID pai do arquivo foi exatamente o
+  ID da pasta `DEVOLUCOES`.
+- Reenvio da devolucao: `Success` em cinco segundos e 15 creditos, usando `GET`
+  para o arquivo existente.
+- Lote de 10 imagens, com payload de aproximadamente 1,4 MB: HTTP `200` em
+  38,7 segundos, 10 recibos, 10 IDs unicos e um unico PDV. O custo calculado e
+  confirmado pelo desenho do cenario e de 40 creditos.
+- `npm.cmd test`: 94 testes aprovados; `npm.cmd run lint`: aprovado.
+- Pagina, configuracao e health checks do dominio principal e do deploy unico
+  retornaram `200`; a sonda interna continuou protegida com `404`.
+
+### Seguranca
+- Nenhum login, roteiro, captura ou persistencia de visita foi desligado.
+- O modo individual permaneceu ativo durante toda a troca do blueprint.
+- Nenhuma credencial, URL de webhook, foto de usuario ou identificador de lote
+  foi registrado no codigo ou neste changelog.
+- Pendente observar o primeiro lote real de ate 10 fotos depois do deploy final;
+  nenhum teste sintetico adicional foi feito no Drive produtivo para evitar
+  criar pastas artificiais.
+
+## [2026-08-18] - Lote ativado em producao sem interromper o aplicativo
+
+### Causa
+- O cenario produtivo registrou `5.449` creditos nas ultimas 24 horas. A
+  auditoria mostrou sequencias de fotos individuais com aproximadamente seis
+  creditos por arquivo e intervalos de poucos segundos.
+- A fila restante da homologacao continha somente um evento sintetico com
+  `ROW_WRITE=false`; ela nao bloqueava a producao e foi ignorada para evitar
+  consumo sem beneficio operacional.
+
+### Solucao aplicada
+- O blueprint produtivo atual foi exportado antes da alteracao para
+  `Criativa Field Ops - Upload V2.blueprint.json`.
+- A promocao foi gerada sobre esse backup, preservando integralmente o webhook
+  produtivo e a conexao do Google Drive, enquanto incorporou os modulos 92 a 99
+  e as rotas individuais com `INDUSTRIA/DATA/PDV/DEVOLUCOES`.
+- O cenario `5846231` permaneceu `Active` e com agendamento
+  `Immediately as data arrives`; as rotas individuais nao foram removidas.
+- O Netlify recebeu `BACKEND_MAKE_PHOTO_BATCH_ENABLED=true`, tamanho 20 e
+  timeout de 45 segundos no contexto de producao.
+- O deploy atomico `6a849cf9bdb850e15438466e` publicou a nova versao sem
+  indisponibilidade observada.
+
+### Testes realizados
+- `npm.cmd test`: 94 testes aprovados.
+- `npm.cmd run lint`: TypeScript aprovado sem erros.
+- `npm.cmd run build`: build de producao aprovado.
+- Um lote sintetico com uma foto e `ROW_WRITE=false` respondeu HTTP `200`,
+  `PHOTO_BATCH_UPLOADED` e recibo completo; a execucao terminou com `Success`
+  em sete segundos e 14 creditos.
+- Execucoes individuais de usuarios continuaram terminando com `Success`
+  antes, durante e depois do salvamento do blueprint.
+- Health checks do dominio principal e do deploy unico retornaram `ok=true`,
+  Make V2 ativo e modo `visit-v2`; a sonda interna permaneceu protegida com
+  HTTP `404`.
+- Os logs das funcoes de sincronizacao nao apresentaram erros apos o deploy.
+- A primeira visita real depois da ativacao agrupou sete fotos, percorreu os
+  modulos 92 a 97 e terminou com `Success` em 34 segundos e 38 creditos; o
+  `VISIT_FINALIZE` seguinte terminou com `Success` e quatro creditos.
+- Sete envios individuais custariam aproximadamente 42 creditos somente nas
+  fotos. A economia observada no lote real foi de quatro creditos, cerca de
+  9,5% nessa etapa; com 20 fotos, o desenho idempotente atual tende a economizar
+  aproximadamente 25%, abaixo do prototipo inicial sem idempotencia.
+
+### Seguranca
+- O rollback operacional e manter o cenario ativo e alterar somente
+  `BACKEND_MAKE_PHOTO_BATCH_ENABLED=false`, seguido de redeploy.
+- Nenhuma credencial ou URL de webhook foi registrada no codigo, no changelog
+  ou na saida dos testes.
+- A proxima otimizacao deve reduzir as quatro operacoes por foto da rota
+  idempotente sem retirar o rollback nem interromper a operacao atual.
+
+## [2026-08-18] - Arvore nova do lote validada e testes pausados por limite do Make
+
+### Causa
+- A rota de lote pesquisava industria, data e PDV com os modulos 71, 72 e 73,
+  mas nao criava os niveis ausentes. A primeira visita de uma arvore nova seguia
+  com ID de pasta vazio e falhava no Google Drive.
+
+### Solucao aplicada
+- A copia inativa de homologacao recebeu os modulos 92 a 97 para pesquisar ou
+  criar, em sequencia, industria, data e PDV com uma unica saida por nivel.
+- Os modulos 98 e 99 aplicam o mesmo desenho para a subpasta `DEVOLUCOES`.
+- As referencias de busca, upload, movimentacao e comprovantes passaram a usar
+  os IDs devolvidos pelos novos modulos.
+- O agendamento foi restaurado para `Immediately as data arrives` depois da
+  importacao e o blueprint foi salvo e reexportado para conferencia.
+
+### Testes realizados
+- Uma arvore sintetica totalmente nova foi enviada com `ROW_WRITE=false`; o
+  cliente interrompeu a espera HTTP apos 1.032 ms, mas o Make concluiu a criacao
+  da arvore e do arquivo com `Success` em 8 segundos e 14 creditos.
+- O mesmo lote foi reenviado e respondeu `200` em 5,5 segundos; o Make concluiu
+  com `Success` em 4 segundos e 14 creditos.
+- O ID do arquivo na primeira execucao e no reenvio foi exatamente o mesmo,
+  confirmando a busca idempotente dentro do PDV criado pelo lote.
+- O blueprint salvo contem os modulos 92 a 99 e nao contem mais os antigos
+  modulos de pasta 71, 72, 73 e 79 na rota de lote.
+
+### Limite operacional encontrado
+- A organizacao atingiu aproximadamente `10.030/10.000` creditos, saldo `-30`;
+  o Make informou que os cenarios foram pausados ate 03/09/2026 11:25.
+- O teste de devolucao nao foi executado: um unico evento sintetico ficou na fila
+  exclusiva da homologacao depois da recusa por `exceeded limits`.
+- O cenario de producao continua marcado como `Active`, mas novos processamentos
+  dependem da liberacao de creditos pela organizacao.
+
+### Seguranca
+- O cenario de producao nao foi editado, executado manualmente ou substituido.
+- A homologacao permaneceu `Inactive`; nenhum `VISIT_FINALIZE` ou escrita em
+  planilha foi realizado.
+- Nenhum novo disparo sera feito enquanto o limite de creditos nao for resolvido.
+
+### Pendente
+- Liberar creditos no Make e processar o unico evento de devolucao que esta na
+  fila da homologacao.
+- Reenviar a devolucao para validar a reutilizacao da subpasta e do arquivo.
+- Executar uma visita completa controlada antes de ativar o lote em producao.
+
+## [2026-08-18] - Timeout HTTP real validado no preview Netlify
+
+### Causa testada
+- O backend pode encerrar a espera pela resposta do webhook enquanto o Make
+  continua processando o lote; nesse caso, a retomada envia novamente o mesmo
+  `BATCH_ID` e precisa reutilizar os arquivos ja gravados.
+
+### Solucao aplicada
+- O timeout da chamada ao Make passou a aceitar configuracao protegida, mantendo
+  45 segundos como padrao e limites entre 500 e 60.000 ms.
+- Foi criada uma sonda interna, protegida por flag e token, para executar somente
+  no draft de homologacao os modos `timeout` de 1 segundo e `retry` de 45 segundos.
+- A carga sintetica usa `ROW_WRITE=false`, duas imagens minimas e a arvore de
+  homologacao ja existente `HOMOLOGACAO_LOTE/18-08-2026/PDV TESTE LOTE 20`.
+
+### Validacao
+- O draft `timeout-make-homolog` respondeu `200` no health check e rejeitou a
+  sonda sem token com `401`.
+- A primeira chamada autenticada retornou `504`, `reason=timeout` e
+  `errorType=AbortError` com limite interno de 1.000 ms; o Make continuou e
+  concluiu a execucao em 9 segundos, com status `Success` e 15 creditos.
+- O reenvio do mesmo lote retornou `200` em 9,2 segundos e o Make concluiu em
+  8 segundos, novamente com status `Success` e 15 creditos.
+- Os dois comprovantes do reenvio conservaram exatamente os IDs de arquivo da
+  primeira execucao e o mesmo ID da pasta do PDV, sem evidencia de duplicacao.
+- Uma tentativa diagnostica anterior, em uma arvore nova, falhou no modulo 84
+  com `File not found`, consumindo 6 creditos e revelando que o caminho de lote
+  ainda depende de industria, data e PDV previamente existentes.
+
+### Seguranca
+- Nenhum `VISIT_FINALIZE` foi enviado e nenhuma linha foi criada na planilha.
+- Foram usadas apenas duas imagens sinteticas de 68 bytes.
+- O cenario de homologacao permaneceu inativo e foi executado apenas com
+  `Run once`; o cenario de producao nao foi editado nem executado.
+- Nenhum deploy de producao foi realizado e a flag de lote continua desligada
+  em producao.
+- As variaveis temporarias da sonda foram removidas depois do ensaio.
+
+### Pendente
+- Fazer o caminho de lote criar ou localizar industria, data e PDV antes do
+  Iterator; sem isso, a primeira visita de uma arvore nova nao pode usar lote.
+- Executar uma visita completa controlada antes de avaliar a ativacao em
+  producao.
+
+## [2026-08-18] - Reenvio apos resposta perdida validado na homologacao do Make
+
+### Causa testada
+- Quando o chamador deixa de receber a resposta final do webhook, o mesmo lote
+  pode ser reenviado mesmo que o Make ja tenha gravado as fotos no Drive.
+- A fila exclusiva da homologacao continha cinco eventos sinteticos com
+  `ROW_WRITE=false`; os dois mais recentes eram copias identicas do mesmo lote.
+
+### Solucao aplicada
+- As duas copias finais foram processadas em sequencia como primeira tentativa
+  sem resposta util e reenvio do mesmo `BATCH_ID`.
+- A busca idempotente por nome reutilizou os arquivos existentes e atualizou o
+  conteudo sem criar uma segunda linha no Google Drive.
+
+### Validacao
+- As execucoes finais de 12:21:33 e 12:22:38 consumiram 15 creditos cada e
+  terminaram em 7 e 8 segundos, respectivamente.
+- O status `Warning` foi causado apenas pelo modulo de resposta: o Make nao
+  consegue devolver a resposta original ao processar manualmente dados antigos
+  da fila. Os modulos do Drive concluiram a gravacao normalmente.
+- A pesquisa exata no Drive retornou uma unica ocorrencia de
+  `HOMOLOG_LOTE_20_01.jpg`, ID `1u-p7dxQ16mkDTKETrnNdypQa8CCfeNlj`, e uma
+  unica ocorrencia de `HOMOLOG_IDEMP_V2_FINAL_20260818.jpg`, ID
+  `1oJPsmFp7iBHkHOJR8zzMVNZJs-ndzapK`.
+- Ambos os arquivos permaneceram em `PDV TESTE LOTE 20`; a fila de homologacao
+  foi reduzida de cinco para zero. As cinco execucoes consumiram 75 creditos.
+
+### Seguranca
+- Nenhum evento `VISIT_FINALIZE` foi processado e nenhuma linha de teste foi
+  criada na planilha operacional.
+- O cenario de producao nao foi aberto para edicao, ativado ou executado.
+- O cenario de homologacao permaneceu `Inactive` depois da validacao.
+- Nenhum deploy, push ou alteracao de variavel no Netlify foi realizado.
+
+### Pendente
+- Repetir o teste com timeout HTTP real no preview Netlify para validar tambem
+  a retomada do backend, sem promover a flag de lote para producao.
+
+## [2026-08-18] - Lote idempotente validado na homologacao do Make
+
+### Corrigido
+- O fluxo em lote passou a localizar cada arquivo por nome dentro da pasta
+  final antes de decidir entre obter o arquivo existente ou criar um novo.
+- Cada foto agora segue por uma unica saida linear antes do agregador: busca,
+  obtencao/criacao, atualizacao do conteudo e garantia explicita da pasta pai.
+- Arquivos novos criados na raiz da conta da conexao sao movidos para o PDV ou
+  para `DEVOLUCOES` com `addParents` e `removeParents` antes da resposta.
+
+### Validacao
+- Lote normal misto, com uma foto existente e uma nova, retornou dois recibos
+  e gravou ambos em `HOMOLOGACAO_LOTE/18-08-2026/PDV TESTE LOTE 20`.
+- O mesmo lote foi reenviado com os mesmos IDs e retornou os mesmos IDs de
+  arquivo; o Drive manteve uma unica linha para cada nome.
+- Uma devolucao nova foi gravada em `PDV TESTE LOTE 20/DEVOLUCOES` e o reenvio
+  manteve o mesmo arquivo e a mesma pasta, sem duplicacao.
+- As quatro execucoes finais terminaram com `Success`: duas de 15 creditos no
+  lote normal e duas de 12 creditos em devolucoes, total de 54 creditos.
+- Blueprint salvo e reexportado com os modulos de garantia de pasta presentes.
+- `npm.cmd test`: 92 testes aprovados; `npm.cmd run lint`: sem erros;
+  `npm.cmd run build`: concluido com o aviso conhecido de chunk acima de 500 kB.
+
+### Seguranca
+- Foram usadas apenas imagens sinteticas e nenhum evento `VISIT_FINALIZE` foi
+  enviado; nenhuma linha de teste foi criada na planilha operacional.
+- O cenario de producao nao foi editado, ativado ou executado nesta etapa.
+- A homologacao permaneceu inativa com `Immediately as data arrives` e a flag
+  `BACKEND_MAKE_PHOTO_BATCH_ENABLED` continua desligada por padrao.
+- Nenhum deploy, push ou alteracao de variavel no Netlify foi realizado.
+
+### Pendencias
+- Simular timeout real durante um lote e repetir o evento depois da falha.
+- Executar preview Netlify e uma visita completa controlada antes de avaliar a
+  promocao da funcionalidade para producao.
+
+## [2026-08-18] - Tentativa de idempotencia no lote mantida fora de homologacao
+
+### Verificado
+- Exportado backup do blueprint do cenario inativo `Criativa Field Ops - Upload
+  V2 - HOMOLOG PDV` antes de qualquer alteracao.
+- Gerada variante de blueprint com busca por nome de arquivo dentro do lote e
+  roteamento entre foto nova e foto ja enviada.
+- O Make rejeitou o desenho porque o agregador do lote nao consegue referenciar
+  modulos de upload colocados dentro de um roteador interno por item.
+
+### Seguranca
+- A variante idempotente nao foi executada e nao foi promovida para producao.
+- O blueprint original foi reimportado, o rascunho local de agendamento foi
+  descartado e o cenario permaneceu inativo com `Immediately as data arrives`.
+- O cenario de producao nao foi aberto para edicao nem alterado.
+
+### Pendencias
+- Redesenhar a idempotencia do lote sem depender de agregador comum apos
+  roteador interno, por exemplo com modulo/API que resolva `create` ou
+  `existing` em uma unica saida por foto.
+- Repetir o mesmo lote depois do novo desenho e validar que todos os recibos
+  retornam em uma unica resposta, sem duplicar arquivos.
+
+## [2026-08-18] - Lote de fotos com teto de 20 em homologacao
+
+### Adicionado
+- Contrato local `PHOTO_UPLOAD_BATCH` que agrupa no maximo 20 fotos somente
+  quando industria, data, PDV e destino final sao iguais.
+- Validacao estrita do retorno do Make: o lote so e aceito quando todos os IDs
+  de foto possuem comprovante unico com arquivo e URL no Google Drive.
+- Chaves `BACKEND_MAKE_PHOTO_BATCH_ENABLED` e
+  `BACKEND_MAKE_PHOTO_BATCH_SIZE`; o recurso permanece desligado por padrao.
+- Rota de lote no cenario inativo `Criativa Field Ops - Upload V2 - HOMOLOG
+  PDV`, com Iterator, upload e agregacao dos comprovantes.
+
+### Validacao
+- Lote normal de 20 fotos concluido em 40 segundos, com 20 recibos unicos e
+  todos os arquivos na mesma pasta do PDV.
+- Execucao de 20 fotos consumiu 27 creditos, contra estimativa de 120 creditos
+  no fluxo individual atual, reducao aproximada de 77,5%.
+- Lote de tres devolucoes retornou tres recibos unicos na mesma subpasta
+  `DEVOLUCOES`, diferente da raiz do PDV, consumindo 11 creditos.
+- Testes automatizados do contrato e `tsc --noEmit` aprovados.
+
+### Seguranca
+- O cenario de producao permaneceu ativo e nao foi editado; o cenario de
+  homologacao permaneceu inativo depois dos testes.
+- Nenhum evento `VISIT_FINALIZE` foi enviado e nenhuma linha sintetica foi
+  gravada na planilha operacional.
+- O sincronizador local preserva o envio individual e so seleciona o lote por
+  uma flag explicita, ainda nao configurada no Netlify.
+
+### Pendencias
+- Preservar a busca idempotente pelo nome de cada arquivo dentro do lote antes
+  de ativar o recurso em producao.
+- Simular timeout e repetir o mesmo lote, comprovando que nenhum arquivo e
+  duplicado.
+- Executar preview Netlify e visita controlada completa antes de qualquer troca
+  de webhook ou variavel de producao.
+
+## [2026-08-18] - Homologacao de pastas por PDV e devolucoes no Make
+
+### Alterado
+- Criada uma copia inativa do cenario Make de producao para homologar o layout
+  `INDUSTRIA/DATA/PDV` sem interromper os usuarios.
+- A rota de fotos da copia pesquisa ou cria a pasta do PDV dentro da data da
+  industria antes de localizar ou enviar o arquivo.
+- Fotos com `ETAPA = TROCAS` usam exclusivamente a subpasta `DEVOLUCOES` dentro
+  do PDV; as demais etapas permanecem na raiz do PDV.
+- Respostas `PHOTO_UPLOADED` passam a informar tanto a pasta final do arquivo
+  quanto a pasta raiz do PDV.
+
+### Seguranca
+- O cenario `Criativa Field Ops - Upload V2 - HOMOLOG PDV` permanece inativo e
+  usa webhook exclusivo; o cenario e o webhook de producao nao foram alterados.
+- A busca pelo nome do arquivo foi preservada nos caminhos de retry para evitar
+  uploads duplicados.
+- Nenhum evento `VISIT_FINALIZE` de teste foi enviado para nao gravar linha
+  sintetica na planilha operacional.
+- O webhook de homologacao nao foi registrado em documentacao nem em logs.
+
+### Validacao
+- Blueprint recarregado apos o salvamento com 53 modulos e sem referencias
+  ausentes ou cruzadas entre rotas.
+- Upload normal confirmado em `INDUSTRIA/DATA/PDV`, com `folderId` igual ao
+  `pdvFolderId`.
+- Upload de troca confirmado em `INDUSTRIA/DATA/PDV/DEVOLUCOES`, com pasta final
+  diferente da raiz do PDV.
+- Reenvios normal e de devolucao retornaram os mesmos IDs de arquivo, sem criar
+  duplicatas.
+
+### Pendencias
+- Reconciliar cinco visitas com erro e uma pendente antes de trocar o webhook de
+  producao; uma das falhas e de 17/08/2026 e possui 25 fotos.
+- Executar uma visita completa controlada, incluindo `VISIT_FINALIZE`, em uma
+  janela que permita conferir e remover a linha de teste da planilha.
+- Ativar a copia e trocar `BACKEND_MAKE_WEBHOOK_V2_URL` somente depois dessas
+  validacoes.
+
 ## [2026-08-17] - Observabilidade operacional protegida
 
 ### Alterado

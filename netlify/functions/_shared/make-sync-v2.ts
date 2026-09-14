@@ -1,10 +1,15 @@
 import { getBrasiliaISO } from './time';
+import { getEnv } from './env';
+import { parseMakeRequestTimeoutMs } from './make-timeout';
 import { saveVisit, type VisitRecord } from './visits';
 import {
+  buildMakePhotoBatches,
   buildMakePhotoEvents,
   buildMakeVisitFinalizeEvent,
   MAKE_CONTRACT_VERSION,
   MAKE_PHOTOS_PER_RUN,
+  MAKE_MAX_PHOTOS_PER_BATCH,
+  validatePhotoBatchUploadResponse,
   validatePhotoUploadResponse,
   validateVisitFinalizeResponse,
   type DriveSyncManifest,
@@ -20,9 +25,16 @@ type V2SyncResult = {
   };
 };
 
-const postMakeEvent = async (webhookUrl: string, event: unknown) => {
+export const getMakeRequestTimeoutMs = () =>
+  parseMakeRequestTimeoutMs(getEnv('BACKEND_MAKE_REQUEST_TIMEOUT_MS'));
+
+export const postMakeEvent = async (
+  webhookUrl: string,
+  event: unknown,
+  timeoutMs = getMakeRequestTimeoutMs(),
+) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(webhookUrl, {
@@ -54,6 +66,13 @@ const createManifest = (visit: VisitRecord, totalPhotos: number): DriveSyncManif
   rowId: visit.payload?.driveSync?.rowId,
 });
 
+const getPhotoBatchSize = () => {
+  const configured = Number(getEnv('BACKEND_MAKE_PHOTO_BATCH_SIZE') || MAKE_MAX_PHOTOS_PER_BATCH);
+  return Number.isInteger(configured) && configured >= 1 && configured <= MAKE_MAX_PHOTOS_PER_BATCH
+    ? configured
+    : MAKE_MAX_PHOTOS_PER_BATCH;
+};
+
 export const syncVisitRecordV2 = async (visit: VisitRecord, webhookUrl: string): Promise<V2SyncResult> => {
   const events = buildMakePhotoEvents(visit.payload);
   let manifest = createManifest(visit, events.length);
@@ -67,16 +86,22 @@ export const syncVisitRecordV2 = async (visit: VisitRecord, webhookUrl: string):
 
   try {
     const pendingEvents = events.filter((event) => !manifest.photos[event.ID_FOTO]);
-    const currentBatch = pendingEvents.slice(0, MAKE_PHOTOS_PER_RUN);
+    const batchEnabled = (getEnv('BACKEND_MAKE_PHOTO_BATCH_ENABLED') || '').trim().toLowerCase() === 'true';
 
-    for (const event of currentBatch) {
-      const responseBody = await postMakeEvent(webhookUrl, event);
-      const receipt = validatePhotoUploadResponse(responseBody, event);
+    if (batchEnabled && pendingEvents.length) {
+      const batch = buildMakePhotoBatches(pendingEvents, getPhotoBatchSize())[0];
+      const responseBody = await postMakeEvent(webhookUrl, batch);
+      const receipts = validatePhotoBatchUploadResponse(responseBody, batch);
+      const photos = { ...manifest.photos };
+      receipts.forEach((receipt) => {
+        photos[receipt.photoId] = receipt;
+      });
+      const firstReceipt = receipts[0];
       manifest = {
         ...manifest,
-        folderId: manifest.folderId || receipt.pdvFolderId || receipt.folderId,
-        folderUrl: manifest.folderUrl || receipt.pdvFolderUrl || receipt.folderUrl,
-        photos: { ...manifest.photos, [event.ID_FOTO]: receipt },
+        folderId: manifest.folderId || firstReceipt?.pdvFolderId || firstReceipt?.folderId,
+        folderUrl: manifest.folderUrl || firstReceipt?.pdvFolderUrl || firstReceipt?.folderUrl,
+        photos,
       };
       current = await saveVisit({
         ...current,
@@ -85,6 +110,25 @@ export const syncVisitRecordV2 = async (visit: VisitRecord, webhookUrl: string):
         payload: { ...current.payload, driveSync: manifest },
         updatedAt: getBrasiliaISO(),
       });
+    } else {
+      const currentBatch = pendingEvents.slice(0, MAKE_PHOTOS_PER_RUN);
+      for (const event of currentBatch) {
+        const responseBody = await postMakeEvent(webhookUrl, event);
+        const receipt = validatePhotoUploadResponse(responseBody, event);
+        manifest = {
+          ...manifest,
+          folderId: manifest.folderId || receipt.pdvFolderId || receipt.folderId,
+          folderUrl: manifest.folderUrl || receipt.pdvFolderUrl || receipt.folderUrl,
+          photos: { ...manifest.photos, [event.ID_FOTO]: receipt },
+        };
+        current = await saveVisit({
+          ...current,
+          syncStatus: 'enviando',
+          syncError: null,
+          payload: { ...current.payload, driveSync: manifest },
+          updatedAt: getBrasiliaISO(),
+        });
+      }
     }
 
     const sent = Object.keys(manifest.photos).length;

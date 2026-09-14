@@ -3,6 +3,7 @@ import { json } from './_shared/json';
 import { authenticate } from './_shared/auth';
 import { canAccessVisit } from './_shared/visit-access';
 import { getVisit } from './_shared/visits';
+import { getGoogleRetryState } from './_shared/google-sync';
 
 export default async (request: Request, context: Context) => {
   if (request.method !== 'GET') {
@@ -24,6 +25,8 @@ export default async (request: Request, context: Context) => {
     return json({ error: 'Visita não encontrada' }, 404);
   }
 
+  const retry = getGoogleRetryState(visit);
+
   return json({
     visitId: visit.visitId,
     syncStatus: visit.syncStatus,
@@ -33,6 +36,7 @@ export default async (request: Request, context: Context) => {
       total: Number(visit.payload.driveSync.totalPhotos || 0),
     } : undefined,
     updatedAt: visit.updatedAt,
+    retry,
   });
 };
 

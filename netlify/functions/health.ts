@@ -10,6 +10,7 @@ export default async (_request: Request, _context: Context) => {
     service: 'criativa-field-ops',
     timestamp: new Date().toISOString(),
     integrations: {
+      syncProvider: (getEnv('BACKEND_SYNC_PROVIDER') || 'make').trim().toLowerCase(),
       googleSheets: Boolean(getEnv('BACKEND_GOOGLE_SHEETS_ID')),
       minimumStoreCount: resolveMinimumStoreCount(getEnv('BACKEND_MIN_STORE_COUNT')),
       make: Boolean(getEnv('BACKEND_MAKE_WEBHOOK_URL')),

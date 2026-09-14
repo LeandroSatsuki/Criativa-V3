@@ -9,6 +9,7 @@ import {
 
 export const MAKE_CONTRACT_VERSION = '2.1';
 export const MAKE_PHOTOS_PER_RUN = 3;
+export const MAKE_MAX_PHOTOS_PER_BATCH = 20;
 
 export type PhotoStage = 'FACHADA' | 'ANTES' | 'ESTOQUE' | 'DEPOIS' | 'TROCAS' | 'CHECKOUT';
 
@@ -34,6 +35,37 @@ export type MakePhotoEvent = {
   NOME_LOJA: string;
   NOME_PROMOTOR: string;
   ROW_WRITE: false;
+};
+
+export type MakePhotoBatchItem = Pick<MakePhotoEvent,
+  | 'EVENT_ID'
+  | 'IDEMPOTENCY_KEY'
+  | 'ID_FOTO'
+  | 'ETAPA'
+  | 'INDUSTRIA'
+  | 'ORDEM'
+  | 'NOME_ARQUIVO'
+  | 'MIME_TYPE'
+  | 'TAMANHO_BYTES'
+  | 'FOTO_BASE64'
+>;
+
+export type MakePhotoBatchEvent = {
+  CONTRACT_VERSION: string;
+  EVENT_TYPE: 'PHOTO_UPLOAD_BATCH';
+  EVENT_ID: string;
+  BATCH_ID: string;
+  ID_VISITA: string;
+  PASTA_INDUSTRIA_NOME: string;
+  PASTA_VISITA_NOME: string;
+  PASTA_PDV_NOME: string;
+  PASTA_SUBPASTA_NOME: '' | 'DEVOLUCOES';
+  LAYOUT_PASTAS: 'INDUSTRIA_DATA_PDV_V1';
+  NOME_LOJA: string;
+  NOME_PROMOTOR: string;
+  ROW_WRITE: false;
+  TOTAL_FOTOS: number;
+  PHOTOS: MakePhotoBatchItem[];
 };
 
 export type DrivePhotoReceipt = {
@@ -208,7 +240,7 @@ const collectPhotoCandidates = (payload: any) => {
 
 export const buildMakePhotoEvents = (payload: any): MakePhotoEvent[] => {
   const visitId = normalizeText(payload.visitId, 'VISIT-SEM-ID');
-  const fileDate = formatFileDate(payload.timestamp || payload.checkInTime);
+  const fileDate = formatFileDate(payload.checkInTime || payload.timestamp);
   const storeName = normalizeText(payload.currentStore, 'Loja');
   const promoterName = normalizeText(payload.user?.name, 'Promotor');
   const storeSlug = safeName(storeName, 'LOJA');
@@ -250,6 +282,71 @@ export const buildMakePhotoEvents = (payload: any): MakePhotoEvent[] => {
       NOME_PROMOTOR: promoterName,
       ROW_WRITE: false,
     };
+  });
+};
+
+export const buildMakePhotoBatches = (
+  events: MakePhotoEvent[],
+  maxPhotos = MAKE_MAX_PHOTOS_PER_BATCH,
+): MakePhotoBatchEvent[] => {
+  if (!Number.isInteger(maxPhotos) || maxPhotos < 1 || maxPhotos > MAKE_MAX_PHOTOS_PER_BATCH) {
+    throw new Error(`O lote deve conter entre 1 e ${MAKE_MAX_PHOTOS_PER_BATCH} fotos.`);
+  }
+
+  const groups = new Map<string, MakePhotoEvent[]>();
+  events.forEach((event) => {
+    const key = [
+      event.ID_VISITA,
+      event.PASTA_INDUSTRIA_NOME,
+      event.PASTA_VISITA_NOME,
+      event.PASTA_PDV_NOME,
+      event.PASTA_SUBPASTA_NOME,
+    ].join('\u001f');
+    const group = groups.get(key) || [];
+    group.push(event);
+    groups.set(key, group);
+  });
+
+  return Array.from(groups.values()).flatMap((group) => {
+    const batches: MakePhotoBatchEvent[] = [];
+    for (let start = 0; start < group.length; start += maxPhotos) {
+      const chunk = group.slice(start, start + maxPhotos);
+      const first = chunk[0];
+      const batchHash = createHash('sha256')
+        .update(chunk.map((event) => event.ID_FOTO).join('|'))
+        .digest('hex')
+        .slice(0, 24);
+      const batchId = `${first.ID_VISITA}:BATCH:${batchHash}`;
+      batches.push({
+        CONTRACT_VERSION: MAKE_CONTRACT_VERSION,
+        EVENT_TYPE: 'PHOTO_UPLOAD_BATCH',
+        EVENT_ID: batchId,
+        BATCH_ID: batchId,
+        ID_VISITA: first.ID_VISITA,
+        PASTA_INDUSTRIA_NOME: first.PASTA_INDUSTRIA_NOME,
+        PASTA_VISITA_NOME: first.PASTA_VISITA_NOME,
+        PASTA_PDV_NOME: first.PASTA_PDV_NOME,
+        PASTA_SUBPASTA_NOME: first.PASTA_SUBPASTA_NOME,
+        LAYOUT_PASTAS: first.LAYOUT_PASTAS,
+        NOME_LOJA: first.NOME_LOJA,
+        NOME_PROMOTOR: first.NOME_PROMOTOR,
+        ROW_WRITE: false,
+        TOTAL_FOTOS: chunk.length,
+        PHOTOS: chunk.map((event) => ({
+          EVENT_ID: event.EVENT_ID,
+          IDEMPOTENCY_KEY: event.IDEMPOTENCY_KEY,
+          ID_FOTO: event.ID_FOTO,
+          ETAPA: event.ETAPA,
+          INDUSTRIA: event.INDUSTRIA,
+          ORDEM: event.ORDEM,
+          NOME_ARQUIVO: event.NOME_ARQUIVO,
+          MIME_TYPE: event.MIME_TYPE,
+          TAMANHO_BYTES: event.TAMANHO_BYTES,
+          FOTO_BASE64: event.FOTO_BASE64,
+        })),
+      });
+    }
+    return batches;
   });
 };
 
@@ -317,7 +414,7 @@ export const buildMakeVisitFinalizeEvent = (
     IDEMPOTENCY_KEY: visitId,
     ROW_MODE: 'UPSERT_BY_ID_VISITA',
     ID_VISITA: visitId,
-    DATA_VISITA: formatBrasiliaDate(payload.timestamp || payload.checkInTime),
+    DATA_VISITA: formatBrasiliaDate(payload.checkInTime || payload.timestamp),
     NOME_PROMOTOR: normalizeText(payload.user?.name, 'Promotor'),
     NOME_LOJA: normalizeText(payload.currentStore, 'Loja'),
     'HORA_ENTRADA_CHECK-IN': formatBrasiliaTime(payload.checkInTime),
@@ -391,6 +488,48 @@ export const validatePhotoUploadResponse = (body: string, event: MakePhotoEvent)
     pdvFolderUrl: parsed.pdvFolderUrl ? String(parsed.pdvFolderUrl) : undefined,
     syncedAt: getBrasiliaISO(),
   } satisfies DrivePhotoReceipt;
+};
+
+export const validatePhotoBatchUploadResponse = (body: string, batch: MakePhotoBatchEvent) => {
+  const parsed = parseObject(body);
+  const receipts = Array.isArray(parsed?.receipts) ? parsed.receipts : [];
+  const expectedById = new Map(batch.PHOTOS.map((photo) => [photo.ID_FOTO, photo]));
+  const receivedIds = receipts.map((receipt: any) => String(receipt?.photoId || ''));
+  const complete = receipts.length === batch.PHOTOS.length
+    && new Set(receivedIds).size === receipts.length
+    && receivedIds.every((photoId: string) => expectedById.has(photoId));
+
+  if (
+    parsed?.success !== true
+    || parsed?.eventType !== 'PHOTO_BATCH_UPLOADED'
+    || parsed?.eventId !== batch.EVENT_ID
+    || parsed?.batchId !== batch.BATCH_ID
+    || !complete
+  ) {
+    throw new Error('Make não confirmou todas as fotos do lote no Google Drive.');
+  }
+
+  return receipts.map((receipt: any) => {
+    const photo = expectedById.get(String(receipt.photoId))!;
+    if (!String(receipt?.fileId || '').trim() || !String(receipt?.fileUrl || '').trim()) {
+      throw new Error('Make retornou um comprovante incompleto no lote de fotos.');
+    }
+    return {
+      eventId: photo.EVENT_ID,
+      photoId: photo.ID_FOTO,
+      stage: photo.ETAPA,
+      industry: photo.INDUSTRIA,
+      order: photo.ORDEM,
+      fileName: photo.NOME_ARQUIVO,
+      fileId: String(receipt.fileId),
+      fileUrl: String(receipt.fileUrl),
+      folderId: receipt.folderId ? String(receipt.folderId) : undefined,
+      folderUrl: receipt.folderUrl ? String(receipt.folderUrl) : undefined,
+      pdvFolderId: receipt.pdvFolderId ? String(receipt.pdvFolderId) : undefined,
+      pdvFolderUrl: receipt.pdvFolderUrl ? String(receipt.pdvFolderUrl) : undefined,
+      syncedAt: getBrasiliaISO(),
+    } satisfies DrivePhotoReceipt;
+  });
 };
 
 export const validateVisitFinalizeResponse = (body: string, event: MakeVisitFinalizeEvent) => {
