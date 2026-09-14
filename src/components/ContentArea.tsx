@@ -18,12 +18,12 @@ import {
 import { classifyQueuedSyncFailure } from '../services/syncPolicy';
 import { generateVisitId } from '../services/visitId';
 import { hasStartedVisit } from '../services/visitLifecycle';
+import { getPhotoPreviewPage, PHOTO_PREVIEW_PAGE_SIZE } from '../services/photoGallery';
 import {
   buildPortraitPhotoLayout,
   compressStampedPhoto,
   drawPhotoInPortrait,
 } from '../services/imageCompression';
-import SupervisorDashboard from './SupervisorDashboard';
 import CriativaIcon from './CriativaIcon';
 import { 
   MapPin, 
@@ -43,6 +43,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const SupervisorDashboard = React.lazy(() => import('./SupervisorDashboard'));
+
 interface ContentAreaProps {
   sectionId: SectionId;
   visitState: VisitState;
@@ -52,6 +54,79 @@ interface ContentAreaProps {
 }
 
 const MAX_PHOTOS_PER_SECTION = 30;
+
+type PhotoGalleryProps = {
+  photos: string[];
+  alt: string;
+  columnsClassName: string;
+  onRemove?: (index: number) => void;
+};
+
+const PhotoGallery: React.FC<PhotoGalleryProps> = ({
+  photos,
+  alt,
+  columnsClassName,
+  onRemove,
+}) => {
+  const latestPage = Math.max(0, Math.ceil(photos.length / PHOTO_PREVIEW_PAGE_SIZE) - 1);
+  const [requestedPage, setRequestedPage] = useState(latestPage);
+  const preview = getPhotoPreviewPage(photos, requestedPage);
+
+  useEffect(() => {
+    setRequestedPage(latestPage);
+  }, [photos.length, latestPage]);
+
+  if (photos.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className={columnsClassName}>
+        {preview.items.map(({ photo, originalIndex }) => {
+          return (
+            <div key={originalIndex} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
+              <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt={alt} />
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(originalIndex)}
+                  className="absolute top-2 right-2 bg-slate-900/55 p-1.5 rounded-lg text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                  aria-label={`Excluir foto ${originalIndex + 1}`}
+                  title="Excluir foto"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {preview.totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            disabled={preview.page === 0}
+            onClick={() => setRequestedPage((current) => Math.max(0, current - 1))}
+            className="flex items-center gap-2 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 disabled:opacity-30"
+          >
+            <ArrowLeft size={14} /> Anteriores
+          </button>
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+            {preview.page + 1}/{preview.totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={preview.page >= preview.totalPages - 1}
+            onClick={() => setRequestedPage((current) => Math.min(preview.totalPages - 1, current + 1))}
+            className="flex items-center gap-2 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 disabled:opacity-30"
+          >
+            Recentes <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ContentArea: React.FC<ContentAreaProps> = ({ 
   sectionId, 
@@ -649,7 +724,15 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const renderSection = () => {
     switch (sectionId) {
       case SectionId.Supervisor:
-        return <SupervisorDashboard />;
+        return (
+          <React.Suspense fallback={(
+            <div className="min-h-[50vh] flex items-center justify-center" role="status" aria-live="polite">
+              <Loader2 className="animate-spin text-[#E65C5C]" size={32} />
+            </div>
+          )}>
+            <SupervisorDashboard />
+          </React.Suspense>
+        );
 
       case SectionId.Facade:
         const facadePhotos = photos[SectionId.Facade] || [];
@@ -1015,32 +1098,26 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {currentPhotos.map((photo, idx) => (
-                <div key={idx} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
-                  <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Captura" />
-                  <button 
-                    onClick={() => {
-                      const newPhotos = currentPhotos.filter((_, i) => i !== idx);
-                      updateSelectedExecution(execution => ({
-                        ...execution,
-                        tasks: {
-                          ...execution.tasks,
-                          [sectionId]: newPhotos.length > 0 ? true : false,
-                        },
-                        photos: {
-                          ...execution.photos,
-                          [sectionId]: newPhotos,
-                        },
-                      }));
-                    }}
-                    className="absolute top-2 right-2 bg-white/20 backdrop-blur-md p-1.5 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <PhotoGallery
+              key={`${sectionId}:${visitState.selectedIndustry || ''}`}
+              photos={currentPhotos}
+              alt="Captura"
+              columnsClassName="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
+              onRemove={(index) => {
+                const newPhotos = currentPhotos.filter((_, photoIndex) => photoIndex !== index);
+                updateSelectedExecution(execution => ({
+                  ...execution,
+                  tasks: {
+                    ...execution.tasks,
+                    [sectionId]: newPhotos.length > 0,
+                  },
+                  photos: {
+                    ...execution.photos,
+                    [sectionId]: newPhotos,
+                  },
+                }));
+              }}
+            />
 
             <div className="flex flex-col gap-4 pt-4">
               <button 
@@ -1246,36 +1323,30 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-3">
-              {estoquePhotos.map((photo, idx) => (
-                <div key={idx} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
-                  <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Estoque" />
-                  <button 
-                    onClick={() => {
-                      const newPhotos = estoquePhotos.filter((_, i) => i !== idx);
-                      updateVisit('photos', (prev: any = {}) => ({ ...prev, [SectionId.Estoque]: newPhotos }));
-                      updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
-                        const existing = stockIndustry ? prev[stockIndustry] : null;
-                        if (!stockIndustry || !existing) return prev;
-                        return {
-                          ...prev,
-                          [stockIndustry]: {
-                            ...existing,
-                            photos: {
-                              ...existing.photos,
-                              [SectionId.Estoque]: newPhotos,
-                            },
-                          },
-                        };
-                      });
-                    }}
-                    className="absolute top-2 right-2 bg-white/20 backdrop-blur-md p-1 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <PhotoGallery
+              key={`estoque:${stockIndustry}`}
+              photos={estoquePhotos}
+              alt="Estoque"
+              columnsClassName="grid grid-cols-3 md:grid-cols-6 gap-3"
+              onRemove={(index) => {
+                const newPhotos = estoquePhotos.filter((_, photoIndex) => photoIndex !== index);
+                updateVisit('photos', (prev: any = {}) => ({ ...prev, [SectionId.Estoque]: newPhotos }));
+                updateVisit('industryExecutions', (prev: Record<string, IndustryExecution> = {}) => {
+                  const existing = stockIndustry ? prev[stockIndustry] : null;
+                  if (!stockIndustry || !existing) return prev;
+                  return {
+                    ...prev,
+                    [stockIndustry]: {
+                      ...existing,
+                      photos: {
+                        ...existing.photos,
+                        [SectionId.Estoque]: newPhotos,
+                      },
+                    },
+                  };
+                });
+              }}
+            />
 
             <button 
               onClick={() => {
@@ -1435,13 +1506,12 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-5 gap-2">
-                    {returnsPhotos.map((photo, idx) => (
-                      <div key={idx} className="aspect-square bg-slate-100 rounded-xl overflow-hidden relative">
-                        <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt="Troca" />
-                      </div>
-                    ))}
-                  </div>
+                  <PhotoGallery
+                    key={`trocas:${visitState.selectedIndustry || ''}`}
+                    photos={returnsPhotos}
+                    alt="Troca"
+                    columnsClassName="grid grid-cols-3 sm:grid-cols-6 gap-2"
+                  />
                 </div>
               )}
 

@@ -17,9 +17,21 @@ test('seletores podem recapturar e miniaturas usam decodificacao assincrona', as
   const contentArea = await readSource('../src/components/ContentArea.tsx');
   const fileInputs = contentArea.match(/type="file"/g) || [];
   const clearedInputs = contentArea.match(/e\.currentTarget\.value = ''/g) || [];
+  const allPhotoPreviews = contentArea.match(/<img /g) || [];
   const photoPreviews = contentArea.match(/<img loading="lazy" decoding="async"/g) || [];
 
   assert.equal(clearedInputs.length, fileInputs.length);
-  assert.equal(photoPreviews.length, 5);
+  assert.equal(photoPreviews.length, allPhotoPreviews.length);
   assert.match(contentArea, /disabled=\{isProcessingPhoto/);
+});
+
+test('galerias limitam miniaturas montadas e supervisor carrega sob demanda', async () => {
+  const contentArea = await readSource('../src/components/ContentArea.tsx');
+
+  assert.match(contentArea, /getPhotoPreviewPage\(photos, requestedPage\)/);
+  assert.doesNotMatch(contentArea, /currentPhotos\.map\(/);
+  assert.doesNotMatch(contentArea, /estoquePhotos\.map\(/);
+  assert.doesNotMatch(contentArea, /returnsPhotos\.map\(/);
+  assert.match(contentArea, /React\.lazy\(\(\) => import\('\.\/SupervisorDashboard'\)\)/);
+  assert.match(contentArea, /<React\.Suspense/);
 });

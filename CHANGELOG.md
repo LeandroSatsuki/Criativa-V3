@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2026-09-14] - Reducao de memoria durante visitas
+
+### Causa
+- Galerias de antes, estoque e depois podiam manter ate 30 miniaturas decodificadas simultaneamente na tela.
+- O painel supervisor e seus graficos eram incluidos no pacote inicial mesmo para promotores, aumentando a memoria usada ao abrir o aplicativo.
+- As fotos continuavam protegidas no rascunho e na fila, mas a quantidade de elementos visuais montados elevava o pico de RAM em aparelhos com menos memoria.
+
+### Solucao aplicada
+- As galerias agora exibem paginas de ate seis miniaturas e iniciam pela pagina mais recente.
+- Os controles permitem consultar todas as paginas e a exclusao preserva o indice original da foto.
+- O painel supervisor passou a ser carregado sob demanda somente quando essa area e acessada.
+- O pacote inicial do promotor foi reduzido de aproximadamente 798 KB para 420 KB sem alterar o formato das fotos.
+
+### Checklist
+- [x] Todas as fotos do rascunho continuam disponiveis e enviadas normalmente.
+- [x] Limite, compressao, qualidade e ordem das fotos preservados.
+- [x] Fila offline, APIs, Google Drive e finalizacao de visita sem alteracao.
+- [x] Fachada e checkout permanecem visiveis como imagens individuais.
+- [x] Painel supervisor preservado em um pacote carregado sob demanda.
+
+### Seguranca
+- A mudanca limita somente as miniaturas montadas no navegador; nao remove, migra nem regrava fotos existentes.
+- Nenhum contrato de dados, endpoint ou mecanismo de sincronizacao foi alterado.
+- A versao produtiva anterior permanece disponivel para reversao atomica no Netlify.
+
+### Testes realizados
+- Suite completa com 128 testes aprovados.
+- TypeScript, lint e build de producao aprovados.
+- Testes de regressao validam paginacao, indices originais e carregamento sob demanda.
+- Em uma secao cheia, o limite visual caiu de 30 para seis miniaturas montadas por vez.
+
 ## [2026-09-12] - Reducao da espera entre capturas
 
 ### Causa
