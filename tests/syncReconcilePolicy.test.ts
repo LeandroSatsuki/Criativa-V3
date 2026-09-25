@@ -41,3 +41,11 @@ test('ignora fila recente, erro legado e visita sem foto', () => {
   ], now);
   assert.equal(selected, undefined);
 });
+
+test('seleciona erro historico de confirmacao de foto para recuperacao', () => {
+  const selected = selectVisitForReconciliation([
+    summary('ERRO-GENERICO', 'erro', 60, 'Make retornou HTTP 500'),
+    summary('FOTO-LEGADA', 'erro', 20, 'Make não confirmou o upload da foto no Google Drive.'),
+  ], now);
+  assert.equal(selected?.visitId, 'FOTO-LEGADA');
+});

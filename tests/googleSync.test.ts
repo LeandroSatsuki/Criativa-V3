@@ -6,6 +6,7 @@ import { getBackgroundPollDelayMs } from '../netlify/functions/_shared/sync-prov
 import { resolveGooglePhotoReceipts } from '../netlify/functions/_shared/google-receipts.ts';
 import {
   buildGoogleRecoveryId,
+  formatSyncErrorForProvider,
   getGoogleRetryState,
 } from '../netlify/functions/_shared/google-retry.ts';
 
@@ -135,4 +136,19 @@ test('torna a inconsistência legada elegível para nova tentativa segura', () =
   const visit = deadLetterVisit();
   visit.syncError = 'Make não confirmou todas as fotos do lote no Google Drive.';
   assert.equal(getGoogleRetryState(visit, Date.parse('2026-08-25T10:02:00.000Z')).available, true);
+});
+
+test('recupera erro legado de foto mesmo sem identificador de lote Google', () => {
+  const visit = {
+    syncStatus: 'erro',
+    syncError: 'Make não confirmou o upload da foto no Google Drive.',
+    payload: {},
+  };
+  assert.equal(getGoogleRetryState(visit, Date.parse('2026-09-25T10:02:00.000Z')).available, true);
+});
+
+test('omite referencia ao Make quando o provedor ativo e Google', () => {
+  const error = 'Make não confirmou o upload da foto no Google Drive.';
+  assert.equal(formatSyncErrorForProvider(error, 'google-v1'), 'Google não confirmou o upload da foto no Google Drive.');
+  assert.equal(formatSyncErrorForProvider(error, 'make'), error);
 });

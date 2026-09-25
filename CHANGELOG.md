@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## [2026-09-25] - Recuperacao de confirmacoes antigas de fotos
+
+### Causa
+- Duas visitas criadas antes da estabilizacao do provedor Google ficaram com um erro legado de confirmacao do Make e sem identificador de lote Google.
+- O erro antigo nao era elegivel para nova tentativa nem para a reconciliacao agendada, embora as fotos permanecessem preservadas no registro local e no backend.
+
+### Solucao aplicada
+- As visitas `VISIT-BF2A106C` e `VISIT-9ECD3FE8` foram reprocessadas de forma controlada pelo provedor Google e concluidas com `44/44` e `38/38` fotos confirmadas.
+- Erros historicos de confirmacao de foto agora podem ser reenviados mesmo sem identificador de lote Google anterior.
+- A reconciliacao agendada passou a recuperar somente esses erros historicos conhecidos.
+- Quando o provedor ativo e Google, a API substitui a referencia antiga ao Make na mensagem exibida ao usuario.
+
+### Checklist
+- [x] 82 fotos confirmadas e duas visitas finalizadas pelo Google.
+- [x] Copia de seguranca dos dois registros criada antes do reprocessamento.
+- [x] Nenhum contrato de foto, pasta, fila local ou autenticacao alterado.
+- [x] Erros genericos continuam fora da recuperacao automatica.
+
+### Seguranca
+- A recuperacao usa os IDs idempotentes existentes e nao exclui fotos ou visitas.
+- A politica automatica reconhece apenas as mensagens legadas de confirmacao de foto.
+- O provedor produtivo permaneceu `google-v1` durante toda a operacao.
+
+### Testes realizados
+- Testes unitarios adicionados para erro legado sem lote, mensagem por provedor e selecao restrita da reconciliacao.
+- Validacao produtiva confirmou `enviado`, sem erro, em ambas as visitas.
+
 ## [2026-09-14] - Liberacao imediata de memoria da camera
 
 ### Causa

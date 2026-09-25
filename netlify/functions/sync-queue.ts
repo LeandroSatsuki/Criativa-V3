@@ -3,6 +3,8 @@ import { authenticate } from './_shared/auth';
 import { json } from './_shared/json';
 import { getAppData } from './_shared/data';
 import { listVisitSummaries } from './_shared/visits';
+import { getEnv } from './_shared/env';
+import { formatSyncErrorForProvider } from './_shared/google-retry';
 
 export default async (request: Request, _context: Context) => {
   if (request.method !== 'GET') {
@@ -28,7 +30,7 @@ export default async (request: Request, _context: Context) => {
     .map((visit) => ({
       visitId: visit.visitId,
       syncStatus: visit.syncStatus,
-      syncError: visit.syncError || null,
+      syncError: formatSyncErrorForProvider(visit.syncError, getEnv('BACKEND_SYNC_PROVIDER')),
       createdAt: visit.createdAt,
       updatedAt: visit.updatedAt,
       store: visit.payload?.currentStore || '',

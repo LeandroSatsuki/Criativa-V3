@@ -4,6 +4,8 @@ import { authenticate } from './_shared/auth';
 import { canAccessVisit } from './_shared/visit-access';
 import { getVisit } from './_shared/visits';
 import { getGoogleRetryState } from './_shared/google-sync';
+import { getEnv } from './_shared/env';
+import { formatSyncErrorForProvider } from './_shared/google-retry';
 
 export default async (request: Request, context: Context) => {
   if (request.method !== 'GET') {
@@ -30,7 +32,7 @@ export default async (request: Request, context: Context) => {
   return json({
     visitId: visit.visitId,
     syncStatus: visit.syncStatus,
-    syncError: visit.syncError || null,
+    syncError: formatSyncErrorForProvider(visit.syncError, getEnv('BACKEND_SYNC_PROVIDER')),
     progress: visit.payload?.driveSync ? {
       sent: Object.keys(visit.payload.driveSync.photos || {}).length,
       total: Number(visit.payload.driveSync.totalPhotos || 0),

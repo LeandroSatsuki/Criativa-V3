@@ -1,4 +1,5 @@
 import type { VisitSummary } from './visit-summary';
+import { isLegacyMakePhotoConfirmationError } from './google-retry.ts';
 
 const PENDING_RECONCILE_AGE_MS = 10 * 60 * 1000;
 const SENDING_RECONCILE_AGE_MS = 5 * 60 * 1000;
@@ -14,6 +15,9 @@ export const selectVisitForReconciliation = (
     const age = now - updatedAt;
     if (visit.syncStatus === 'pendente') {
       return !visit.syncError && age >= PENDING_RECONCILE_AGE_MS;
+    }
+    if (visit.syncStatus === 'erro') {
+      return isLegacyMakePhotoConfirmationError(visit.syncError) && age >= PENDING_RECONCILE_AGE_MS;
     }
     return visit.syncStatus === 'enviando' && age >= SENDING_RECONCILE_AGE_MS;
   })
