@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildGooglePhotoBatchIngress } from '../netlify/functions/_shared/google-contract.ts';
 import { buildMakePhotoBatches, buildMakePhotoEvents } from '../netlify/functions/_shared/make-contract-v2.ts';
-import { getBackgroundPollDelayMs } from '../netlify/functions/_shared/sync-provider.ts';
+import { getBackgroundPollDelayMs, resolveSyncProvider } from '../netlify/functions/_shared/sync-provider.ts';
 import { resolveGooglePhotoReceipts } from '../netlify/functions/_shared/google-receipts.ts';
 import {
   buildGoogleRecoveryId,
@@ -35,6 +35,14 @@ test('aguarda entre consultas apenas no provedor Google', () => {
   assert.equal(getBackgroundPollDelayMs(' GOOGLE-V1 '), 2_000);
   assert.equal(getBackgroundPollDelayMs('make'), 0);
   assert.equal(getBackgroundPollDelayMs(undefined), 0);
+});
+
+test('nao usa Make como fallback quando o provedor nao esta configurado', () => {
+  assert.equal(resolveSyncProvider('google-v1'), 'google-v1');
+  assert.equal(resolveSyncProvider(' MAKE '), 'make');
+  assert.equal(resolveSyncProvider(undefined), null);
+  assert.equal(resolveSyncProvider(''), null);
+  assert.equal(resolveSyncProvider('googl-v1'), null);
 });
 
 const deadLetterVisit = (overrides: Record<string, unknown> = {}) => ({

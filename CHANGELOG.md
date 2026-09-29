@@ -1,5 +1,61 @@
 # CHANGELOG
 
+## [2026-09-29] - Provedor de sincronizacao explicito
+
+### Causa
+- O backend assumia Make quando `BACKEND_SYNC_PROVIDER` estava ausente ou invalido.
+- No contexto Netlify `branch-deploy`, o provedor e as credenciais Google nao estao configurados, mas o webhook Make esta. Uma URL de branch existente ainda informou `provider=make`.
+- Variaveis e funcoes dos deploys de branch antigos sao imutaveis; publicar o codigo atual em producao nao altera esses enderecos.
+
+### Solucao aplicada
+- O Make so e selecionado quando `BACKEND_SYNC_PROVIDER=make` e definido explicitamente.
+- Provedor ausente ou invalido agora preserva a visita com erro de configuracao, sem chamar o webhook; o healthcheck informa `unconfigured` nesse caso.
+- Correcao publicada no preview `6abb2a0edfa74a422f9c2bfa` e em producao `6abb2a9d8ea714b1ba24ed6b`.
+
+### Checklist
+- [x] Producao mantida em `google-v1` e rota de reenvio sem sessao em HTTP 401.
+- [x] Nenhuma foto, visita, fila local, credencial ou webhook alterado pelo deploy.
+- [ ] Confirmar a URL usada no aparelho afetado e retirar de circulacao o deploy antigo somente depois de verificar eventuais dados locais nessa origem.
+- [ ] Revisar os demais deploys de branch publicados antes de declara-los corrigidos.
+
+### Seguranca
+- O fallback silencioso para Make foi removido de novos deploys; o rollback para Make continua possivel apenas por configuracao explicita.
+- Links de branch ja publicados continuam com o comportamento antigo ate serem substituidos ou desativados de forma controlada.
+
+### Testes realizados
+- 148 testes, TypeScript e build de producao aprovados.
+- Preview e producao responderam `google-v1`; rota de reenvio sem autenticacao retornou HTTP 401.
+- Logs de erro das funcoes sem novas falhas na janela consultada apos a publicacao.
+
+## [2026-09-28] - Recuperacao controlada de visitas pendentes
+
+### Causa
+- Onze visitas antigas permaneciam no servidor sem finalizacao: oito com erro de confirmacao de fotos e tres com `Make retornou HTTP 400: Queue is full.`
+- Os registros nao estavam no indice consultado pela reconciliacao automatica; um resumo tambem divergia do registro completo.
+- O contexto Netlify `branch-deploy` possui webhook Make, mas nao possui `BACKEND_SYNC_PROVIDER` nem credenciais Google. Nesse contexto, o codigo assume Make; uma URL de branch consultada confirmou `provider=make`. O endereco efetivamente usado no aparelho ainda precisa ser confirmado.
+
+### Solucao aplicada
+- Copias integrais dos onze registros foram gravadas e verificadas no armazenamento do projeto antes de qualquer reenvio.
+- As visitas foram retomadas individualmente pela API autenticada do dominio produtivo, com verificacao de fotos, finalizacao e saida do indice de pendencias antes de avancar para a proxima.
+- Onze visitas terminaram com 415 de 415 comprovantes; o painel passou a mostrar 32 de 32 visitas concluidas e zero pendencias para a promotora auditada.
+
+### Checklist
+- [x] Todos os registros antigos preservados e conciliados.
+- [x] Nenhuma fila local, foto ou visita foi excluida manualmente.
+- [x] Nenhum ambiente, webhook ou codigo produtivo foi alterado durante os reenvios.
+- [ ] Confirmar o endereco usado no aparelho antes de orientar qualquer troca de atalho.
+- [ ] Corrigir de forma planejada o fallback para Make nos deploys de branch.
+
+### Seguranca
+- Reenvio sequencial com IDs existentes e comprovacao do estado final; falhas interromperiam a sequencia.
+- Backups foram mantidos em armazenamento separado, sem expor credenciais ou fotos no repositorio.
+- Uma eventual duplicidade de arquivos legados no Drive nao deve ser removida sem auditoria individual.
+
+### Testes realizados
+- Onze registros completos relidos apos o processamento: `enviado`, manifesto completo, finalizacao confirmada, resumo atualizado e ausencia no indice de pendencias.
+- Painel autenticado de producao respondeu HTTP 200 com zero pendencias da promotora.
+- Health do dominio principal informou `google-v1`; uma URL de branch informou `make`.
+
 ## [2026-09-28] - Encerramento automatico e painel interativo
 
 ### Causa

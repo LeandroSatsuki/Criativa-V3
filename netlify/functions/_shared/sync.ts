@@ -3,6 +3,7 @@ import { buildTransformedPayloads, saveVisit, type VisitRecord } from './visits'
 import { getBrasiliaISO } from './time';
 import { syncVisitRecordV2 } from './make-sync-v2';
 import { syncVisitRecordGoogle } from './google-sync.ts';
+import { resolveSyncProvider } from './sync-provider.ts';
 
 export type SyncResult = {
   visitId: string;
@@ -18,8 +19,18 @@ export const syncVisitRecord = async (
   visit: VisitRecord,
   options: { recoverDeadLetter?: boolean } = {},
 ): Promise<SyncResult> => {
-  const provider = (getEnv('BACKEND_SYNC_PROVIDER') || 'make').trim().toLowerCase();
+  const provider = resolveSyncProvider(getEnv('BACKEND_SYNC_PROVIDER'));
   if (provider === 'google-v1') return syncVisitRecordGoogle(visit, options);
+  if (provider !== 'make') {
+    console.error(JSON.stringify({ event: 'visit_sync_failed', visitId: visit.visitId, reason: 'provider_unconfigured' }));
+    const errored = await saveVisit({
+      ...visit,
+      syncStatus: 'erro',
+      syncError: 'Sincronizacao indisponivel neste endereco. A visita permanece salva para reenvio.',
+      updatedAt: getBrasiliaISO(),
+    });
+    return { visitId: errored.visitId, syncStatus: 'erro', syncError: errored.syncError };
+  }
   const syncMode = (getEnv('BACKEND_MAKE_SYNC_MODE') || 'legacy').trim().toLowerCase();
   const webhookVariable = syncMode === 'visit-v2'
     ? 'BACKEND_MAKE_WEBHOOK_V2_URL'
