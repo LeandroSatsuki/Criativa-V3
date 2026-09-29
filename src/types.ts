@@ -48,6 +48,11 @@ export interface VisitState {
   checkInDone: boolean;
   checkInTime: string | null;
   checkOutTime: string | null;
+  automaticCheckout?: {
+    reason: 'end_of_day';
+    scheduledAt: string;
+    recordedAt: string;
+  };
   syncStatus?: 'pendente' | 'enviando' | 'enviado' | 'erro' | 'reenviar' | null;
   syncError?: string | null;
   selectedIndustry: Industry | null;
@@ -133,6 +138,7 @@ export interface SupervisorDashboardResponse {
 }
 
 export interface SupervisorPromoterDetailRouteItem {
+  automaticCheckout?: boolean;
   id: string;
   visitId: string;
   name: string;

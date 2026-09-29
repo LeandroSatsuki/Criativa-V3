@@ -12,6 +12,7 @@ export type QueuedVisit = {
 };
 
 export type QueuedVisitSummary = {
+  automaticCheckout?: boolean;
   visitId: string;
   ownerId: string;
   store: string;
@@ -36,6 +37,7 @@ export const getQueuedVisitOwnerId = (visit: QueuedVisit) => normalizeOwnerId(
 );
 
 export const toQueuedVisitSummary = (visit: QueuedVisit): QueuedVisitSummary => ({
+  automaticCheckout: visit.payload?.automaticCheckout?.reason === 'end_of_day',
   visitId: visit.visitId,
   ownerId: getQueuedVisitOwnerId(visit),
   store: String(visit.payload?.currentStore || 'Loja nao informada'),

@@ -24,6 +24,9 @@ import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, sa
 import { resolveSessionSection } from './services/navigationPolicy';
 import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
 import { isStaleSync } from './services/syncAge';
+import { submitAutomaticVisit } from './services/submitAutomaticVisit';
+import { classifyQueuedSyncFailure } from './services/syncPolicy';
+import { isRetryableHttpStatus } from './services/httpPolicy';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -95,6 +98,70 @@ const App: React.FC = () => {
   const [draftHydrated, setDraftHydrated] = useState(false);
   const persistenceAlertShown = useRef(false);
   const lastSessionRefresh = useRef(0);
+  const automaticUploadBusy = useRef(false);
+  const automaticUploadAttempts = useRef(new Map<string, number>());
+
+  useEffect(() => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || !draftHydrated) return;
+    let cancelled = false;
+    const resumeAutomaticUploads = async () => {
+      if (cancelled || automaticUploadBusy.current || !navigator.onLine || document.visibilityState === 'hidden') return;
+      automaticUploadBusy.current = true;
+      try {
+        const summaries = await listQueuedVisitSummaries(ownerId);
+        const pending = summaries.filter((item) => item.automaticCheckout && item.status === 'pending'
+          && Date.now() - (automaticUploadAttempts.current.get(item.visitId) || 0) >= 60_000).slice(0, 2);
+        for (const summary of pending) {
+          if (cancelled || !navigator.onLine) break;
+          automaticUploadAttempts.current.set(summary.visitId, Date.now());
+          const queued = await getQueuedVisit(ownerId, summary.visitId);
+          if (!queued || queued.status !== 'pending') continue;
+          const requireSameOwner = () => {
+            if (cancelled || getSession()?.user.id !== ownerId) throw new Error('A sessao mudou. O envio foi preservado.');
+          };
+          try {
+            const result = await submitAutomaticVisit(queued.visitId, queued.payload, {
+              status: (id) => { requireSameOwner(); return apiService.getSyncStatus(id); },
+              create: (payload) => { requireSameOwner(); return apiService.createVisit(payload); },
+              start: (id) => { requireSameOwner(); return apiService.startBackgroundSync(id); },
+            });
+            if (result === 'sent') await removeQueuedVisit(ownerId, queued.visitId);
+            else await updateQueuedVisit(ownerId, queued.visitId, { status: 'syncing', error: null });
+          } catch (error) {
+            if (cancelled || getSession()?.user.id !== ownerId) break;
+            const failure = classifyQueuedSyncFailure(error);
+            const transient = error instanceof HttpRequestError
+              && (isRetryableHttpStatus(error.status) || error.status === 429 || error.status === 500);
+            await updateQueuedVisit(ownerId, queued.visitId, {
+              status: transient ? 'pending' : failure.status,
+              error: transient ? 'Servidor temporariamente indisponivel. O envio sera retomado automaticamente.' : failure.message,
+            });
+          }
+          window.dispatchEvent(new Event('criativa-sync-queue-updated'));
+        }
+      } catch (error) {
+        console.error('Falha ao consultar encerramentos pendentes:', error);
+      } finally {
+        automaticUploadBusy.current = false;
+      }
+    };
+    const resume = () => { void resumeAutomaticUploads(); };
+    const timer = window.setInterval(resume, 60_000);
+    window.addEventListener('online', resume);
+    window.addEventListener('pageshow', resume);
+    window.addEventListener('criativa-sync-queue-updated', resume);
+    document.addEventListener('visibilitychange', resume);
+    resume();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('online', resume);
+      window.removeEventListener('pageshow', resume);
+      window.removeEventListener('criativa-sync-queue-updated', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
+  }, [visitState.user?.id, draftHydrated]);
 
   useEffect(() => {
     let cancelled = false;
@@ -494,7 +561,7 @@ const App: React.FC = () => {
     }));
   };
 
-  if (loading) {
+  if (loading || !draftHydrated) {
     return (
       <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center text-white p-6 text-center">
         <RefreshCw className="w-12 h-12 mb-6 animate-spin text-blue-400" />

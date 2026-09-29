@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## [2026-09-28] - Encerramento automatico e painel interativo
+
+### Causa
+- Visitas abertas podiam permanecer no aparelho depois do fim da jornada sem envio.
+- O painel do supervisor exigia muita rolagem e nao oferecia filtro regional ou ordenacao por pendencias.
+
+### Solucao aplicada
+- Visitas iniciadas ate as 18h de Brasilia sao encerradas automaticamente, com o mesmo ID, sem exigir foto de saida e preservando fotos, estoque e etapas incompletas.
+- O rascunho so e liberado depois da gravacao confirmada na fila local. Uma foto em processamento e aguardada antes do encerramento.
+- Com o app fechado, o encerramento ocorre na reabertura e conserva as 18h do dia previsto. Entradas excepcionais apos as 18h pertencem ao proximo ciclo de encerramento, evitando saida anterior a entrada.
+- O envio automatico consulta o status antes de criar a visita, retoma ao recuperar conexao e respeita intervalo minimo de um minuto entre tentativas. Erros transitorios do servidor permanecem pendentes para retomada.
+- O supervisor identifica a saida automatica no detalhe da visita. A confirmacao das fotos e a finalizacao no Google continuam no fluxo existente.
+- Painel com indicadores compactos, abas Equipe/Evolucao, busca, filtro de regiao e ordenacao por pendencias, nome ou cumprimento do roteiro.
+- Falha em uma atualizacao do painel preserva a ultima consulta e mostra o erro. Dados de datas diferentes nao sao misturados.
+
+### Checklist
+- [x] Fila existente, IDs e contratos do Google preservados; metadados novos sao opcionais.
+- [x] Nenhum registro antigo no servidor foi regravado ou removido.
+- [x] Alerta de 24h mantido sem bloqueio do trabalho offline.
+- [x] Encerramento manual existente e foto de saida mantidos no fluxo normal.
+
+### Seguranca
+- Falha de armazenamento mantem o rascunho aberto; a fila so e removida depois de o servidor confirmar envio completo.
+- Encerramento nao marca tarefas incompletas nem inventa foto de saida. Horario previsto e horario efetivo do salvamento ficam registrados separadamente.
+- Envio automatico valida o dono da sessao a cada chamada e nao substitui payload que ja existe no servidor.
+- O app precisa estar aberto ou ser reaberto para acessar fotos locais; nenhuma tarefa em nuvem pode recuperar um aparelho fechado e offline.
+
+### Testes realizados
+- Testes unitarios de horario, retomada no dia seguinte, preservacao de dados e idempotencia.
+- Chrome com dados ficticios em 320, 390 e 1366 px: filtros, busca, calendario, grafico, detalhe, Escape e ausencia de rolagem horizontal.
+- Falha HTTP 502 no painel preservou a consulta anterior.
+- Fluxos completos simulados: encerramento offline, reabertura no dia seguinte, falha de armazenamento e captura de foto em processamento no limite das 18h.
+- Preview `6abb0c5098d4e4a2822b5b23`: fluxos simulados aprovados no Chrome, sem envio de dados ficticios ao Google.
+- App, health, manifesto e service worker do preview HTTP 200; painel sem autenticacao HTTP 401.
+- Contrato de finalizacao validado para visita parcial sem foto de saida: data original, saida 18:00, duracao correta e contagem exata de fotos.
+- Suite completa: 147 testes aprovados; TypeScript e build de producao aprovados.
+
 ## [2026-09-28] - Consulta historica e acompanhamento do supervisor
 
 ### Causa

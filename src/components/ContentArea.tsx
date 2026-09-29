@@ -18,6 +18,7 @@ import {
 import { classifyQueuedSyncFailure } from '../services/syncPolicy';
 import { generateVisitId } from '../services/visitId';
 import { hasStartedVisit } from '../services/visitLifecycle';
+import { buildAutomaticCheckout } from '../services/automaticCheckout';
 import { getPhotoPreviewPage, PHOTO_PREVIEW_PAGE_SIZE } from '../services/photoGallery';
 import {
   buildPortraitPhotoLayout,
@@ -146,7 +147,64 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const [showVisitExitDialog, setShowVisitExitDialog] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const photoProcessingRef = React.useRef(false);
+  const syncOperationRef = React.useRef(false);
+  const automaticClosingRef = React.useRef(false);
+  const [automaticClosing, setAutomaticClosing] = useState(false);
+  const [automaticNotice, setAutomaticNotice] = useState<string | null>(null);
+  const latestVisitRef = React.useRef(visitState);
+  latestVisitRef.current = visitState;
+  const resetVisitRef = React.useRef(onReset);
+  resetVisitRef.current = onReset;
   const queueOwnerId = String(visitState.user?.id || '');
+
+  useEffect(() => {
+    let mounted = true;
+    let lastAttempt = 0;
+    const closeDueVisit = async () => {
+      if (document.visibilityState === 'hidden' || photoProcessingRef.current
+        || syncOperationRef.current || automaticClosingRef.current || Date.now() - lastAttempt < 60_000) return;
+      const snapshot = buildAutomaticCheckout(latestVisitRef.current);
+      if (!snapshot) return;
+      lastAttempt = Date.now();
+      automaticClosingRef.current = true;
+      setAutomaticClosing(true);
+      try {
+        const existing = await getQueuedVisit(queueOwnerId, snapshot.visitId!);
+        if (!existing) await upsertQueuedVisit(queueOwnerId, snapshot, snapshot.visitId!, 'pending');
+        // Release the draft only after the queue transaction has committed.
+        if (mounted && latestVisitRef.current.visitId === snapshot.visitId) {
+          resetVisitRef.current();
+          setShowVisitExitDialog(false);
+          setAutomaticNotice('Visita encerrada às 18h. Os registros foram salvos e aguardam a confirmação do envio.');
+        }
+        window.dispatchEvent(new Event('criativa-sync-queue-updated'));
+      } catch (error) {
+        if (mounted) setAutomaticNotice('Não foi possível salvar o encerramento automático. A visita continua aberta e suas fotos foram preservadas.');
+        console.error('Falha ao salvar encerramento automatico:', error);
+      } finally {
+        automaticClosingRef.current = false;
+        if (mounted) setAutomaticClosing(false);
+      }
+    };
+    let resumeTimer: number | undefined;
+    const check = () => {
+      window.clearTimeout(resumeTimer);
+      resumeTimer = window.setTimeout(() => { void closeDueVisit(); }, 1000);
+    };
+    const timer = window.setInterval(check, 15_000);
+    window.addEventListener('focus', check);
+    window.addEventListener('pageshow', check);
+    document.addEventListener('visibilitychange', check);
+    check();
+    return () => {
+      mounted = false;
+      window.clearTimeout(resumeTimer);
+      window.clearInterval(timer);
+      window.removeEventListener('focus', check);
+      window.removeEventListener('pageshow', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [queueOwnerId]);
 
   React.useEffect(() => {
     const refreshQueue = () => {
@@ -649,6 +707,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   };
 
   const handleSync = async () => {
+    if (syncOperationRef.current || automaticClosingRef.current) return;
     console.log(">>> BOTAO SINCRONIZAR CLICADO <<<");
     setSyncError(null);
     setSyncSuccess(false);
@@ -667,6 +726,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       return;
     }
 
+    syncOperationRef.current = true;
     setIsSyncing(true);
     setSyncMessage('Iniciando sincronização...');
     try {
@@ -692,17 +752,21 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     } catch (error: any) {
       setSyncError(formatSyncError(error.message || "Erro desconhecido na sincronização"));
     } finally {
+      syncOperationRef.current = false;
       setIsSyncing(false);
     }
   };
 
   const handleRetryQueue = async () => {
+    if (syncOperationRef.current || automaticClosingRef.current) return;
     const queuedVisits = await listQueuedVisitSummaries(queueOwnerId);
     if (queuedVisits.length === 0) {
       setSyncError('Não há visitas na fila local para reenviar.');
       return;
     }
 
+    if (syncOperationRef.current || automaticClosingRef.current) return;
+    syncOperationRef.current = true;
     setIsSyncing(true);
     setSyncError(null);
     setSyncSuccess(false);
@@ -722,6 +786,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     } catch (error: any) {
       setSyncError(formatSyncError(error.message || 'Não foi possível reenviar a fila local.'));
     } finally {
+      syncOperationRef.current = false;
       setIsSyncing(false);
     }
   };
@@ -1723,6 +1788,17 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto">
+      {automaticClosing && (
+        <div className="fixed inset-0 z-[110] bg-white/95 flex items-center justify-center p-6" role="status" aria-live="polite">
+          <div className="flex items-center gap-3 text-sm font-semibold"><Loader2 className="animate-spin text-blue-600" size={24} /> Salvando encerramento da visita...</div>
+        </div>
+      )}
+      {automaticNotice && (
+        <div className="mb-5 border-l-4 border-blue-500 bg-blue-50 p-4 flex items-start gap-3" role="status">
+          <p className="flex-1 text-sm text-blue-900">{automaticNotice}</p>
+          <button type="button" onClick={() => setAutomaticNotice(null)} aria-label="Fechar aviso" className="text-blue-700 p-1"><CheckCircle2 size={18} /></button>
+        </div>
+      )}
       {isProcessingPhoto && (
         <div
           className="fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-xl bg-[#0F172A] px-5 py-3 text-white shadow-xl pointer-events-none"

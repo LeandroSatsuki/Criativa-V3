@@ -78,6 +78,7 @@ export type SupervisorDashboardResponse = {
 };
 
 export type SupervisorPromoterDetailRouteItem = {
+  automaticCheckout?: boolean;
   id: string;
   visitId: string;
   name: string;
@@ -554,6 +555,7 @@ export const buildSupervisorPromoterDetail = (
       tasks: countVisitTasks(visit),
       photos: countVisitPhotos(visit),
       syncStatus: visit.syncStatus,
+      automaticCheckout: visit.payload?.automaticCheckout?.reason === 'end_of_day',
       duration: getVisitDuration(visit) === null ? '--:--' : formatDuration(getVisitDuration(visit) as number),
     })),
     plannedRoute: plannedStores.map((store) => {

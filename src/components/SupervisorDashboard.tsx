@@ -3,8 +3,17 @@ import { apiService } from '../services/apiService';
 import { filterSupervisorPromoters, type SupervisorFilter } from '../services/supervisorFilters';
 import { buildWhatsAppUrl } from '../services/whatsapp';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp, Users, Clock, MapPin, CheckCircle2, Loader2, Route, Play, ClipboardList, SignalLow, Search, X, MessageCircle, Phone, CalendarDays, SearchCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, CloudUpload, ArrowUpRight, ListFilter, AlertCircle, TrendingUp, Users, Clock, MapPin, CheckCircle2, Loader2, Route, Search, X, MessageCircle, Phone, CalendarDays } from 'lucide-react';
 import type { SupervisorDashboardResponse, SupervisorPromoterDetailResponse, SupervisorPromoterOverview, SupervisorTimelinePoint } from '../types';
+
+import './supervisor.css';
+
+const shiftDay = (day: string, offset: number) => {
+  const date = new Date(day + 'T12:00:00Z');
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+};
+const statusClass = (status: string) => status === 'CONCLUÍDO' ? 'success' : status === 'INATIVO' || status === 'SEM ATIVIDADE' ? 'neutral' : 'warning';
 
 const EMPTY_TIMELINE: SupervisorTimelinePoint[] = [
   { time: '08:00', totalVisits: 0, completedVisits: 0, pendingSyncVisits: 0 },
@@ -98,6 +107,10 @@ const SupervisorDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<SupervisorFilter>('all');
   const [selectedDate, setSelectedDate] = useState(getTodayKey);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [region, setRegion] = useState('');
+  const [sort, setSort] = useState('attention');
+  const [view, setView] = useState<'team' | 'evolution'>('team');
   const [search, setSearch] = useState('');
   const [selectedPromoter, setSelectedPromoter] = useState<SupervisorPromoterOverview | null>(null);
   const [promoterDetail, setPromoterDetail] = useState<SupervisorPromoterDetailResponse | null>(null);
@@ -107,6 +120,38 @@ const SupervisorDashboard: React.FC = () => {
   const searchRef = useRef<HTMLInputElement>(null);
   const lastDashboardLoad = useRef(0);
   const detailRequestId = useRef(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!selectedPromoter) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        detailRequestId.current += 1;
+        setSelectedPromoter(null);
+        setPromoterDetail(null);
+      }
+      if (event.key !== 'Tab') return;
+      const items = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], summary') || [])
+        .filter((element) => element.getClientRects().length > 0);
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKey);
+      previousFocus?.focus();
+    };
+  }, [selectedPromoter?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +168,6 @@ const SupervisorDashboard: React.FC = () => {
         lastDashboardLoad.current = Date.now();
       } catch (fetchError: any) {
         if (cancelled) return;
-        setDashboard(EMPTY_DASHBOARD);
         setError(fetchError?.message || 'Não foi possível carregar o painel do supervisor.');
       } finally {
         if (!cancelled) setLoading(false);
@@ -165,7 +209,7 @@ const SupervisorDashboard: React.FC = () => {
       window.removeEventListener('pageshow', refreshWhenVisible);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [selectedDate]);
+  }, [selectedDate, refreshVersion]);
 
   const handlePromoterClick = async (promoter: SupervisorPromoterOverview) => {
     const requestId = ++detailRequestId.current;
@@ -192,10 +236,23 @@ const SupervisorDashboard: React.FC = () => {
     setDetailError(null);
   };
 
-  const filteredData = filterSupervisorPromoters(dashboard.promoters, filter, search);
-  const activeFilterInfo = FILTER_INFO[filter];
+  const changeDate = (date: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > getTodayKey() || date === selectedDate) return;
+    closePromoterDetail();
+    setDashboard(EMPTY_DASHBOARD);
+    setSelectedDate(date);
+  };
+  const regions = [...new Set(dashboard.promoters.map((promoter) => promoter.region).filter(Boolean))].sort();
+  const filteredData = filterSupervisorPromoters(dashboard.promoters, filter, search)
+    .filter((promoter) => !region || promoter.region === region)
+    .sort((left, right) => {
+      if (sort === 'attention' && left.pendingSyncVisits !== right.pendingSyncVisits) return right.pendingSyncVisits - left.pendingSyncVisits;
+      if (sort === 'progress' && left.progress !== right.progress) return right.progress - left.progress;
+      return left.name.localeCompare(right.name, 'pt-BR');
+    });
   const selectFilter = (nextFilter: SupervisorFilter) => {
     setSearch('');
+    setView('team');
     setFilter((current) => current === nextFilter ? 'all' : nextFilter);
 
     window.requestAnimationFrame(() => {
@@ -209,35 +266,45 @@ const SupervisorDashboard: React.FC = () => {
   const chartData = dashboard.timeline;
   const historical = selectedDate !== getTodayKey();
   const dateLabel = new Date(`${selectedDate}T12:00:00-03:00`).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-  const periodLabel = historical ? dateLabel : 'hoje';
   const whatsappUrl = selectedPromoter ? buildWhatsAppUrl(selectedPromoter.phone) : null;
 
-  if (loading) return (
+  const completion = dashboard.summary.totalVisits ? Math.round(dashboard.summary.completedVisits / dashboard.summary.totalVisits * 100) : 0;
+  const metrics = [
+    { key: 'completed' as const, label: 'Lojas concluídas', value: dashboard.summary.completedVisits + ' / ' + dashboard.summary.totalVisits, subtitle: completion + '% do roteiro', icon: CheckCircle2, tone: 'success' },
+    { key: 'sync_pending' as const, label: 'Envios pendentes', value: dashboard.summary.pendingSyncVisits, subtitle: dashboard.summary.pendingSyncPromoters + ' promotores · todos os dias', icon: CloudUpload, tone: 'warning' },
+    { key: 'active' as const, label: 'Equipe cadastrada', value: dashboard.summary.totalPromoters, subtitle: dashboard.summary.activePromoters + ' ativos · ' + dashboard.summary.inactivePromoters + ' inativos', icon: Users, tone: 'blue' },
+    { key: 'duration' as const, label: 'Tempo médio em loja', value: dashboard.summary.averageVisitTime, subtitle: dashboard.summary.recordedVisits + ' registros no dia', icon: Clock, tone: 'neutral' },
+  ];
+
+  if (loading && !dashboard.lastUpdated) return (
     <div className="h-64 flex items-center justify-center">
       <Loader2 className="animate-spin text-[#E65C5C]" size={32} />
     </div>
   );
 
-  if (error) {
+  if (error && !dashboard.lastUpdated) {
     return (
       <div className="h-64 flex items-center justify-center text-center px-6">
         <div className="space-y-3">
           <p className="text-sm font-black uppercase tracking-widest text-[#0F172A]">Painel indisponível</p>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest max-w-sm">{error}</p>
+          <button className="sv-button" onClick={() => setRefreshVersion((value) => value + 1)}>Tentar novamente</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in">
+    <div className="supervisor-workspace">
       {selectedPromoter && (
         <div className="fixed inset-0 z-[90] bg-[#0F172A]/55 backdrop-blur-sm flex items-center justify-center p-4 md:p-8" onClick={closePromoterDetail}>
           <div
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="promoter-detail-title"
-            className="w-full max-w-3xl max-h-[88vh] overflow-y-auto bg-white rounded-[32px] md:rounded-[40px] shadow-2xl border border-slate-100"
+            className="sv-legacy-detail w-full max-w-3xl max-h-[88vh] overflow-y-auto bg-white rounded-[32px] md:rounded-[40px] shadow-2xl border border-slate-100"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-6 py-5 md:px-8 flex items-start justify-between gap-4">
@@ -251,6 +318,8 @@ const SupervisorDashboard: React.FC = () => {
             </div>
 
             <div className="p-6 md:p-8 space-y-6">
+              <details className="sv-contact-details">
+                <summary><Phone size={15} /> Contato e cadastro</summary>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-slate-50 rounded-3xl p-5 space-y-3">
                   <div><p className="text-[8px] font-black uppercase tracking-widest text-slate-400">ID</p><p className="text-sm font-black text-[#0F172A]">{selectedPromoter.id}</p></div>
@@ -272,6 +341,7 @@ const SupervisorDashboard: React.FC = () => {
                   )}
                 </div>
               </div>
+              </details>
 
               {detailLoading && <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-[#E65C5C]" size={28} /></div>}
               {detailError && <div className="bg-red-50 text-red-600 rounded-2xl p-4 text-[10px] font-black uppercase tracking-wider">{detailError}</div>}
@@ -300,7 +370,7 @@ const SupervisorDashboard: React.FC = () => {
                     {promoterDetail.route.length === 0 && <p className="bg-slate-50 rounded-2xl p-5 text-[10px] font-bold uppercase text-slate-400">Nenhuma visita registrada.</p>}
                     {promoterDetail.route.map((stop) => (
                       <div key={stop.id} className="border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div><p className="text-sm font-black uppercase text-[#0F172A]">{stop.name}</p><p className="text-[9px] font-bold uppercase text-slate-400">{stop.date} às {stop.time} • {stop.photos} fotos • {stop.duration || '--:--'} em loja</p></div>
+                        <div><p className="text-sm font-black uppercase text-[#0F172A]">{stop.name}</p><p className="text-[9px] font-bold uppercase text-slate-400">{stop.date} às {stop.time} • {stop.photos} fotos • {stop.duration || '--:--'} em loja</p>{stop.automaticCheckout && <p className="text-xs text-amber-700 mt-1">Encerramento automático às 18h</p>}</div>
                         <span className={`self-start sm:self-auto px-3 py-1 rounded-full text-[8px] font-black uppercase ${stop.status === 'CONCLUÍDO' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>{stop.status}</span>
                       </div>
                     ))}
@@ -311,305 +381,53 @@ const SupervisorDashboard: React.FC = () => {
           </div>
         </div>
       )}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-black uppercase text-[#0F172A]">Gestão de Equipe</h2>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-2">
-            {activeFilterInfo.title}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-md bg-white text-xs font-semibold text-slate-700">
-            <CalendarDays size={16} aria-hidden="true" />
-            <span className="sr-only">Data da análise</span>
-            <input type="date" value={selectedDate} max={getTodayKey()} onChange={(event) => {
-              if (!event.target.value) return;
-              setSelectedDate(event.target.value);
-              closePromoterDetail();
-            }} className="bg-transparent outline-none" aria-label="Data da análise" />
-          </label>
-          <button type="button" title="Consultar promotor" aria-label="Consultar promotor" onClick={() => {
-            setFilter('consult');
-            resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            searchRef.current?.focus();
-          }} className="w-10 h-10 flex items-center justify-center rounded-md border border-slate-200 bg-white text-[#0F172A]">
-            <SearchCheck size={18} />
-          </button>
-          {historical && (
-            <button type="button" onClick={() => setSelectedDate(getTodayKey())} className="text-xs font-semibold text-[#0F172A] px-2 py-2">
-              Hoje
-            </button>
-          )}
-          {filter !== 'all' && (
-            <button
-              onClick={() => { setFilter('all'); setSearch(''); }}
-              className="text-[10px] font-black uppercase tracking-widest text-[#E65C5C] hover:underline"
-            >
-              ← Voltar para Geral
-            </button>
-          )}
+      <div className="sv-heading">
+        <div><p className="sv-eyebrow">Acompanhamento da operação</p><h2>Visão da equipe</h2><p className="sv-muted">{historical ? dateLabel : 'Hoje'} · {dashboard.lastUpdated ? 'Atualizado às ' + new Date(dashboard.lastUpdated).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : 'Aguardando dados'}</p></div>
+        <div className="sv-date-tools">
+          <button className="sv-icon" title="Dia anterior" aria-label="Dia anterior" onClick={() => changeDate(shiftDay(selectedDate, -1))}><ChevronLeft size={18} /></button>
+          <label className="sv-date"><CalendarDays size={17} /><input type="date" aria-label="Data da análise" value={selectedDate} max={getTodayKey()} onChange={(event) => changeDate(event.target.value)} /></label>
+          <button className="sv-icon" title="Dia seguinte" aria-label="Dia seguinte" disabled={!historical} onClick={() => changeDate(shiftDay(selectedDate, 1))}><ChevronRight size={18} /></button>
+          {historical && <button className="sv-button" onClick={() => changeDate(getTodayKey())}>Hoje</button>}
+          <button className="sv-icon" title="Atualizar painel" aria-label="Atualizar painel" disabled={loading} onClick={() => setRefreshVersion((value) => value + 1)}><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
         </div>
       </div>
-
-      {historical && (
-        <p className="text-xs text-slate-600 border-l-2 border-amber-500 pl-3">
-          Visitas e horários de {dateLabel} vêm dos registros daquele dia. Lojas previstas e faltantes usam o cadastro de rotas atual.
-        </p>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <button 
-          onClick={() => selectFilter('active')}
-          aria-pressed={filter === 'active'}
-          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'active' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
-              <Users className="text-emerald-600" size={16} />
-            </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Promotores Cadastrados</p>
-          </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.totalPromoters}</h4>
-          <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-1">{dashboard.summary.activePromoters} ativos • {dashboard.summary.inactivePromoters} inativos</p>
-        </button>
-
-        <button 
-          onClick={() => selectFilter('offline')}
-          aria-pressed={filter === 'offline'}
-          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'offline' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center">
-              <SignalLow className="text-slate-600" size={16} />
-            </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sem Atualização Recente</p>
-          </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.offlinePromoters}</h4>
-        </button>
-
-        <button 
-          onClick={() => selectFilter('sync_pending')}
-          aria-pressed={filter === 'sync_pending'}
-          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'sync_pending' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
-              <ClipboardList className="text-red-600" size={16} />
-            </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pendências de Sync (todos os dias)</p>
-          </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.pendingSyncPromoters}</h4>
-          <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-1">{dashboard.summary.pendingSyncVisits} envio(s)</p>
-        </button>
-
-        <button 
-          onClick={() => selectFilter('on_route')}
-          aria-pressed={filter === 'on_route'}
-          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'on_route' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-              <Route className="text-blue-600" size={16} />
-            </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Com Roteiro {periodLabel}</p>
-          </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.onRoutePromoters}</h4>
-        </button>
-
-        <button 
-          onClick={() => selectFilter('in_progress')}
-          aria-pressed={filter === 'in_progress'}
-          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'in_progress' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
-              <Play className="text-amber-600" size={16} />
-            </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Envios em Processamento</p>
-          </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.inProgressPromoters}</h4>
-        </button>
-
-        <button 
-          onClick={() => selectFilter('completed')}
-          aria-pressed={filter === 'completed'}
-          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'completed' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <CheckCircle2 className="text-emerald-700" size={16} />
-            </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Concluídas {periodLabel}</p>
-          </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.completedVisits}</h4>
-          <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-1">de {dashboard.summary.totalVisits} previstas</p>
-        </button>
-
-        <button 
-          onClick={() => selectFilter('pending')}
-          aria-pressed={filter === 'pending'}
-          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'pending' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center">
-              <ClipboardList className="text-orange-600" size={16} />
-            </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Visitas Pendentes {periodLabel}</p>
-          </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.pendingVisits}</h4>
-        </button>
-
-        <button
-          onClick={() => selectFilter('duration')}
-          aria-pressed={filter === 'duration'}
-          className={`text-left transition-all hover:scale-[1.02] active:scale-95 ${filter === 'duration' ? 'ring-2 ring-[#E65C5C]' : ''} bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm`}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center">
-              <Clock className="text-slate-600" size={16} />
-            </div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Média de Tempo {periodLabel}</p>
-          </div>
-          <h4 className="text-2xl font-black text-[#0F172A]">{dashboard.summary.averageVisitTime}</h4>
-        </button>
+      {historical && <p className="sv-notice">Registros de {dateLabel}. O roteiro previsto usa as atribuições atuais; a rota original pode ter sido diferente.</p>}
+      {error && <div className="sv-notice sv-error" role="alert"><AlertCircle size={18} /><span>Exibindo a última consulta. {error}</span></div>}
+      <div className="sv-metrics">
+        {metrics.map(({ key, label, value, subtitle, icon: Icon, tone }) => <button key={key} className={'sv-metric ' + (filter === key ? 'selected' : '')} aria-pressed={filter === key} onClick={() => selectFilter(key)}>
+          <div className="sv-metric-label"><Icon size={18} className={'sv-text-' + tone} /><span>{label}</span><ArrowUpRight size={15} /></div><strong>{value}</strong><span className="sv-muted">{subtitle}</span>
+        </button>)}
       </div>
-
-      <div className="bg-slate-50 border border-slate-100 rounded-[28px] p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <p className="text-[9px] font-black text-[#E65C5C] uppercase tracking-[0.2em]">Indicador selecionado</p>
-          <p className="text-sm font-black uppercase tracking-tight text-[#0F172A] mt-1">{historical ? activeFilterInfo.title.replaceAll('Hoje', dateLabel) : activeFilterInfo.title}</p>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">{historical ? activeFilterInfo.description.replaceAll('Hoje', dateLabel).replaceAll('hoje', dateLabel) : activeFilterInfo.description}</p>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="text-right min-w-24">
-            <p className="text-2xl font-black text-[#0F172A]">{filteredData.length}</p>
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Promotores no recorte</p>
-          </div>
-          <label className="relative block min-w-[240px]">
-            <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              ref={searchRef}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar nome, telefone, loja ou região"
-              className="w-full bg-white border border-slate-100 rounded-2xl py-3 pl-10 pr-4 text-[10px] font-bold uppercase tracking-wider outline-none focus:border-[#E65C5C]"
-            />
-          </label>
-        </div>
+      <div className="sv-operational-strip">
+        <button onClick={() => selectFilter('on_route')}><Route size={16} /><strong>{dashboard.summary.onRoutePromoters}</strong> com roteiro</button>
+        <span><strong>{dashboard.summary.pendingVisits}</strong> lojas ainda não concluídas</span>
+        <button onClick={() => selectFilter('in_progress')}><Loader2 size={16} /><strong>{dashboard.summary.inProgressPromoters}</strong> processando envios</button>
+        <button onClick={() => selectFilter('offline')} title="Sem atualização nos últimos 15 minutos; não confirma falta de internet"><strong>{dashboard.summary.offlinePromoters}</strong> sem atualização recente</button>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div ref={resultsRef} tabIndex={-1} className="lg:col-span-2 space-y-4 scroll-mt-6 outline-none">
-          <h3 aria-live="polite" className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
-            {filter === 'all' && !search ? 'Desempenho dos Promotores' : `${historical ? activeFilterInfo.title.replaceAll('Hoje', dateLabel) : activeFilterInfo.title} • ${filteredData.length} resultado${filteredData.length === 1 ? '' : 's'}`}
-          </h3>
-          {filteredData.length === 0 && (
-            <div className="bg-white p-8 rounded-3xl border border-slate-100 text-center">
-              <p className="text-xs font-black uppercase tracking-widest text-[#0F172A]">Nenhum promotor neste recorte</p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-2">Altere o indicador ou limpe a busca para ampliar a análise.</p>
-            </div>
-          )}
-          {filteredData.map(promoter => (
-            <button 
-              key={promoter.id} 
-              onClick={() => handlePromoterClick(promoter)}
-              className="w-full bg-white p-4 md:p-6 rounded-md border border-slate-100 shadow-sm flex items-center justify-between gap-3 group hover:border-[#E65C5C] transition-all text-left"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center relative shrink-0">
-                  <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${promoter.online ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                  <span className="font-black text-xs text-slate-400">{promoter.name.split(' ').map((n:any) => n[0]).join('').slice(0,2)}</span>
-                </div>
-                <div className="min-w-0">
-                  <p className="font-black uppercase text-sm tracking-tight text-[#0F172A] truncate">{promoter.name}</p>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <div className="flex items-center gap-1 min-w-0 text-[9px] font-bold text-slate-400 uppercase">
-                      <MapPin size={10} className="shrink-0" /> <span className="truncate">{promoter.store}</span>
-                    </div>
-                    <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${
-                      promoter.status === 'INATIVO' ? 'bg-red-50 text-red-600' :
-                      promoter.status === 'CONCLUÍDO' ? 'bg-emerald-50 text-emerald-600' : 
-                      promoter.status === 'EM ANDAMENTO' ? 'bg-amber-50 text-amber-600' :
-                      promoter.status === 'PENDENTE' ? 'bg-orange-50 text-orange-600' :
-                      'bg-slate-50 text-slate-600'
-                    }`}>
-                      {promoter.status}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 md:gap-8 shrink-0">
-                <div className="text-right hidden md:block">
-                  <p className="text-[9px] font-black text-slate-400 uppercase">Roteiro {periodLabel}</p>
-                  <p className="text-sm font-black text-[#0F172A]">{promoter.todayVisits?.completed || 0} / {promoter.todayVisits?.total || 0}</p>
-                  {(promoter.todayVisits.extra > 0 || promoter.todayVisits.duplicates > 0) && (
-                    <p className="text-[8px] font-bold text-orange-500 uppercase mt-1">
-                      {promoter.todayVisits.extra > 0 ? `${promoter.todayVisits.extra} extra` : ''}
-                      {promoter.todayVisits.extra > 0 && promoter.todayVisits.duplicates > 0 ? ' • ' : ''}
-                      {promoter.todayVisits.duplicates > 0 ? `${promoter.todayVisits.duplicates} duplicada(s)` : ''}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-[#0F172A]">{promoter.progress}%</p>
-                  <div className="w-24 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                    <div className="h-full bg-[#E65C5C] transition-all" style={{ width: `${promoter.progress}%` }} />
-                  </div>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">Sinc: {promoter.lastSync}</p>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm h-fit">
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
-            <TrendingUp className="text-[#E65C5C]" size={16}/> Curva de Execução {periodLabel}
-          </h3>
-          <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="time" fontSize={10} axisLine={false} tickLine={false} />
-                <YAxis fontSize={10} axisLine={false} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  labelStyle={{ fontWeight: 'bold', color: '#0F172A' }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', paddingTop: '20px' }} />
-                <Line type="monotone" dataKey="totalVisits" name="Registros" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="completedVisits" name="Concluídas" stroke="#10B981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="pendingSyncVisits" name="Pendências" stroke="#F59E0B" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4 }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
+      <div className="sv-view-tabs" role="tablist" aria-label="Visão do painel">
+        <button role="tab" aria-selected={view === 'team'} aria-controls="sv-team-panel" id="sv-team-tab" onClick={() => setView('team')}><Users size={17} /> Equipe</button>
+        <button role="tab" aria-selected={view === 'evolution'} aria-controls="sv-evolution-panel" id="sv-evolution-tab" onClick={() => setView('evolution')}><TrendingUp size={17} /> Evolução do dia</button>
+      </div>
+      <div ref={resultsRef} className="sv-results">
+        {view === 'team' ? <section role="tabpanel" id="sv-team-panel" aria-labelledby="sv-team-tab">
+          <div className="sv-filters">
+            <label className="sv-search"><Search size={18} /><input ref={searchRef} aria-label="Buscar promotor" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, loja, telefone ou região" />{search && <button title="Limpar busca" aria-label="Limpar busca" onClick={() => setSearch('')}><X size={16} /></button>}</label>
+            <label className="sv-select"><ListFilter size={16} /><select aria-label="Situação da equipe" value={filter} onChange={(event) => setFilter(event.target.value as SupervisorFilter)}>{Object.entries(FILTER_INFO).map(([key, info]) => <option key={key} value={key}>{info.title.replaceAll('Hoje', historical ? dateLabel : 'Hoje')}</option>)}</select></label>
+            <label className="sv-select"><MapPin size={16} /><select aria-label="Região" value={region} onChange={(event) => setRegion(event.target.value)}><option value="">Todas as regiões</option>{regions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           </div>
-          <div className="mt-6 pt-6 border-t border-slate-50 space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Lojas Previstas</span>
-              <span className="text-[10px] font-black text-blue-600">{dashboard.summary.totalVisits}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Concluídas</span>
-              <span className="text-[10px] font-black text-emerald-600">{dashboard.summary.completedVisits}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Cumprimento</span>
-              <span className="text-[10px] font-black text-emerald-600">
-                {dashboard.summary.totalVisits ? Math.round(dashboard.summary.completedVisits / dashboard.summary.totalVisits * 100) : 0}%
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Pendentes de Rota</span>
-              <span className="text-[10px] font-black text-orange-500">{dashboard.summary.pendingVisits}</span>
-            </div>
-            {(dashboard.summary.extraVisits > 0 || dashboard.summary.duplicateVisits > 0) && (
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Extras / Duplicadas</span>
-                <span className="text-[10px] font-black text-orange-500">{dashboard.summary.extraVisits} / {dashboard.summary.duplicateVisits}</span>
-              </div>
-            )}
-          </div>
-        </div>
+          <div className="sv-list-meta"><p aria-live="polite"><strong>{filteredData.length}</strong> promotores{(filter !== 'all' || search || region) && <button className="sv-link" onClick={() => { setFilter('all'); setSearch(''); setRegion(''); }}>Limpar filtros</button>}</p><label>Ordenar por <select aria-label="Ordenar promotores" value={sort} onChange={(event) => setSort(event.target.value)}><option value="attention">Envios pendentes</option><option value="name">Nome</option><option value="progress">Conclusão do roteiro</option></select></label></div>
+          <div className="sv-table-head" aria-hidden="true"><span>Promotor / última loja</span><span>Roteiro do dia</span><span>Sincronização</span><span /></div>
+          {filteredData.length === 0 && <div className="sv-empty"><Search size={25} /><p>Nenhum promotor encontrado.</p><button className="sv-button" onClick={() => { setFilter('consult'); setSearch(''); setRegion(''); }}>Consultar todos</button></div>}
+          {filteredData.map((promoter) => <button key={promoter.id} className="sv-promoter" onClick={() => void handlePromoterClick(promoter)} aria-label={'Ver detalhes de ' + promoter.name}>
+            <div className="sv-identity"><span className="sv-avatar" aria-hidden="true">{promoter.name.split(' ').filter(Boolean).map((part) => part[0]).join('').slice(0, 2)}<i className={promoter.online ? 'recent' : ''} /></span><div><strong>{promoter.name}</strong><span className="sv-store"><MapPin size={12} />{promoter.store || 'Sem registro de loja'}</span><span className={'sv-status ' + statusClass(promoter.status)}>{promoter.status}</span>{promoter.region && <span className="sv-region">{promoter.region}</span>}</div></div>
+            <div className="sv-route-progress"><span><strong>{promoter.todayVisits.completed}/{promoter.todayVisits.total}</strong> lojas <b>{promoter.progress}%</b></span><div className="sv-progress" role="progressbar" aria-label={'Roteiro de ' + promoter.name} aria-valuenow={Math.min(100, promoter.progress)} aria-valuemin={0} aria-valuemax={100}><i style={{ width: Math.min(100, Math.max(0, promoter.progress)) + '%' }} /></div>{(promoter.todayVisits.extra > 0 || promoter.todayVisits.duplicates > 0) && <small>{promoter.todayVisits.extra} extras · {promoter.todayVisits.duplicates} duplicadas</small>}</div>
+            <div className="sv-sync-cell">{promoter.pendingSyncVisits ? <span className="sv-text-warning"><CloudUpload size={15} />{promoter.pendingSyncVisits} pendente(s)</span> : <span className="sv-text-success"><CheckCircle2 size={15} />Sem pendências</span>}<small>Última sinc. {promoter.lastSync}</small></div><ChevronRight size={18} className="sv-row-arrow" />
+          </button>)}
+        </section> : <section role="tabpanel" id="sv-evolution-panel" aria-labelledby="sv-evolution-tab" className="sv-evolution">
+          <div className="sv-chart-heading"><div><h3>Visitas ao longo do dia</h3><p className="sv-muted">{dateLabel} · horário de Brasília</p></div><div><strong>{completion}%</strong><span className="sv-muted"> do roteiro concluído</span></div></div>
+          <div className="sv-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 12, right: 12, bottom: 8, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><XAxis dataKey="time" fontSize={12} axisLine={false} tickLine={false} /><YAxis allowDecimals={false} fontSize={12} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ borderRadius: 8, borderColor: '#e5e7eb' }} /><Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 14 }} /><Line isAnimationActive={false} type="monotone" dataKey="totalVisits" name="Registros" stroke="#2563eb" strokeWidth={2} dot={false} /><Line isAnimationActive={false} type="monotone" dataKey="completedVisits" name="Concluídas" stroke="#059669" strokeWidth={2} dot={false} /><Line isAnimationActive={false} type="monotone" dataKey="pendingSyncVisits" name="Pendências" stroke="#c27803" strokeWidth={2} strokeDasharray="5 5" dot={false} /></LineChart></ResponsiveContainer></div>
+          <div className="sv-operational-strip"><span><strong>{dashboard.summary.totalVisits}</strong> lojas previstas</span><span><strong>{dashboard.summary.recordedVisits}</strong> registros</span><span><strong>{dashboard.summary.extraVisits}</strong> extras</span><span><strong>{dashboard.summary.duplicateVisits}</strong> duplicadas</span></div>
+        </section>}
       </div>
     </div>
   );
