@@ -32,6 +32,8 @@
 - Preview `6abafd51da675908e88dc4c0`: app, health, manifesto e service worker HTTP 200; API do supervisor sem sessao HTTP 401.
 - Consultas autenticadas no preview responderam sem 502 em 6,6 s (hoje), 5,8 s (dia anterior) e 5,4 s (detalhe), com cache frio.
 - Capturas com dados ficticios em 390 px e 1366 px confirmaram ausencia de rolagem horizontal, troca de data e abertura do detalhe.
+- Correcao publicada no deploy produtivo `6abaffe3cd07cf7a7d3fd286`; app, health, manifesto e service worker HTTP 200, supervisor sem sessao HTTP 401.
+- Logs de erro das funcoes sem novas falhas na janela consultada apos a publicacao. A primeira consulta real de supervisor no novo deploy ainda depende do uso da equipe.
 
 ## [2026-09-25] - Recuperacao de confirmacoes antigas de fotos
 
