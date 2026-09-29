@@ -259,12 +259,12 @@ export const apiService = {
     return Boolean(health.ok);
   },
 
-  getSupervisorDashboard: async () => {
-    return requestJson<SupervisorDashboardResponse>('/supervisor/dashboard');
+  getSupervisorDashboard: async (date?: string) => {
+    return requestJson<SupervisorDashboardResponse>(`/supervisor/dashboard${date ? `?date=${encodeURIComponent(date)}` : ''}`);
   },
 
-  getPromoterExecution: async (id: string) => {
-    return requestJson<SupervisorPromoterDetailResponse>(`/supervisor/promoters/${id}`);
+  getPromoterExecution: async (id: string, date?: string) => {
+    return requestJson<SupervisorPromoterDetailResponse>(`/supervisor/promoters/${encodeURIComponent(id)}${date ? `?date=${encodeURIComponent(date)}` : ''}`);
   },
 
   createVisit: async (payload: any) => {

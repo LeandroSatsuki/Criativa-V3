@@ -23,6 +23,7 @@ import {
 import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
 import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
+import { isStaleSync } from './services/syncAge';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -33,6 +34,7 @@ const INITIAL_STATE = {
 
 type PendingSyncView = {
   visitId: string;
+  createdAt: string;
   store: string;
   status: string;
   error: string | null;
@@ -87,6 +89,7 @@ const App: React.FC = () => {
   const [promptSyncMessage, setPromptSyncMessage] = useState('');
   const [promptSyncError, setPromptSyncError] = useState<string | null>(null);
   const [promptQueueCount, setPromptQueueCount] = useState(0);
+  const [promptStaleCount, setPromptStaleCount] = useState(0);
   const [pendingSyncs, setPendingSyncs] = useState<PendingSyncView[]>([]);
   const [showSyncStatus, setShowSyncStatus] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
@@ -262,12 +265,15 @@ const App: React.FC = () => {
 
     setShowPendingSyncPrompt(false);
     setPromptQueueCount(0);
+    setPromptStaleCount(0);
     setPromptSyncError(null);
 
-    getQueuedVisitCount(ownerId).then((queuedCount) => {
+    listQueuedVisitSummaries(ownerId).then((queuedVisits) => {
       if (cancelled) return;
+      const queuedCount = queuedVisits.length;
       if (queuedCount > 0) {
         setPromptQueueCount(queuedCount);
+        setPromptStaleCount(queuedVisits.filter((visit) => isStaleSync(visit.createdAt)).length);
         setPromptSyncMessage(`${queuedCount} envio${queuedCount > 1 ? 's' : ''} pendente${queuedCount > 1 ? 's' : ''} na fila local.`);
         setPromptSyncError(null);
         setShowPendingSyncPrompt(true);
@@ -321,6 +327,7 @@ const App: React.FC = () => {
 
         next.push({
           visitId: queuedVisit.visitId,
+          createdAt: queuedVisit.createdAt,
           store: queuedVisit.store,
           status: remote.syncStatus,
           error: remote.syncError || null,
@@ -331,6 +338,7 @@ const App: React.FC = () => {
       } catch {
         next.push({
           visitId: queuedVisit.visitId,
+          createdAt: queuedVisit.createdAt,
           store: queuedVisit.store,
           status: queuedVisit.status,
           error: queuedVisit.error,
@@ -559,6 +567,11 @@ const App: React.FC = () => {
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
                 Existem {promptQueueCount} registro{promptQueueCount !== 1 ? 's' : ''} aguardando sincronização.
               </p>
+              {promptStaleCount > 0 && (
+                <p className="text-xs font-semibold text-orange-700">
+                  {promptStaleCount} envio{promptStaleCount === 1 ? '' : 's'} há mais de 24 horas. Conecte-se e sincronize assim que possível.
+                </p>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -659,6 +672,9 @@ const App: React.FC = () => {
                         <span className="text-slate-400">{sync.sent}/{sync.total || '--'}</span>
                       </div>
                       {sync.error && <p className="text-[10px] font-bold text-orange-700 leading-relaxed">{sync.error}</p>}
+                      {isStaleSync(sync.createdAt) && (
+                        <p className="text-[10px] font-bold text-orange-700">Pendente há mais de 24 horas. Sincronize com conexão estável.</p>
+                      )}
                       {hasError && sync.retry?.retryable && (
                         <button
                           type="button"

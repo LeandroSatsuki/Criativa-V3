@@ -128,6 +128,8 @@ export interface SupervisorDashboardResponse {
   timeline: SupervisorTimelinePoint[];
   promoters: SupervisorPromoterOverview[];
   lastUpdated: string;
+  selectedDate?: string;
+  historical?: boolean;
 }
 
 export interface SupervisorPromoterDetailRouteItem {
@@ -140,6 +142,15 @@ export interface SupervisorPromoterDetailRouteItem {
   tasks: number;
   photos: number;
   syncStatus: 'pendente' | 'enviando' | 'enviado' | 'erro' | 'reenviar';
+  duration?: string;
+}
+
+export interface SupervisorPlannedStop {
+  id: string;
+  name: string;
+  status: 'CONCLUÍDO' | 'PENDENTE' | 'SEM REGISTRO';
+  visits: number;
+  duration: string;
 }
 
 export interface SupervisorPromoterDetailResponse {
@@ -161,4 +172,5 @@ export interface SupervisorPromoterDetailResponse {
     averageDuration: string;
   };
   route: SupervisorPromoterDetailRouteItem[];
+  plannedRoute?: SupervisorPlannedStop[];
 }

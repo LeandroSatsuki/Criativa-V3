@@ -1,5 +1,38 @@
 # CHANGELOG
 
+## [2026-09-28] - Consulta historica e acompanhamento do supervisor
+
+### Causa
+- O painel era fixo no dia atual e listava, por padrao, cadastros ativos, inativos e historicos misturados.
+- O detalhe do promotor mostrava apenas registros recentes e nao separava lojas previstas, faltantes e tempo de permanencia na data consultada.
+- Envios locais com mais de 24 horas nao tinham destaque especifico no aparelho.
+
+### Solucao aplicada
+- O supervisor pode selecionar um dia no calendario. O backend valida a data e mantem cache separado por dia.
+- A lista inicial mostra promotores ativos. O atalho de consulta permite pesquisar tambem inativos e historicos.
+- O detalhe apresenta a rota prevista, lojas sem registro, visitas daquele dia, fotos, tempo em loja e pendencias de sincronizacao.
+- O painel apresenta o percentual de cumprimento de rota e identifica que rotas historicas usam o cadastro atual, pois nao existem retratos antigos da planilha.
+- Envios locais com mais de 24 horas sao destacados na tela de sincronizacao, sem remover ou modificar a fila.
+- A rota compartilhada por multiplos promotores ja era suportada e foi preservada.
+
+### Checklist
+- [x] Leitura por data e acesso de supervisor mantidos separados dos endpoints de gravacao.
+- [x] Visitas, fotos, pastas do Drive e fila offline sem alteracao de formato.
+- [x] Datas invalidas e futuras rejeitadas.
+- [x] Uso offline preservado quando ha pendencia antiga.
+
+### Seguranca
+- As mudancas de painel sao somente de leitura; nenhuma visita antiga e regravada.
+- O alerta de 24 horas nao bloqueia o aparelho sem conectividade.
+- Check-out automatico sem o app aberto nao foi ativado: o servidor nao recebe rascunhos ainda salvos apenas no celular.
+
+### Testes realizados
+- Testes de data em Brasilia, rota prevista, lista inicial de ativos e idade da fila local.
+- Suite completa com 137 testes aprovados, TypeScript e build de producao aprovados.
+- Preview `6abafd51da675908e88dc4c0`: app, health, manifesto e service worker HTTP 200; API do supervisor sem sessao HTTP 401.
+- Consultas autenticadas no preview responderam sem 502 em 6,6 s (hoje), 5,8 s (dia anterior) e 5,4 s (detalhe), com cache frio.
+- Capturas com dados ficticios em 390 px e 1366 px confirmaram ausencia de rolagem horizontal, troca de data e abertura do detalhe.
+
 ## [2026-09-25] - Recuperacao de confirmacoes antigas de fotos
 
 ### Causa

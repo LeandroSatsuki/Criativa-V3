@@ -9,7 +9,7 @@ export type SupervisorDashboardCacheEntry = {
 };
 
 const cacheStore = getJsonStore('criativa-supervisor-cache');
-const CACHE_KEY = 'dashboard-v1';
+const cacheKey = (date: string) => `dashboard-v2/${date}`;
 
 export const getFreshSupervisorDashboard = (
   entry: SupervisorDashboardCacheEntry | null,
@@ -21,10 +21,10 @@ export const getFreshSupervisorDashboard = (
   return now - cachedAt <= SUPERVISOR_DASHBOARD_CACHE_TTL_MS ? entry.dashboard : null;
 };
 
-export const readSupervisorDashboardCache = async () => getFreshSupervisorDashboard(
-  await cacheStore.get<SupervisorDashboardCacheEntry>(CACHE_KEY),
+export const readSupervisorDashboardCache = async (date: string) => getFreshSupervisorDashboard(
+  await cacheStore.get<SupervisorDashboardCacheEntry>(cacheKey(date)),
 );
 
-export const writeSupervisorDashboardCache = async (dashboard: SupervisorDashboardResponse) => {
-  await cacheStore.set(CACHE_KEY, { cachedAt: new Date().toISOString(), dashboard });
+export const writeSupervisorDashboardCache = async (date: string, dashboard: SupervisorDashboardResponse) => {
+  await cacheStore.set(cacheKey(date), { cachedAt: new Date().toISOString(), dashboard });
 };

@@ -10,12 +10,13 @@ import {
   writeSupervisorDashboardCache,
 } from './_shared/supervisor-dashboard-cache';
 import type { SupervisorDashboardResponse } from '../../src/types';
+import { resolveSupervisorDate } from './_shared/supervisor-date.ts';
 
-let dashboardBuild: Promise<SupervisorDashboardResponse> | null = null;
+const dashboardBuilds = new Map<string, Promise<SupervisorDashboardResponse>>();
 
-const loadDashboard = async () => {
+const loadDashboard = async (date: string, selected: Date) => {
   try {
-    const cached = await readSupervisorDashboardCache();
+    const cached = await readSupervisorDashboardCache(date);
     if (cached) return cached;
   } catch (error) {
     console.warn(JSON.stringify({
@@ -24,12 +25,12 @@ const loadDashboard = async () => {
     }));
   }
 
-  if (!dashboardBuild) {
-    dashboardBuild = (async () => {
+  if (!dashboardBuilds.has(date)) {
+    const build = (async () => {
       const [data, visits] = await Promise.all([getAppData(), listVisitSummaries()]);
-      const dashboard = buildSupervisorDashboard(data, visits);
+      const dashboard = buildSupervisorDashboard(data, visits, new Date(), selected);
       try {
-        await writeSupervisorDashboardCache(dashboard);
+        await writeSupervisorDashboardCache(date, dashboard);
       } catch (error) {
         console.warn(JSON.stringify({
           event: 'supervisor_dashboard_cache_write_failed',
@@ -38,11 +39,12 @@ const loadDashboard = async () => {
       }
       return dashboard;
     })().finally(() => {
-      dashboardBuild = null;
+      dashboardBuilds.delete(date);
     });
+    dashboardBuilds.set(date, build);
   }
 
-  return dashboardBuild;
+  return dashboardBuilds.get(date);
 };
 
 export default async (request: Request, _context: Context) => {
@@ -56,7 +58,10 @@ export default async (request: Request, _context: Context) => {
     return json({ error: accessError.message }, accessError.status);
   }
 
-  return json(await loadDashboard());
+  const selection = resolveSupervisorDate(new URL(request.url).searchParams.get('date'));
+  if (!selection) return json({ error: 'Data de consulta inválida.' }, 400);
+
+  return json(await loadDashboard(selection.date, selection.selected));
 };
 
 export const config: Config = {
