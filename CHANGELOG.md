@@ -36,6 +36,9 @@
 - App, health, manifesto e service worker do preview HTTP 200; painel sem autenticacao HTTP 401.
 - Contrato de finalizacao validado para visita parcial sem foto de saida: data original, saida 18:00, duracao correta e contagem exata de fotos.
 - Suite completa: 147 testes aprovados; TypeScript e build de producao aprovados.
+- Producao publicada no deploy `6abb0d115a501946919a2ac5`, codigo `4d341bf`, com o mesmo pacote validado no preview.
+- Verificacao pos-deploy: app, health, manifesto e service worker HTTP 200; supervisor sem sessao HTTP 401; asset principal corresponde ao pacote publicado.
+- Consulta de logs das funcoes sem erros na janela de cinco minutos verificada apos a publicacao. O primeiro encerramento real depende de uso do app atualizado pela equipe.
 
 ## [2026-09-28] - Consulta historica e acompanhamento do supervisor
 
