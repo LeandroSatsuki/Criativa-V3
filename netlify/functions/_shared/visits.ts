@@ -11,6 +11,7 @@ import {
   completeVisitSummaryIndex,
   type VisitSummary,
 } from './visit-summary';
+import { mapWithConcurrency } from './async-pool';
 
 export type VisitRecord = {
   visitId: string;
@@ -28,10 +29,13 @@ export type VisitRecord = {
 
 const visitStore = getJsonStore('criativa-visits');
 const visitSummaryStore = getJsonStore('criativa-visit-summaries');
+const pendingVisitSummaryStore = getJsonStore('criativa-pending-visit-summaries');
 
 const keyFor = (visitId: string) => `visits/${visitId}`;
 const summaryKeyFor = (visitId: string) => `visits/${visitId}`;
 const SUMMARY_MIGRATION_BATCH_SIZE = 4;
+const SUMMARY_READ_CONCURRENCY = 24;
+const FULL_VISIT_READ_CONCURRENCY = 4;
 
 export const generateVisitId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -46,16 +50,37 @@ export const getVisit = async (visitId: string) => {
 
 export const saveVisit = async (record: VisitRecord) => {
   await visitStore.set(keyFor(record.visitId), record);
-  try {
-    await visitSummaryStore.set(summaryKeyFor(record.visitId), buildVisitSummary(record));
-  } catch (error) {
-    console.error(JSON.stringify({
-      event: 'visit_summary_write_failed',
-      visitId: record.visitId,
-      errorType: error instanceof Error ? error.name : 'UnknownError',
-    }));
-  }
+  const summary = buildVisitSummary(record);
+  await Promise.all([
+    visitSummaryStore.set(summaryKeyFor(record.visitId), summary).catch((error) => {
+      console.error(JSON.stringify({
+        event: 'visit_summary_write_failed',
+        visitId: record.visitId,
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      }));
+    }),
+    (record.syncStatus === 'enviado'
+      ? pendingVisitSummaryStore.remove(summaryKeyFor(record.visitId))
+      : pendingVisitSummaryStore.set(summaryKeyFor(record.visitId), summary)
+    ).catch((error) => {
+      console.error(JSON.stringify({
+        event: 'pending_visit_summary_write_failed',
+        visitId: record.visitId,
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      }));
+    }),
+  ]);
   return record;
+};
+
+export const listPendingVisitSummaries = async () => {
+  const keys = await pendingVisitSummaryStore.list('visits/');
+  const summaries = await mapWithConcurrency(
+    keys,
+    SUMMARY_READ_CONCURRENCY,
+    (key) => pendingVisitSummaryStore.get<VisitSummary>(key),
+  );
+  return summaries.filter(Boolean) as VisitSummary[];
 };
 
 export const upsertVisit = async (payload: any, syncStatus: VisitRecord['syncStatus'] = 'pendente') => {
@@ -107,8 +132,10 @@ export const updateVisit = async (visitId: string, patch: any) => {
 
 export const listVisits = async () => {
   const keys = await visitStore.list('visits/');
-  const visits = await Promise.all(
-    keys.map(async (key) => visitStore.get<VisitRecord>(key)),
+  const visits = await mapWithConcurrency(
+    keys,
+    FULL_VISIT_READ_CONCURRENCY,
+    (key) => visitStore.get<VisitRecord>(key),
   );
   return visits.filter(Boolean) as VisitRecord[];
 };
@@ -120,8 +147,10 @@ export const listVisitSummaries = async () => {
   ]);
   const visitKeySet = new Set(visitKeys);
   const validSummaryKeys = summaryKeys.filter((key) => visitKeySet.has(key));
-  const summaries = (await Promise.all(
-    validSummaryKeys.map((key) => visitSummaryStore.get<VisitSummary>(key)),
+  const summaries = (await mapWithConcurrency(
+    validSummaryKeys,
+    SUMMARY_READ_CONCURRENCY,
+    (key) => visitSummaryStore.get<VisitSummary>(key),
   )).filter(Boolean) as VisitSummary[];
   const missingCount = visitKeys.length - summaries.length;
   if (missingCount > 0) {
@@ -170,8 +199,8 @@ export const buildTransformedPayload = (payload: any) => {
   };
 
   const storeNameClean = cleanText(payload.currentStore || 'LOJA', 'LOJA').replace(/\s+/g, '_').toUpperCase();
-  const fileDate = formatFileDate(payload.timestamp || payload.checkInTime);
-  const dataVisita = formatBrasiliaDate(payload.timestamp || payload.checkInTime);
+  const fileDate = formatFileDate(payload.checkInTime || payload.timestamp);
+  const dataVisita = formatBrasiliaDate(payload.checkInTime || payload.timestamp);
   const idVisita = payload.visitId || generateVisitId();
   const nomePromotor = cleanText(payload.user?.name, 'Promotor');
   const nomeLoja = cleanText(payload.currentStore, 'Loja');

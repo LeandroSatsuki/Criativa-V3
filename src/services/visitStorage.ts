@@ -55,6 +55,9 @@ const writeIndexedDraft = async (state: PersistedVisitState) => {
 const stripPhotosForCompatibility = (state: PersistedVisitState): PersistedVisitState => ({
   ...state,
   photos: Object.fromEntries(Object.keys(state.photos || {}).map((section) => [section, []])),
+  returnsPhotosByIndustry: Object.fromEntries(
+    Object.keys(state.returnsPhotosByIndustry || {}).map((industry) => [industry, []]),
+  ),
   industryExecutions: Object.fromEntries(
     Object.entries(state.industryExecutions || {}).map(([industry, execution]) => [
       industry,
@@ -86,15 +89,28 @@ export const loadVisitDraft = async (storageKey: string) => {
   return readLegacyVisitState(storageKey);
 };
 
-let saveSequence: Promise<void> = Promise.resolve();
+let pendingSave: { storageKey: string; state: PersistedVisitState } | null = null;
+let saveSequence: Promise<void> | null = null;
+
+const flushPendingSaves = async () => {
+  while (pendingSave) {
+    const current = pendingSave;
+    pendingSave = null;
+    await writeIndexedDraft(current.state);
+    localStorage.setItem(
+      current.storageKey,
+      JSON.stringify(stripPhotosForCompatibility(current.state)),
+    );
+  }
+};
 
 export const saveVisitDraft = (storageKey: string, state: PersistedVisitState) => {
-  saveSequence = saveSequence
-    .catch(() => undefined)
-    .then(async () => {
-      await writeIndexedDraft(state);
-      localStorage.setItem(storageKey, JSON.stringify(stripPhotosForCompatibility(state)));
+  pendingSave = { storageKey, state };
+  if (!saveSequence) {
+    saveSequence = flushPendingSaves().finally(() => {
+      saveSequence = null;
     });
+  }
 
   return saveSequence;
 };

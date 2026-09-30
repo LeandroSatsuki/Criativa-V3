@@ -6,6 +6,7 @@ import {
   drawPhotoInPortrait,
   PHOTO_INITIAL_MAX_LONG_EDGE,
   PHOTO_MAX_BYTES,
+  PHOTO_QUALITY_SEARCH_STEPS,
   PHOTO_TARGET_BYTES,
 } from '../src/services/imageCompression.ts';
 
@@ -56,6 +57,7 @@ test('define alvo menor que o teto e reduz a resolução inicial em 35 por cento
   assert.equal(PHOTO_TARGET_BYTES, 100 * 1024);
   assert.equal(PHOTO_MAX_BYTES, 120 * 1024);
   assert.equal(PHOTO_INITIAL_MAX_LONG_EDGE, 832);
+  assert.equal(PHOTO_QUALITY_SEARCH_STEPS, 2);
   assert.ok(PHOTO_TARGET_BYTES < PHOTO_MAX_BYTES);
 });
 

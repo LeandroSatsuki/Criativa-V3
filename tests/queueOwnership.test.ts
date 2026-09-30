@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   filterQueuedVisitsByOwner,
   getQueuedVisitOwnerId,
+  toQueuedVisitSummary,
   type QueuedVisit,
 } from '../src/services/syncQueue.ts';
 import {
@@ -45,6 +46,19 @@ test('fila antiga sem ownerId herda o dono apenas do payload da propria visita',
   const legacy = queuedVisit('VISIT-LEGACY', 'promotor-antigo');
   assert.equal(getQueuedVisitOwnerId(legacy), 'promotor-antigo');
   assert.equal(filterQueuedVisitsByOwner([legacy], 'promotor-novo').length, 0);
+});
+
+test('indice local preserva dados operacionais sem carregar fotos', () => {
+  const visit = queuedVisit('VISIT-LIGHT', 'promotor-a', 'promotor-a');
+  visit.payload.currentStore = 'Loja Central';
+  visit.payload.photos = { checkout: ['base64-muito-grande'] };
+
+  const summary = toQueuedVisitSummary(visit);
+
+  assert.equal(summary.store, 'Loja Central');
+  assert.equal(summary.ownerId, 'promotor-a');
+  assert.equal('payload' in summary, false);
+  assert.doesNotMatch(JSON.stringify(summary), /base64-muito-grande/);
 });
 
 test('visita do backend pertence ao promotor e supervisor pode auditar', () => {
