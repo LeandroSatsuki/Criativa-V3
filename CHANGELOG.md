@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2026-09-30] - Menos alocacoes na abertura e preparacao dos envios
+
+### Causa
+- Relatos de aviso de memoria e bloqueio na logo em varios aparelhos; a causa especifica nesses dispositivos ainda depende do aviso exato e da versao instalada.
+- Confirmado no codigo: o particionamento de um payload sintetico de 12 MB alocava cumulativamente 301.983.778 bytes em 182 buffers UTF-8 temporarios. Isso nao representa o pico de RAM do aparelho.
+- O rascunho legado era lido antes da restauracao IndexedDB; consultas operacionais e retomadas podiam se sobrepor a abertura. Fotos de devolucao ainda eram serializadas na copia de compatibilidade.
+
+### Solucao aplicada
+- Contagem e divisao UTF-8 em leitura linear, sem buffers temporarios, mantendo limites, conteudo, hash de upload e compatibilidade dos fragmentos existentes.
+- Restauracao unica pelo IndexedDB, com fallback legado preservado; carga operacional depois da restauracao, seguida de consultas e retomadas.
+- Evitada a segunda consulta de lojas na renovacao inicial da sessao.
+- Copia de compatibilidade sem fotos de devolucao; originais continuam integralmente no IndexedDB, gravados antes dessa copia.
+
+### Checklist
+- [x] Sem alteracao de esquema IndexedDB, IDs, qualidade das fotos ou contrato de upload.
+- [x] Filas antigas e fotos preservadas nos testes de navegador.
+- [ ] Confirmar abertura no aparelho do Alex e nos demais afetados apos receberem a versao atualizada.
+
+### Seguranca
+- Nenhuma limpeza de dados, desinstalacao, migracao de fila ou atualizacao forcada durante visitas.
+- Backend Google, pastas e regras de confirmacao dos envios permanecem iguais.
+
+### Testes realizados
+- 152 testes aprovados; TypeScript e build aprovados.
+- 19 comparacoes com o particionador anterior: mesmos bytes e fragmentos, incluindo Unicode e payload grande.
+- Ensaio local de 12 MB: 1.077 ms antes e 122 ms depois; zero buffers UTF-8 no novo particionamento. Nao e uma medicao de RAM total nem garantia de desempenho em celulares.
+- Chrome isolado, viewport movel: abertura sem sessao, restauracao legada e rascunho de 100 fotos com tres visitas pendentes. Fotos e devolucoes preservadas, uma consulta de lojas e nenhum erro JavaScript.
+- Abertura com APIs sem conexao validada usando o cache operacional e preservando o rascunho local.
+
 ## [2026-09-30] - Recuperacao controlada de visita da Sirlene
 
 ### Causa

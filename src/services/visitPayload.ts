@@ -1,9 +1,28 @@
 export const DIRECT_VISIT_PAYLOAD_MAX_BYTES = 4 * 1024 * 1024;
 export const VISIT_PAYLOAD_CHUNK_MAX_BYTES = Math.floor(1.5 * 1024 * 1024);
 
-const encoder = new TextEncoder();
+// Count UTF-8 bytes without allocating a second copy of the photo payload.
+const utf8Character = (value: string, index: number) => {
+  const code = value.charCodeAt(index);
+  if (code < 0x80) return 1;
+  if (code < 0x800) return 2;
+  if (code >= 0xD800 && code <= 0xDBFF) {
+    const next = value.charCodeAt(index + 1);
+    if (next >= 0xDC00 && next <= 0xDFFF) return 4;
+  }
+  // TextEncoder also uses three bytes for an unpaired surrogate (U+FFFD).
+  return 3;
+};
 
-export const getUtf8ByteLength = (value: string) => encoder.encode(value).byteLength;
+export const getUtf8ByteLength = (value: string) => {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const size = utf8Character(value, index);
+    bytes += size;
+    if (size === 4) index += 1;
+  }
+  return bytes;
+};
 
 export const getMissingChunkIndexes = (total: number, receivedIndexes: unknown) => {
   const received = new Set(
@@ -16,53 +35,30 @@ export const getMissingChunkIndexes = (total: number, receivedIndexes: unknown) 
     .filter((index) => !received.has(index));
 };
 
-const avoidSplittingSurrogatePair = (value: string, index: number) => {
-  if (index <= 0 || index >= value.length) return index;
-
-  const previous = value.charCodeAt(index - 1);
-  const current = value.charCodeAt(index);
-  const splitsPair = previous >= 0xD800 && previous <= 0xDBFF
-    && current >= 0xDC00 && current <= 0xDFFF;
-
-  return splitsPair ? index - 1 : index;
-};
-
 export const splitUtf8Text = (value: string, maxBytes = VISIT_PAYLOAD_CHUNK_MAX_BYTES) => {
   if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
     throw new Error('O tamanho máximo do fragmento deve ser um inteiro positivo.');
   }
 
-  if (getUtf8ByteLength(value) <= maxBytes) return [value];
-
   const chunks: string[] = [];
   let start = 0;
+  let bytes = 0;
 
-  while (start < value.length) {
-    let low = start + 1;
-    let high = value.length;
-    let bestEnd = start;
-
-    while (low <= high) {
-      const middle = Math.floor((low + high) / 2);
-      const candidateEnd = avoidSplittingSurrogatePair(value, middle);
-      const candidate = value.slice(start, candidateEnd);
-
-      if (getUtf8ByteLength(candidate) <= maxBytes) {
-        bestEnd = candidateEnd;
-        low = middle + 1;
-      } else {
-        high = middle - 1;
-      }
-    }
-
-    if (bestEnd <= start) {
+  for (let index = 0; index < value.length; index += 1) {
+    const size = utf8Character(value, index);
+    if (size > maxBytes) {
       throw new Error('Não foi possível dividir o payload da visita com segurança.');
     }
-
-    chunks.push(value.slice(start, bestEnd));
-    start = bestEnd;
+    if (bytes + size > maxBytes) {
+      chunks.push(value.slice(start, index));
+      start = index;
+      bytes = 0;
+    }
+    bytes += size;
+    if (size === 4) index += 1;
   }
 
+  chunks.push(value.slice(start));
   return chunks;
 };
 

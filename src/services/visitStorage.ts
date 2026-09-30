@@ -55,6 +55,9 @@ const writeIndexedDraft = async (state: PersistedVisitState) => {
 const stripPhotosForCompatibility = (state: PersistedVisitState): PersistedVisitState => ({
   ...state,
   photos: Object.fromEntries(Object.keys(state.photos || {}).map((section) => [section, []])),
+  returnsPhotosByIndustry: Object.fromEntries(
+    Object.keys(state.returnsPhotosByIndustry || {}).map((industry) => [industry, []]),
+  ),
   industryExecutions: Object.fromEntries(
     Object.entries(state.industryExecutions || {}).map(([industry, execution]) => [
       industry,

@@ -20,7 +20,7 @@ import {
   removeQueuedVisit,
   updateQueuedVisit,
 } from './services/syncQueue';
-import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
+import { loadVisitDraft, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
 import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
 import { isStaleSync } from './services/syncAge';
@@ -61,19 +61,7 @@ const App: React.FC = () => {
   const loginRequestInFlight = useRef(false);
   const [visitState, setVisitState] = useState(() => {
     try {
-      const saved = readLegacyVisitState(STORAGE_KEY);
       const session = getSession();
-      if (saved) {
-        const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
-        const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
-        const restored = sessionMatchesDraft ? recoverUnstartedVisit(saved) : {};
-        return {
-          ...INITIAL_STATE,
-          ...restored,
-          user: session?.user || null,
-          draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
-        };
-      }
       if (session?.user) return { ...INITIAL_STATE, user: session.user, draftOwnerId: session.user.id };
     } catch (e) {
       console.error("Erro ao carregar estado do localStorage:", e);
@@ -103,7 +91,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const ownerId = visitState.user?.id;
-    if (!ownerId || !draftHydrated) return;
+    if (!ownerId || !draftHydrated || loading) return;
     let cancelled = false;
     const resumeAutomaticUploads = async () => {
       if (cancelled || automaticUploadBusy.current || !navigator.onLine || document.visibilityState === 'hidden') return;
@@ -161,7 +149,7 @@ const App: React.FC = () => {
       window.removeEventListener('criativa-sync-queue-updated', resume);
       document.removeEventListener('visibilitychange', resume);
     };
-  }, [visitState.user?.id, draftHydrated]);
+  }, [visitState.user?.id, draftHydrated, loading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -268,11 +256,12 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!draftHydrated) return;
     loadConfig();
-  }, [visitState.user?.id]);
+  }, [visitState.user?.id, draftHydrated]);
 
   useEffect(() => {
-    if (!visitState.user?.id) return;
+    if (!visitState.user?.id || !draftHydrated || loading) return;
     let cancelled = false;
 
     const renewSession = async (force = false) => {
@@ -285,7 +274,7 @@ const App: React.FC = () => {
         const refreshedUser = await apiService.refreshSession();
         if (cancelled) return;
         setVisitState((prev: any) => ({ ...prev, user: refreshedUser }));
-        await loadConfig(false, true);
+        if (!force) await loadConfig(false, true);
       } catch (error) {
         if (!(error instanceof HttpRequestError && error.status === 401)) {
           console.warn('Sessão não pôde ser renovada agora; o acesso local foi preservado.');
@@ -311,7 +300,7 @@ const App: React.FC = () => {
       window.removeEventListener('focus', handleResume);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [visitState.user?.id]);
+  }, [visitState.user?.id, draftHydrated, loading]);
 
   useEffect(() => {
     if (!draftHydrated) return;
@@ -501,7 +490,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!visitState.user?.id) return;
+    if (!visitState.user?.id || !draftHydrated || loading) return;
 
     const handleResume = () => {
       if (document.visibilityState !== 'hidden') void refreshSyncStatus();
@@ -525,7 +514,7 @@ const App: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('criativa-sync-queue-updated', handleResume);
     };
-  }, [visitState.user?.id]);
+  }, [visitState.user?.id, draftHydrated, loading]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
