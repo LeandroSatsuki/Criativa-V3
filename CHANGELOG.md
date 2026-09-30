@@ -16,6 +16,7 @@
 ### Checklist
 - [x] Sem alteracao de esquema IndexedDB, IDs, qualidade das fotos ou contrato de upload.
 - [x] Filas antigas e fotos preservadas nos testes de navegador.
+- [x] Publicado no link oficial em `2026-09-30T20:37:26Z`, deploy `6abd72eed1b3b209bff98ad8`, bundle `index-CuofTeGC.js`.
 - [ ] Confirmar abertura no aparelho do Alex e nos demais afetados apos receberem a versao atualizada.
 
 ### Seguranca
@@ -28,6 +29,8 @@
 - Ensaio local de 12 MB: 1.077 ms antes e 122 ms depois; zero buffers UTF-8 no novo particionamento. Nao e uma medicao de RAM total nem garantia de desempenho em celulares.
 - Chrome isolado, viewport movel: abertura sem sessao, restauracao legada e rascunho de 100 fotos com tres visitas pendentes. Fotos e devolucoes preservadas, uma consulta de lojas e nenhum erro JavaScript.
 - Abertura com APIs sem conexao validada usando o cache operacional e preservando o rascunho local.
+- Preview e producao: HTTP 200, health `google-v1`, login visivel sem erro JavaScript e registro da PWA com o bundle novo. Producao manteve 20 funcoes e o agendamento de conciliacao a cada cinco minutos.
+- A tentativa inicial de deploy falhou no build do CLI sem substituir producao. Publicacao concluida com os arquivos ja compilados e validados (`--no-build`); logs consultados de health/config/conciliacao sem erro na janela verificada.
 
 ## [2026-09-30] - Recuperacao controlada de visita da Sirlene
 
