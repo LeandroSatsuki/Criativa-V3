@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2026-09-30] - Recuperacao controlada de visita da Sirlene
+
+### Causa
+- O aparelho ainda exibiu uma versao antiga da PWA e manteve uma visita na fila local.
+- A visita `VISIT-62A55D5A` estava no servidor com `Make retornou HTTP 400: Queue is full.`; o contexto antigo continuava encaminhando o envio ao Make.
+
+### Solucao aplicada
+- Registro integral preservado fora do repositorio antes do reprocessamento.
+- Conferidos 46 eventos fotograficos com IDs unicos e dados da promotora e loja correspondentes ao registro original.
+- Uma tarefa temporaria, restrita ao ID da visita, ao proprietario, a loja e ao hash do conjunto de fotos, retomou o registro pelo provedor Google de producao.
+- A visita terminou com 46/46 comprovantes, `syncStatus=enviado`, linha criada e indice de pendencias do servidor vazio para esse ID.
+- A tarefa temporaria foi retirada do codigo apos a conclusao. A fila local do aparelho nao foi alterada remotamente.
+
+### Checklist
+- [x] Copia integral criada antes de qualquer reenvio.
+- [x] Comprovantes, finalizacao e resumo da visita verificados no servidor.
+- [x] Nenhuma foto ou visita foi apagada; o Make nao foi chamado pela recuperacao.
+- [ ] Confirmar no aparelho que `Atualizar status` retira a pendencia local antes de trocar o link.
+- [ ] Corrigir a permanencia da versao antiga da PWA e restringir links antigos em etapa separada, sem eliminar filas locais.
+
+### Seguranca
+- A recuperacao usou o mesmo ID e os IDs idempotentes de foto do contrato existente.
+- A tarefa validava o conjunto exato de 46 fotos a cada execucao e parava automaticamente apos `enviado`.
+- O backup de 4,8 MB foi mantido fora do repositorio, sem expor fotos ou credenciais no GitHub.
+
+### Testes realizados
+- 149 testes, TypeScript e build aprovados antes da publicacao da tarefa.
+- Preview com 21 funcoes e health `google-v1`; producao permaneceu disponivel durante o reenvio.
+- Comparacao final entre o backup e o registro: mesmo ID, promotora e loja; 46 comprovantes sem lacunas nem links vazios; finalizacao e linha confirmadas.
+- Resumo com `enviado` e ausencia da visita no indice de pendencias do servidor.
+
 ## [2026-09-29] - Provedor de sincronizacao explicito
 
 ### Causa
