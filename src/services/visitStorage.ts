@@ -4,10 +4,32 @@ const DB_NAME = 'criativa-field-ops';
 const DB_VERSION = 1;
 const STORE_NAME = 'visit-drafts';
 const ACTIVE_DRAFT_KEY = 'active-visit';
+const POSITION_KEY = 'active-visit-position';
 
 type PersistedVisitState = VisitState & {
   draftOwnerId?: string | null;
 };
+
+const draftOwner = (state: PersistedVisitState) => state.draftOwnerId || state.user?.id || null;
+const draftPosition = (state: PersistedVisitState) => ({
+  ownerId: draftOwner(state), visitId: state.visitId || null, step: state.step,
+});
+
+// Catalogs are refreshed separately; navigation does not change photo evidence.
+const transientKeys = new Set(['step', 'availableStores', 'industries']);
+const sameUser = (left: PersistedVisitState['user'], right: PersistedVisitState['user']) => {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  return [...keys].every((key) => left[key as keyof typeof left] === right[key as keyof typeof right]);
+};
+const sameVisitContent = (left: PersistedVisitState, right: PersistedVisitState) => {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  return [...keys].every((key) => transientKeys.has(key) || (key === 'user'
+    ? sameUser(left.user, right.user)
+    : (left as any)[key] === (right as any)[key]));
+};
+let committedDraft: { storageKey: string; state: PersistedVisitState } | null = null;
 
 const openDatabase = () => new Promise<IDBDatabase>((resolve, reject) => {
   if (!('indexedDB' in window)) {
@@ -30,21 +52,34 @@ const readIndexedDraft = async () => {
 
   return new Promise<PersistedVisitState | null>((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, 'readonly');
-    const request = transaction.objectStore(STORE_NAME).get(ACTIVE_DRAFT_KEY);
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(ACTIVE_DRAFT_KEY);
+    const position = store.get(POSITION_KEY);
     request.onerror = () => reject(request.error || new Error('Falha ao ler o rascunho local.'));
-    request.onsuccess = () => resolve((request.result as PersistedVisitState | undefined) || null);
-    transaction.oncomplete = () => database.close();
+    transaction.onerror = () => { database.close(); reject(transaction.error); };
+    transaction.onabort = () => { database.close(); reject(transaction.error); };
+    transaction.oncomplete = () => {
+      database.close();
+      const state = request.result as PersistedVisitState | undefined;
+      const savedPosition = position.result;
+      if (state && savedPosition && savedPosition.ownerId === draftOwner(state)
+        && savedPosition.visitId === (state.visitId || null) && typeof savedPosition.step === 'string') {
+        resolve({ ...state, step: savedPosition.step });
+      } else resolve(state || null);
+    };
   });
 };
 
-const writeIndexedDraft = async (state: PersistedVisitState) => {
+const writeIndexedDraft = async (state: PersistedVisitState, positionOnly: boolean) => {
   const database = await openDatabase();
 
   return new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).put(state, ACTIVE_DRAFT_KEY);
-    transaction.onerror = () => reject(transaction.error || new Error('Falha ao salvar o rascunho local.'));
-    transaction.onabort = () => reject(transaction.error || new Error('O salvamento local foi interrompido.'));
+    const store = transaction.objectStore(STORE_NAME);
+    if (!positionOnly) store.put(state, ACTIVE_DRAFT_KEY);
+    store.put(draftPosition(state), POSITION_KEY);
+    transaction.onerror = () => { database.close(); reject(transaction.error || new Error('Falha ao salvar o rascunho local.')); };
+    transaction.onabort = () => { database.close(); reject(transaction.error || new Error('O salvamento local foi interrompido.')); };
     transaction.oncomplete = () => {
       database.close();
       resolve();
@@ -81,7 +116,10 @@ export const readLegacyVisitState = (storageKey: string): PersistedVisitState | 
 export const loadVisitDraft = async (storageKey: string) => {
   try {
     const indexedDraft = await readIndexedDraft();
-    if (indexedDraft) return indexedDraft;
+    if (indexedDraft) {
+      if (!saveSequence && !pendingSave) committedDraft = { storageKey, state: indexedDraft };
+      return indexedDraft;
+    }
   } catch (error) {
     console.warn('IndexedDB indisponivel ao restaurar visita; usando copia de compatibilidade.', error);
   }
@@ -96,11 +134,15 @@ const flushPendingSaves = async () => {
   while (pendingSave) {
     const current = pendingSave;
     pendingSave = null;
-    await writeIndexedDraft(current.state);
+    const sameContent = committedDraft?.storageKey === current.storageKey
+      && sameVisitContent(committedDraft.state, current.state);
+    if (sameContent && committedDraft!.state.step === current.state.step) continue;
+    await writeIndexedDraft(current.state, sameContent);
     localStorage.setItem(
       current.storageKey,
       JSON.stringify(stripPhotosForCompatibility(current.state)),
     );
+    committedDraft = current;
   }
 };
 

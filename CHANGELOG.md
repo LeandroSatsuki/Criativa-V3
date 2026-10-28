@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2026-10-28] - Reducao de copias do rascunho durante abertura e navegacao
+
+### Causa
+- O salvamento observava o estado inteiro e a tela ativa: navegacao, renovacao da sessao e atualizacao de catalogos podiam serializar novamente todas as fotos sem alterar a visita.
+- Esse trabalho acrescentava alocacoes temporarias; nao foi comprovado vazamento permanente nem medida a RAM do aparelho da Keutily.
+
+### Solucao aplicada
+- Restauracao IndexedDB passa a reconhecer o rascunho ja persistido, evitando regravacao quando o conteudo nao mudou.
+- Troca de tela salva apenas uma posicao pequena no mesmo armazenamento. A restauracao confere dono e ID da visita antes de aplicar a posicao.
+- Usuario com os mesmos dados e mudancas apenas nos catalogos nao provocam nova gravacao das fotos.
+- Fotos, tarefas, quantidades, encerramento, mudanca de dono e demais alteracoes reais continuam gravando o rascunho integral; as gravacoes concorrentes continuam coalescidas.
+
+### Checklist
+- [x] Formato integral das fotos e rascunhos preservado, sem migracao ou mudanca de versao do IndexedDB.
+- [x] Falha de transacao preserva a versao anterior e permite repetir a gravacao.
+- [x] Leitura de rascunhos antigos, fila pendente e abertura sem conexao verificadas.
+- [ ] Confirmar no aparelho da Keutily apos receber a nova versao.
+
+### Seguranca
+- Nenhuma limpeza de dados, fila ou cache; sem atualizacao forcada de telas abertas.
+- Backend, organizacao do Drive, autenticacao e envio de fotos permanecem nos contratos existentes.
+- Este ajuste reduz copias de persistencia; nao elimina o carregamento integral do rascunho nem altera a camera nativa ou o formato da fila.
+
+### Testes realizados
+- 155 testes aprovados, TypeScript e build aprovados.
+- Teste de rascunho de 4 MB: nenhuma regravacao integral em renovacao equivalente ou atualizacao de catalogo; navegacao grava somente a posicao; novas fotos e tarefas gravam integralmente.
+- Transacao abortada e falha de compatibilidade simuladas: dados anteriores preservados e nova tentativa concluida.
+- Chrome isolado em viewport movel: abertura com 100 fotos e tres filas antigas, renovacao e navegacao sem `put` integral do rascunho; fotos e devolucoes preservadas. Restauracao legada, login vazio e abertura com falha de conexao tambem aprovados.
+
 ## [2026-09-30] - Menos alocacoes na abertura e preparacao dos envios
 
 ### Causa
