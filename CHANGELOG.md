@@ -16,6 +16,7 @@
 - [x] Formato integral das fotos e rascunhos preservado, sem migracao ou mudanca de versao do IndexedDB.
 - [x] Falha de transacao preserva a versao anterior e permite repetir a gravacao.
 - [x] Leitura de rascunhos antigos, fila pendente e abertura sem conexao verificadas.
+- [x] Publicado em 28/10/2026 as 10:16 de Brasilia, deploy `6ae1f58c3c646eebc5f8d7a6`, bundle `index-BxRpz8GC.js`; preview `6ae1f52f4b4e5a56e2a8556f` validado antes da publicacao.
 - [ ] Confirmar no aparelho da Keutily apos receber a nova versao.
 
 ### Seguranca
@@ -28,6 +29,7 @@
 - Teste de rascunho de 4 MB: nenhuma regravacao integral em renovacao equivalente ou atualizacao de catalogo; navegacao grava somente a posicao; novas fotos e tarefas gravam integralmente.
 - Transacao abortada e falha de compatibilidade simuladas: dados anteriores preservados e nova tentativa concluida.
 - Chrome isolado em viewport movel: abertura com 100 fotos e tres filas antigas, renovacao e navegacao sem `put` integral do rascunho; fotos e devolucoes preservadas. Restauracao legada, login vazio e abertura com falha de conexao tambem aprovados.
+- Producao apos publicacao: versao nova e login conferidos no Chrome sem erro JavaScript, health `google-v1`, 20 funcoes e conciliacao a cada cinco minutos. Sem erros nos logs consultados de config, health e conciliacao na janela de cinco minutos.
 
 ## [2026-09-30] - Menos alocacoes na abertura e preparacao dos envios
 
