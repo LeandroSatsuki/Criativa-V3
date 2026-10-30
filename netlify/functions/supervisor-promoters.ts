@@ -6,6 +6,7 @@ import { buildSupervisorPromoterDetail } from './_shared/supervisor';
 import { getSupervisorAccessError } from './_shared/supervisor-access';
 import { getAppData } from './_shared/data';
 import { getStoresForUser } from './_shared/store-routes';
+import { resolveSupervisorDate } from './_shared/supervisor-date.ts';
 
 export default async (request: Request, context: Context) => {
   if (request.method !== 'GET') {
@@ -23,6 +24,9 @@ export default async (request: Request, context: Context) => {
     return json({ error: 'ID do promotor é obrigatório' }, 400);
   }
 
+  const selection = resolveSupervisorDate(new URL(request.url).searchParams.get('date'));
+  if (!selection) return json({ error: 'Data de consulta inválida.' }, 400);
+
   const [visits, data] = await Promise.all([listVisitSummaries(), getAppData()]);
   const promoter = data.promoters.find((item) => item.id === promoterId);
   const identities = new Set(
@@ -35,12 +39,12 @@ export default async (request: Request, context: Context) => {
     identities.has(String(visit.payload?.user?.user || '').toLowerCase().trim())
   ));
   const plannedStores = promoter
-    ? getStoresForUser(data, { ...promoter, role: 'FIELD_OPS' })
+    ? getStoresForUser(data, { ...promoter, role: 'FIELD_OPS' }, selection.selected)
     : [];
 
   return json(buildSupervisorPromoterDetail(promoterVisits, promoter
     ? { ...promoter, registered: true }
-    : { id: promoterId, registered: false }, new Date(), plannedStores));
+    : { id: promoterId, registered: false }, selection.selected, plannedStores));
 };
 
 export const config: Config = {

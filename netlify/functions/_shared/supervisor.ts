@@ -73,9 +73,12 @@ export type SupervisorDashboardResponse = {
   timeline: SupervisorTimelinePoint[];
   promoters: SupervisorPromoterOverview[];
   lastUpdated: string;
+  selectedDate: string;
+  historical: boolean;
 };
 
 export type SupervisorPromoterDetailRouteItem = {
+  automaticCheckout?: boolean;
   id: string;
   visitId: string;
   name: string;
@@ -85,6 +88,15 @@ export type SupervisorPromoterDetailRouteItem = {
   tasks: number;
   photos: number;
   syncStatus: VisitRecord['syncStatus'];
+  duration: string;
+};
+
+export type SupervisorPlannedStop = {
+  id: string;
+  name: string;
+  status: 'CONCLUÍDO' | 'PENDENTE' | 'SEM REGISTRO';
+  visits: number;
+  duration: string;
 };
 
 export type SupervisorPromoterDetailResponse = {
@@ -106,6 +118,7 @@ export type SupervisorPromoterDetailResponse = {
     averageDuration: string;
   };
   route: SupervisorPromoterDetailRouteItem[];
+  plannedRoute: SupervisorPlannedStop[];
 };
 
 const pendingSyncStatuses = new Set<VisitRecord['syncStatus']>(['pendente', 'erro', 'reenviar', 'enviando']);
@@ -356,8 +369,9 @@ export const buildSupervisorDashboard = (
   data: AppData,
   visits: SupervisorVisit[],
   now = new Date(),
+  selectedDate = now,
 ): SupervisorDashboardResponse => {
-  const dateKey = getBrasiliaDateKey(now);
+  const dateKey = getBrasiliaDateKey(selectedDate);
   const todayVisits = visits.filter((visit) => isVisitFromDate(visit, dateKey));
   const byPromoter = new Map<string, SupervisorVisit[]>();
   const promoterByIdentity = new Map<string, AppData['promoters'][number]>();
@@ -396,7 +410,7 @@ export const buildSupervisorDashboard = (
   const knownRouteIds = new Set(fieldPromoters.map((promoter) => promoter.id));
   const knownRouteNames = new Set(fieldPromoters.map((promoter) => normalizeStoreIdentity(promoter.name)));
   const routeOnlyById = new Map<string, AppData['promoters'][number]>();
-  const weekday = getBrasiliaWeekday(now);
+  const weekday = getBrasiliaWeekday(selectedDate);
   data.stores
     .filter((store) => store.routeDays?.includes(weekday))
     .forEach((store) => {
@@ -435,7 +449,7 @@ export const buildSupervisorDashboard = (
   const promoterSources = [...promoterSourcesById.values()];
   const promoters = promoterSources.map((promoter) => {
     const registered = registeredIds.has(promoter.id);
-    const plannedStores = getStoresForUser(data, { ...promoter, role: 'FIELD_OPS' }, now);
+    const plannedStores = getStoresForUser(data, { ...promoter, role: 'FIELD_OPS' }, selectedDate);
     return buildPromoterOverview(
       promoter,
       byPromoter.get(promoter.id) || [],
@@ -487,6 +501,8 @@ export const buildSupervisorDashboard = (
     timeline: buildTimeline(todayVisits),
     promoters,
     lastUpdated: summary.lastUpdated,
+    selectedDate: dateKey,
+    historical: dateKey !== getBrasiliaDateKey(now),
   };
 };
 
@@ -505,7 +521,7 @@ export const buildSupervisorPromoterDetail = (
   const todayVisits = orderedVisits.filter((visit) => isVisitFromDate(visit, dateKey));
   const latestUser = orderedVisits.at(-1)?.payload?.user || {};
 
-  const pendingSyncVisits = todayVisits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
+  const pendingSyncVisits = orderedVisits.filter((visit) => pendingSyncStatuses.has(visit.syncStatus)).length;
   const averageDuration = getAverageDuration(todayVisits);
   const routeProgress = buildRouteProgress(plannedStores, todayVisits);
 
@@ -529,7 +545,7 @@ export const buildSupervisorPromoterDetail = (
       pendingSyncVisits,
       averageDuration,
     },
-    route: orderedVisits.slice(-10).reverse().map((visit, index) => ({
+    route: todayVisits.slice().reverse().map((visit, index) => ({
       id: `${visit.visitId}-${index}`,
       visitId: visit.visitId,
       name: visit.payload?.currentStore || 'Loja sem nome',
@@ -539,6 +555,24 @@ export const buildSupervisorPromoterDetail = (
       tasks: countVisitTasks(visit),
       photos: countVisitPhotos(visit),
       syncStatus: visit.syncStatus,
+      automaticCheckout: visit.payload?.automaticCheckout?.reason === 'end_of_day',
+      duration: getVisitDuration(visit) === null ? '--:--' : formatDuration(getVisitDuration(visit) as number),
     })),
+    plannedRoute: plannedStores.map((store) => {
+      const normalizedName = normalizeStoreIdentity(store.name);
+      const matches = todayVisits.filter((visit) => (
+        String(visit.payload?.currentStoreId || visit.payload?.storeId || '').trim() === store.id
+        || Boolean(normalizedName && normalizeStoreIdentity(visit.payload?.currentStore) === normalizedName)
+      ));
+      const completed = matches.find((visit) => visit.syncStatus === 'enviado' && visit.payload?.checkOutTime);
+      const duration = completed ? getVisitDuration(completed) : null;
+      return {
+        id: store.id,
+        name: store.name,
+        status: completed ? 'CONCLUÍDO' as const : matches.length ? 'PENDENTE' as const : 'SEM REGISTRO' as const,
+        visits: matches.length,
+        duration: duration === null ? '--:--' : formatDuration(duration),
+      };
+    }),
   };
 };

@@ -79,6 +79,20 @@ test('indicadores de visitas consideram somente o dia de Brasilia', () => {
   assert.equal(dashboard.promoters.find((item) => item.id === '3')?.todayVisits.total, 1);
 });
 
+test('consulta historica usa visitas e dia da rota selecionados sem falsear estado online', () => {
+  const record = visit('VISIT-ANTIGA', { id: '3', user: 'promotora', name: 'Promotora' }, {});
+  const dashboard = buildSupervisorDashboard(
+    data,
+    [record],
+    new Date('2026-09-28T15:00:00-03:00'),
+    new Date('2026-08-03T12:00:00-03:00'),
+  );
+  assert.equal(dashboard.selectedDate, '2026-08-03');
+  assert.equal(dashboard.historical, true);
+  assert.equal(dashboard.summary.completedVisits, 1);
+  assert.equal(dashboard.promoters.find((item) => item.id === '3')?.online, false);
+});
+
 test('detalhe conta fotos unicas no fluxo geral e por industria', () => {
   const record = visit('VISIT-FOTOS', { id: '3', user: 'promotora', name: 'Promotora' }, {
     photos: { FACHADA: ['foto-fachada'], ANTES: ['foto-repetida'] },
@@ -87,8 +101,26 @@ test('detalhe conta fotos unicas no fluxo geral e por industria', () => {
     },
   });
 
-  const detail = buildSupervisorPromoterDetail([record]);
+  const detail = buildSupervisorPromoterDetail([record], undefined, new Date('2026-08-03T15:00:00-03:00'));
   assert.equal(detail.route[0].photos, 4);
+});
+
+test('detalhe distingue lojas previstas, concluidas e sem registro na data', () => {
+  const planned = [
+    { ...data.stores[0], id: '1', name: 'Loja Teste' },
+    { ...data.stores[0], id: '2', name: 'Loja Faltante' },
+  ];
+  const detail = buildSupervisorPromoterDetail([
+    { ...visit('VISIT-1', { id: '3', user: 'promotora' }, {}), payload: {
+      ...visit('BASE', { id: '3', user: 'promotora' }, {}).payload,
+      currentStoreId: '1',
+    } },
+  ], data.promoters[0], new Date('2026-08-03T15:00:00-03:00'), planned);
+
+  assert.equal(detail.plannedRoute[0].status, 'CONCLUÍDO');
+  assert.equal(detail.plannedRoute[0].duration, '01:00h');
+  assert.equal(detail.plannedRoute[1].status, 'SEM REGISTRO');
+  assert.equal(detail.route.length, 1);
 });
 
 test('progresso usa lojas distintas previstas e separa extras e duplicadas', () => {

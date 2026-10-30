@@ -3,6 +3,7 @@ import { json } from './_shared/json';
 import { getEnv } from './_shared/env';
 import { getProvisionalSupervisorDiagnostics } from './_shared/data';
 import { resolveMinimumStoreCount } from './_shared/config-integrity';
+import { resolveSyncProvider } from './_shared/sync-provider';
 
 export default async (_request: Request, _context: Context) => {
   return json({
@@ -10,6 +11,7 @@ export default async (_request: Request, _context: Context) => {
     service: 'criativa-field-ops',
     timestamp: new Date().toISOString(),
     integrations: {
+      syncProvider: resolveSyncProvider(getEnv('BACKEND_SYNC_PROVIDER')) || 'unconfigured',
       googleSheets: Boolean(getEnv('BACKEND_GOOGLE_SHEETS_ID')),
       minimumStoreCount: resolveMinimumStoreCount(getEnv('BACKEND_MIN_STORE_COUNT')),
       make: Boolean(getEnv('BACKEND_MAKE_WEBHOOK_URL')),

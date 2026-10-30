@@ -12,8 +12,13 @@ import {
   writeOperationalCache,
 } from './operationalCache';
 import { isNetworkRequestFailure } from './networkStatus';
+import { hasLocalPhotos, readLocalPhoto } from './litePhotos';
+import { sendLiteVisit } from './liteUpload';
+import { getSession } from './session';
+import { liteTestCatalog } from './liteMode';
 import {
   DIRECT_VISIT_PAYLOAD_MAX_BYTES,
+  getMissingChunkIndexes,
   getUtf8ByteLength,
   splitUtf8Text,
 } from './visitPayload';
@@ -113,10 +118,22 @@ const createChunkedVisit = async (payload: any, serializedPayload: string) => {
   const visitId = String(payload.visitId || buildVisitName('VISIT'));
   const chunks = splitUtf8Text(serializedPayload);
   const uploadId = await buildUploadId(serializedPayload);
+  const uploadStatus = await requestJson<{ receivedIndexes?: number[] }>('/visits/upload', {
+    method: 'POST',
+    retries: 1,
+    body: toJsonBody({
+      action: 'status',
+      uploadId,
+      visitId,
+      total: chunks.length,
+    }),
+  });
+  const missingIndexes = getMissingChunkIndexes(chunks.length, uploadStatus.receivedIndexes);
 
-  for (let index = 0; index < chunks.length; index += 1) {
+  for (const index of missingIndexes) {
     await requestJson('/visits/upload', {
       method: 'POST',
+      retries: 2,
       body: toJsonBody({
         action: 'chunk',
         uploadId,
@@ -130,6 +147,7 @@ const createChunkedVisit = async (payload: any, serializedPayload: string) => {
 
   return requestJson<any>('/visits/upload', {
     method: 'POST',
+    headers: { 'X-Criativa-Start-Sync': 'background' },
     body: toJsonBody({
       action: 'finalize',
       uploadId,
@@ -141,6 +159,7 @@ const createChunkedVisit = async (payload: any, serializedPayload: string) => {
 
 export const apiService = {
   getAppConfig: async (force = false) => {
+    if (liteTestCatalog) return { industries: ['HOMOLOGACAO LITE'], timestamp: null };
     if (!force) {
       const cached = readCachedConfig();
       if (cached) return cached;
@@ -203,6 +222,10 @@ export const apiService = {
   },
 
   getOperationalData: async (user: User, industries: string[]) => {
+    if (liteTestCatalog) return {
+      stores: [{ id: 'HOMOLOG-LITE', name: 'HOMOLOGACAO LITE - NAO OPERACIONAL' }],
+      industries: ['HOMOLOGACAO LITE'], source: 'cache' as const,
+    };
     try {
       const query = new URLSearchParams({ userId: user.id });
       const stores = await requestJson<any[]>(`/stores?${query.toString()}`);
@@ -245,12 +268,12 @@ export const apiService = {
     return Boolean(health.ok);
   },
 
-  getSupervisorDashboard: async () => {
-    return requestJson<SupervisorDashboardResponse>('/supervisor/dashboard');
+  getSupervisorDashboard: async (date?: string) => {
+    return requestJson<SupervisorDashboardResponse>(`/supervisor/dashboard${date ? `?date=${encodeURIComponent(date)}` : ''}`);
   },
 
-  getPromoterExecution: async (id: string) => {
-    return requestJson<SupervisorPromoterDetailResponse>(`/supervisor/promoters/${id}`);
+  getPromoterExecution: async (id: string, date?: string) => {
+    return requestJson<SupervisorPromoterDetailResponse>(`/supervisor/promoters/${encodeURIComponent(id)}${date ? `?date=${encodeURIComponent(date)}` : ''}`);
   },
 
   createVisit: async (payload: any) => {
@@ -258,6 +281,17 @@ export const apiService = {
       ...payload,
       visitId: payload.visitId || buildVisitName('VISIT'),
     };
+    if (hasLocalPhotos(payloadWithVisitId)) {
+      const ownerId = String(getSession()?.user.id || '');
+      return sendLiteVisit(payloadWithVisitId, id => readLocalPhoto(ownerId, id), body => {
+        if (getSession()?.user.id !== ownerId) throw new Error('A sessao mudou. Dados preservados.');
+        return requestJson('/visits/upload', {
+          method: 'POST', retries: body.action === 'finalize' ? 0 : 1,
+          headers: body.action === 'finalize' ? { 'X-Criativa-Start-Sync': 'background' } : undefined,
+          body: toJsonBody(body),
+        });
+      });
+    }
     const serializedPayload = toJsonBody(payloadWithVisitId);
 
     if (getUtf8ByteLength(serializedPayload) > DIRECT_VISIT_PAYLOAD_MAX_BYTES) {
@@ -266,6 +300,7 @@ export const apiService = {
 
     return requestJson<any>('/visits', {
       method: 'POST',
+      headers: { 'X-Criativa-Start-Sync': 'background' },
       body: serializedPayload,
     });
   },

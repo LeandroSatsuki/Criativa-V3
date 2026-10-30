@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildMakePhotoBatches,
   buildMakePhotoEvents,
   buildMakeVisitFinalizeEvent,
+  MAKE_MAX_PHOTOS_PER_BATCH,
+  validatePhotoBatchUploadResponse,
   validatePhotoUploadResponse,
   validateVisitFinalizeResponse,
   type DriveSyncManifest,
@@ -159,6 +162,23 @@ test('preserva o horario de Brasilia em filas antigas sem fuso', () => {
   assert.equal(finalize.TEMPO_PERMANENCIA, '0h 1m');
 });
 
+test('mantem a data da visita pelo check-in quando o envio ocorre no dia seguinte', () => {
+  const delayedPayload = {
+    ...payload,
+    timestamp: '2026-07-18T08:45:00-03:00',
+  };
+  const events = buildMakePhotoEvents(delayedPayload);
+  const manifest: DriveSyncManifest = {
+    contractVersion: '2.1',
+    totalPhotos: events.length,
+    photos: {},
+  };
+  const finalize = buildMakeVisitFinalizeEvent(delayedPayload, events, manifest);
+
+  assert.ok(events.every((event) => event.PASTA_VISITA_NOME === '17-07-2026'));
+  assert.equal(finalize.DATA_VISITA, '17/07/2026');
+});
+
 test('não aceita HTTP 200 genérico como confirmação de upload', () => {
   const event = buildMakePhotoEvents(payload)[0];
   assert.throws(() => validatePhotoUploadResponse('Accepted', event));
@@ -193,4 +213,56 @@ test('valida confirmações vinculadas ao evento e à visita', () => {
     rowId: '42',
   }), finalize);
   assert.equal(confirmation.rowAction, 'updated');
+});
+
+test('agrupa no maximo 20 fotos sem misturar industria, PDV ou devolucoes', () => {
+  const manyPhotosPayload = structuredClone(payload);
+  manyPhotosPayload.photos = { FACHADA: [], CHECKOUT: [] };
+  manyPhotosPayload.industryExecutions.VENEZA.photos = {
+    ANTES: Array.from({ length: 23 }, (_, index) => photo(`antes-${index}`)),
+    TROCAS: Array.from({ length: 4 }, (_, index) => photo(`troca-${index}`)),
+  };
+  manyPhotosPayload.industryExecutions.IDEALPAN.photos = {
+    DEPOIS: Array.from({ length: 2 }, (_, index) => photo(`idealpan-${index}`)),
+  };
+  manyPhotosPayload.returnsPhotosByIndustry = {};
+
+  const batches = buildMakePhotoBatches(buildMakePhotoEvents(manyPhotosPayload));
+
+  assert.equal(MAKE_MAX_PHOTOS_PER_BATCH, 20);
+  assert.deepEqual(batches.map((batch) => batch.TOTAL_FOTOS), [2, 20, 3, 4]);
+  assert.ok(batches.every((batch) => batch.PHOTOS.length <= 20));
+  assert.ok(batches.every((batch) => batch.PHOTOS.every(
+    (item) => item.INDUSTRIA === batch.PASTA_INDUSTRIA_NOME,
+  )));
+  assert.equal(batches.filter((batch) => batch.PASTA_SUBPASTA_NOME === 'DEVOLUCOES').length, 1);
+  assert.throws(() => buildMakePhotoBatches(buildMakePhotoEvents(payload), 21));
+});
+
+test('valida o recibo completo do lote e rejeita resposta parcial', () => {
+  const batch = buildMakePhotoBatches(buildMakePhotoEvents(payload), 20)[0];
+  const receipts = batch.PHOTOS.map((item) => ({
+    photoId: item.ID_FOTO,
+    fileId: `file-${item.ID_FOTO}`,
+    fileUrl: `https://drive.google.com/file/d/file-${item.ID_FOTO}/view`,
+    folderId: 'folder-id',
+    folderUrl: 'https://drive.google.com/drive/folders/folder-id',
+    pdvFolderId: 'pdv-id',
+    pdvFolderUrl: 'https://drive.google.com/drive/folders/pdv-id',
+  }));
+  const response = {
+    success: true,
+    eventType: 'PHOTO_BATCH_UPLOADED',
+    eventId: batch.EVENT_ID,
+    batchId: batch.BATCH_ID,
+    receipts,
+  };
+
+  const validated = validatePhotoBatchUploadResponse(JSON.stringify(response), batch);
+  assert.equal(validated.length, batch.PHOTOS.length);
+  assert.equal(validated[0].pdvFolderId, 'pdv-id');
+  assert.throws(() => validatePhotoBatchUploadResponse(JSON.stringify({
+    ...response,
+    receipts: receipts.slice(1),
+  }), batch));
 });

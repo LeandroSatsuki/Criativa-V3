@@ -9,13 +9,27 @@ import ContentArea from './components/ContentArea';
 import CriativaIcon from './components/CriativaIcon';
 import { SectionId, STORAGE_KEY } from './types';
 import { apiService } from './services/apiService';
-import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X } from 'lucide-react';
+import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X, Settings } from 'lucide-react';
+import { liteMode, litePilot, setLitePreference, isPhotoCaptureBusy } from './services/liteMode';
+import { pruneConfirmedPhotos } from './services/litePhotos';
+import { confirmQueuedVisit } from './services/confirmQueuedVisit';
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT, type SessionEndReason } from './services/session';
 import { HttpRequestError } from './services/httpClient';
-import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
-import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
+import {
+  getQueuedVisit,
+  getQueuedVisitCount,
+  listQueuedVisitSummaries,
+  removeQueuedVisit,
+  updateQueuedVisit,
+} from './services/syncQueue';
+import { loadVisitDraft, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
+import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
+import { isStaleSync } from './services/syncAge';
+import { submitAutomaticVisit } from './services/submitAutomaticVisit';
+import { classifyQueuedSyncFailure } from './services/syncPolicy';
+import { isRetryableHttpStatus } from './services/httpPolicy';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -26,20 +40,19 @@ const INITIAL_STATE = {
 
 type PendingSyncView = {
   visitId: string;
+  createdAt: string;
   store: string;
   status: string;
   error: string | null;
   sent: number;
   total: number;
+  retry?: {
+    retryable: boolean;
+    available: boolean;
+    remaining: number;
+    retryAfterSeconds: number;
+  };
 };
-
-const hasVisitInProgress = (state: {
-  visitId?: string | null;
-  checkInDone?: boolean;
-  currentStoreId?: string;
-}) => Boolean(
-  state.visitId || state.checkInDone || state.currentStoreId,
-);
 
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -51,18 +64,7 @@ const App: React.FC = () => {
   const loginRequestInFlight = useRef(false);
   const [visitState, setVisitState] = useState(() => {
     try {
-      const saved = readLegacyVisitState(STORAGE_KEY);
       const session = getSession();
-      if (saved) {
-        const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
-        const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
-        return {
-          ...INITIAL_STATE,
-          ...(sessionMatchesDraft ? saved : {}),
-          user: session?.user || null,
-          draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
-        };
-      }
       if (session?.user) return { ...INITIAL_STATE, user: session.user, draftOwnerId: session.user.id };
     } catch (e) {
       console.error("Erro ao carregar estado do localStorage:", e);
@@ -71,7 +73,7 @@ const App: React.FC = () => {
   });
 
   const [activeSection, setActiveSection] = useState<SectionId>(() =>
-    resolveSessionSection(visitState.user?.role, visitState.step, hasVisitInProgress(visitState)),
+    resolveSessionSection(visitState.user?.role, visitState.step, hasStartedVisit(visitState)),
   );
 
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
@@ -81,11 +83,79 @@ const App: React.FC = () => {
   const [promptSyncMessage, setPromptSyncMessage] = useState('');
   const [promptSyncError, setPromptSyncError] = useState<string | null>(null);
   const [promptQueueCount, setPromptQueueCount] = useState(0);
+  const [promptStaleCount, setPromptStaleCount] = useState(0);
   const [pendingSyncs, setPendingSyncs] = useState<PendingSyncView[]>([]);
   const [showSyncStatus, setShowSyncStatus] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+  const [deviceSettingBusy, setDeviceSettingBusy] = useState(false);
+  const [deviceSettingError, setDeviceSettingError] = useState<string | null>(null);
   const persistenceAlertShown = useRef(false);
   const lastSessionRefresh = useRef(0);
+  const automaticUploadBusy = useRef(false);
+  const automaticUploadAttempts = useRef(new Map<string, number>());
+
+  useEffect(() => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || !draftHydrated || loading) return;
+    let cancelled = false;
+    const resumeAutomaticUploads = async () => {
+      if (cancelled || automaticUploadBusy.current || !navigator.onLine || document.visibilityState === 'hidden') return;
+      automaticUploadBusy.current = true;
+      try {
+        const summaries = await listQueuedVisitSummaries(ownerId);
+        const pending = summaries.filter((item) => item.automaticCheckout && item.status === 'pending'
+          && Date.now() - (automaticUploadAttempts.current.get(item.visitId) || 0) >= 60_000).slice(0, 2);
+        for (const summary of pending) {
+          if (cancelled || !navigator.onLine) break;
+          automaticUploadAttempts.current.set(summary.visitId, Date.now());
+          const queued = await getQueuedVisit(ownerId, summary.visitId);
+          if (!queued || queued.status !== 'pending') continue;
+          const requireSameOwner = () => {
+            if (cancelled || getSession()?.user.id !== ownerId) throw new Error('A sessao mudou. O envio foi preservado.');
+          };
+          try {
+            const result = await submitAutomaticVisit(queued.visitId, queued.payload, {
+              status: (id) => { requireSameOwner(); return apiService.getSyncStatus(id); },
+              create: (payload) => { requireSameOwner(); return apiService.createVisit(payload); },
+              start: (id) => { requireSameOwner(); return apiService.startBackgroundSync(id); },
+            });
+            if (result === 'sent') await confirmQueuedVisit(ownerId, queued.visitId, 'enviado');
+            else await updateQueuedVisit(ownerId, queued.visitId, { status: 'syncing', error: null });
+          } catch (error) {
+            if (cancelled || getSession()?.user.id !== ownerId) break;
+            const failure = classifyQueuedSyncFailure(error);
+            const transient = error instanceof HttpRequestError
+              && (isRetryableHttpStatus(error.status) || error.status === 429 || error.status === 500);
+            await updateQueuedVisit(ownerId, queued.visitId, {
+              status: transient ? 'pending' : failure.status,
+              error: transient ? 'Servidor temporariamente indisponivel. O envio sera retomado automaticamente.' : failure.message,
+            });
+          }
+          window.dispatchEvent(new Event('criativa-sync-queue-updated'));
+        }
+      } catch (error) {
+        console.error('Falha ao consultar encerramentos pendentes:', error);
+      } finally {
+        automaticUploadBusy.current = false;
+      }
+    };
+    const resume = () => { void resumeAutomaticUploads(); };
+    const timer = window.setInterval(resume, 60_000);
+    window.addEventListener('online', resume);
+    window.addEventListener('pageshow', resume);
+    window.addEventListener('criativa-sync-queue-updated', resume);
+    document.addEventListener('visibilitychange', resume);
+    resume();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('online', resume);
+      window.removeEventListener('pageshow', resume);
+      window.removeEventListener('criativa-sync-queue-updated', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
+  }, [visitState.user?.id, draftHydrated, loading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,17 +168,17 @@ const App: React.FC = () => {
       if (saved) {
         const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
         const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
-        const restored = sessionMatchesDraft ? saved : {};
+        const restored = sessionMatchesDraft ? recoverUnstartedVisit(saved) : null;
         setVisitState({
           ...INITIAL_STATE,
-          ...restored,
+          ...(restored || {}),
           user: session?.user || null,
           draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
         });
         setActiveSection(resolveSessionSection(
           session?.user.role,
-          sessionMatchesDraft ? saved.step : SectionId.Dashboard,
-          sessionMatchesDraft && hasVisitInProgress(saved),
+          restored?.step || SectionId.Dashboard,
+          Boolean(restored && hasStartedVisit(restored)),
         ));
       } else if (session?.user) {
         setActiveSection(resolveSessionSection(session.user.role));
@@ -192,11 +262,12 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!draftHydrated) return;
     loadConfig();
-  }, [visitState.user?.id]);
+  }, [visitState.user?.id, draftHydrated]);
 
   useEffect(() => {
-    if (!visitState.user?.id) return;
+    if (!visitState.user?.id || !draftHydrated || loading) return;
     let cancelled = false;
 
     const renewSession = async (force = false) => {
@@ -209,7 +280,7 @@ const App: React.FC = () => {
         const refreshedUser = await apiService.refreshSession();
         if (cancelled) return;
         setVisitState((prev: any) => ({ ...prev, user: refreshedUser }));
-        await loadConfig(false, true);
+        if (!force) await loadConfig(false, true);
       } catch (error) {
         if (!(error instanceof HttpRequestError && error.status === 401)) {
           console.warn('Sessão não pôde ser renovada agora; o acesso local foi preservado.');
@@ -235,7 +306,7 @@ const App: React.FC = () => {
       window.removeEventListener('focus', handleResume);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [visitState.user?.id]);
+  }, [visitState.user?.id, draftHydrated, loading]);
 
   useEffect(() => {
     if (!draftHydrated) return;
@@ -256,12 +327,15 @@ const App: React.FC = () => {
 
     setShowPendingSyncPrompt(false);
     setPromptQueueCount(0);
+    setPromptStaleCount(0);
     setPromptSyncError(null);
 
-    getQueuedVisitCount(ownerId).then((queuedCount) => {
+    listQueuedVisitSummaries(ownerId).then((queuedVisits) => {
       if (cancelled) return;
+      const queuedCount = queuedVisits.length;
       if (queuedCount > 0) {
         setPromptQueueCount(queuedCount);
+        setPromptStaleCount(queuedVisits.filter((visit) => isStaleSync(visit.createdAt)).length);
         setPromptSyncMessage(`${queuedCount} envio${queuedCount > 1 ? 's' : ''} pendente${queuedCount > 1 ? 's' : ''} na fila local.`);
         setPromptSyncError(null);
         setShowPendingSyncPrompt(true);
@@ -292,7 +366,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const queuedVisits = await listQueuedVisits(ownerId);
+    const queuedVisits = await listQueuedVisitSummaries(ownerId);
     const next: PendingSyncView[] = [];
     let queueChanged = false;
 
@@ -300,7 +374,7 @@ const App: React.FC = () => {
       try {
         const remote = await apiService.getSyncStatus(queuedVisit.visitId);
         if (remote.syncStatus === 'enviado') {
-          await removeQueuedVisit(ownerId, queuedVisit.visitId);
+          await confirmQueuedVisit(ownerId, queuedVisit.visitId, remote.syncStatus);
           queueChanged = true;
           continue;
         }
@@ -315,16 +389,19 @@ const App: React.FC = () => {
 
         next.push({
           visitId: queuedVisit.visitId,
-          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          createdAt: queuedVisit.createdAt,
+          store: queuedVisit.store,
           status: remote.syncStatus,
           error: remote.syncError || null,
           sent: Number(remote.progress?.sent || 0),
           total: Number(remote.progress?.total || 0),
+          retry: remote.retry,
         });
       } catch {
         next.push({
           visitId: queuedVisit.visitId,
-          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          createdAt: queuedVisit.createdAt,
+          store: queuedVisit.store,
           status: queuedVisit.status,
           error: queuedVisit.error,
           sent: 0,
@@ -337,10 +414,34 @@ const App: React.FC = () => {
     if (queueChanged) notifyQueueChanged();
   };
 
+  const retryPendingSync = async (sync: PendingSyncView) => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || !sync.retry?.available) return;
+
+    setPromptSyncError(null);
+    setPendingSyncs((current) => current.map((item) => item.visitId === sync.visitId
+      ? { ...item, status: 'enviando', error: null, retry: { ...item.retry!, available: false } }
+      : item));
+
+    try {
+      const result = await apiService.retrySync(sync.visitId);
+      await updateQueuedVisit(ownerId, sync.visitId, { status: 'syncing', error: null });
+      if (result.syncStatus === 'enviando') await apiService.startBackgroundSync(sync.visitId);
+      await refreshSyncStatus();
+      notifyQueueChanged();
+    } catch (error: any) {
+      await updateQueuedVisit(ownerId, sync.visitId, {
+        status: 'error',
+        error: error.message || 'Nao foi possivel tentar novamente.',
+      });
+      await refreshSyncStatus();
+    }
+  };
+
   const syncPendingQueueFromPrompt = async () => {
     const ownerId = visitState.user?.id;
     if (!ownerId) return;
-    const queuedVisits = await listQueuedVisits(ownerId);
+    const queuedVisits = await listQueuedVisitSummaries(ownerId);
     if (queuedVisits.length === 0) {
       setShowPendingSyncPrompt(false);
       return;
@@ -351,7 +452,9 @@ const App: React.FC = () => {
 
     try {
       for (let index = 0; index < queuedVisits.length; index += 1) {
-        const queuedVisit = queuedVisits[index];
+        const queuedSummary = queuedVisits[index];
+        const queuedVisit = await getQueuedVisit(ownerId, queuedSummary.visitId);
+        if (!queuedVisit) continue;
         setPromptSyncMessage(`Sincronizando ${index + 1}/${queuedVisits.length}...`);
         await updateQueuedVisit(ownerId, queuedVisit.visitId, {
           status: 'syncing',
@@ -363,9 +466,9 @@ const App: React.FC = () => {
         const status = await apiService.getSyncStatus(serverVisitId);
 
         if (status.syncStatus === 'enviado') {
-          await removeQueuedVisit(ownerId, serverVisitId);
+          await confirmQueuedVisit(ownerId, serverVisitId, status.syncStatus);
           if (serverVisitId !== queuedVisit.visitId) {
-            await removeQueuedVisit(ownerId, queuedVisit.visitId);
+            await confirmQueuedVisit(ownerId, queuedVisit.visitId, status.syncStatus);
           }
           notifyQueueChanged();
           continue;
@@ -393,7 +496,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!visitState.user?.id) return;
+    if (!visitState.user?.id || !draftHydrated || loading) return;
 
     const handleResume = () => {
       if (document.visibilityState !== 'hidden') void refreshSyncStatus();
@@ -417,22 +520,41 @@ const App: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('criativa-sync-queue-updated', handleResume);
     };
-  }, [visitState.user?.id]);
+  }, [visitState.user?.id, draftHydrated, loading]);
 
-  const clearCurrentUserQueue = async () => {
+  useEffect(() => {
     const ownerId = visitState.user?.id;
-    if (!ownerId || promptSyncing) return;
-    const confirmed = window.confirm(
-      'Limpar os envios pendentes deste usuário neste aparelho? Visitas ainda não enviadas deixarão de aparecer para reenvio local.',
-    );
-    if (!confirmed) return;
+    if (!ownerId || !draftHydrated || loading || hasStartedVisit(visitState)) return;
+    let busy = false;
+    const clean = async () => {
+      if (busy || document.visibilityState === 'hidden') return;
+      busy = true;
+      try { await pruneConfirmedPhotos(ownerId); }
+      catch (error) { console.warn('Limpeza adiada; fotos locais preservadas.', error); }
+      finally { busy = false; }
+    };
+    void clean();
+    const timer = window.setInterval(clean, 60_000);
+    return () => window.clearInterval(timer);
+  }, [visitState.user?.id, draftHydrated, loading, visitState.visitId, visitState.checkInDone]);
 
-    await clearQueuedVisits(ownerId);
-    setPromptQueueCount(0);
-    setPromptSyncError(null);
-    setPromptSyncMessage('Fila local deste usuário limpa.');
-    setShowPendingSyncPrompt(false);
-    notifyQueueChanged();
+  const changeDeviceMode = async () => {
+    if (deviceSettingBusy || litePilot) return;
+    setDeviceSettingBusy(true);
+    setDeviceSettingError(null);
+    try {
+      const ownerId = visitState.user?.id;
+      if (!ownerId || hasStartedVisit(visitState) || isPhotoCaptureBusy() || promptSyncing || automaticUploadBusy.current
+        || await getQueuedVisitCount(ownerId) > 0) {
+        setDeviceSettingError('Finalize a visita e confirme os envios pendentes antes de trocar o modo.');
+        return;
+      }
+      await saveVisitDraft(STORAGE_KEY, { ...visitState, step: activeSection });
+      setLitePreference(!liteMode);
+      window.location.reload();
+    } catch {
+      setDeviceSettingError('Nao foi possivel trocar o modo. Os registros foram preservados.');
+    } finally { setDeviceSettingBusy(false); }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -446,7 +568,7 @@ const App: React.FC = () => {
       const userData = await apiService.login(loginForm);
       setLoginForm({ user: userData.user, pass: '' });
       const sameDraftOwner = !visitState.draftOwnerId || visitState.draftOwnerId === userData.id;
-      const hasActiveVisit = sameDraftOwner && hasVisitInProgress(visitState);
+      const hasActiveVisit = sameDraftOwner && hasStartedVisit(visitState);
       setVisitState((prev: any) => sameDraftOwner
         ? { ...prev, user: userData, draftOwnerId: userData.id }
         : { ...INITIAL_STATE, user: userData, draftOwnerId: userData.id });
@@ -469,7 +591,7 @@ const App: React.FC = () => {
     }));
   };
 
-  if (loading) {
+  if (loading || !draftHydrated) {
     return (
       <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center text-white p-6 text-center">
         <RefreshCw className="w-12 h-12 mb-6 animate-spin text-blue-400" />
@@ -542,6 +664,11 @@ const App: React.FC = () => {
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
                 Existem {promptQueueCount} registro{promptQueueCount !== 1 ? 's' : ''} aguardando sincronização.
               </p>
+              {promptStaleCount > 0 && (
+                <p className="text-xs font-semibold text-orange-700">
+                  {promptStaleCount} envio{promptStaleCount === 1 ? '' : 's'} há mais de 24 horas. Conecte-se e sincronize assim que possível.
+                </p>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -560,7 +687,7 @@ const App: React.FC = () => {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-3">
               {!promptSyncError && (
                 <button
                   disabled={promptSyncing}
@@ -570,24 +697,20 @@ const App: React.FC = () => {
                   {promptSyncing ? 'Sincronizando' : 'Sincronizar agora'}
                 </button>
               )}
-              {promptSyncError && (
+              {!promptSyncing && (
                 <button
-                  disabled={promptSyncing}
                   onClick={() => setShowPendingSyncPrompt(false)}
                   className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
                 >
-                  Depois
-                </button>
-              )}
-              {!promptSyncing && (
-                <button
-                  onClick={clearCurrentUserQueue}
-                  className="flex-1 bg-white border border-slate-200 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
-                >
-                  Limpar minha fila
+                  Continuar trabalhando
                 </button>
               )}
             </div>
+            {!promptSyncing && (
+              <p className="text-center text-[10px] font-bold text-slate-400">
+                Os registros permanecem salvos e podem continuar enviando em segundo plano.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -646,6 +769,23 @@ const App: React.FC = () => {
                         <span className="text-slate-400">{sync.sent}/{sync.total || '--'}</span>
                       </div>
                       {sync.error && <p className="text-[10px] font-bold text-orange-700 leading-relaxed">{sync.error}</p>}
+                      {isStaleSync(sync.createdAt) && (
+                        <p className="text-[10px] font-bold text-orange-700">Pendente há mais de 24 horas. Sincronize com conexão estável.</p>
+                      )}
+                      {hasError && sync.retry?.retryable && (
+                        <button
+                          type="button"
+                          disabled={!sync.retry.available}
+                          onClick={() => void retryPendingSync(sync)}
+                          className="w-full bg-orange-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          {sync.retry.remaining === 0
+                            ? 'Necessita suporte'
+                            : sync.retry.retryAfterSeconds > 0
+                              ? `Aguarde ${sync.retry.retryAfterSeconds}s`
+                              : 'Tentar novamente'}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -681,6 +821,9 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {visitState.user?.role === 'FIELD_OPS' && <button type="button" onClick={() => setShowDeviceSettings(true)}
+              className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${liteMode ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-500'}`}
+              title="Preferencias do aparelho" aria-label="Preferencias do aparelho"><Settings size={18} /></button>}
             <div className="hidden md:block text-right mr-4">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Última Sincronização</p>
               <p className="text-[10px] font-bold text-slate-600">
@@ -742,6 +885,19 @@ const App: React.FC = () => {
           />
         </div>
       </main>
+      {showDeviceSettings && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-5">
+        <div role="dialog" aria-modal="true" aria-labelledby="device-settings-title" className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 id="device-settings-title" className="text-lg font-semibold">Preferencias do aparelho</h2>
+            <button type="button" onClick={() => setShowDeviceSettings(false)} disabled={deviceSettingBusy} aria-label="Fechar preferencias" title="Fechar" className="p-2"><X size={18}/></button>
+          </div>
+          <label className="flex items-center justify-between gap-4 text-sm font-semibold">
+            Modo Lite
+            <input type="checkbox" checked={liteMode} disabled={deviceSettingBusy || litePilot} onChange={() => void changeDeviceMode()} className="h-5 w-5" />
+          </label>
+          {deviceSettingError && <p role="alert" className="mt-4 text-sm text-orange-700">{deviceSettingError}</p>}
+        </div>
+      </div>}
     </div>
   );
 };

@@ -48,6 +48,11 @@ export interface VisitState {
   checkInDone: boolean;
   checkInTime: string | null;
   checkOutTime: string | null;
+  automaticCheckout?: {
+    reason: 'end_of_day';
+    scheduledAt: string;
+    recordedAt: string;
+  };
   syncStatus?: 'pendente' | 'enviando' | 'enviado' | 'erro' | 'reenviar' | null;
   syncError?: string | null;
   selectedIndustry: Industry | null;
@@ -128,9 +133,12 @@ export interface SupervisorDashboardResponse {
   timeline: SupervisorTimelinePoint[];
   promoters: SupervisorPromoterOverview[];
   lastUpdated: string;
+  selectedDate?: string;
+  historical?: boolean;
 }
 
 export interface SupervisorPromoterDetailRouteItem {
+  automaticCheckout?: boolean;
   id: string;
   visitId: string;
   name: string;
@@ -140,6 +148,15 @@ export interface SupervisorPromoterDetailRouteItem {
   tasks: number;
   photos: number;
   syncStatus: 'pendente' | 'enviando' | 'enviado' | 'erro' | 'reenviar';
+  duration?: string;
+}
+
+export interface SupervisorPlannedStop {
+  id: string;
+  name: string;
+  status: 'CONCLUÍDO' | 'PENDENTE' | 'SEM REGISTRO';
+  visits: number;
+  duration: string;
 }
 
 export interface SupervisorPromoterDetailResponse {
@@ -161,4 +178,5 @@ export interface SupervisorPromoterDetailResponse {
     averageDuration: string;
   };
   route: SupervisorPromoterDetailRouteItem[];
+  plannedRoute?: SupervisorPlannedStop[];
 }
