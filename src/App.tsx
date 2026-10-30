@@ -9,7 +9,10 @@ import ContentArea from './components/ContentArea';
 import CriativaIcon from './components/CriativaIcon';
 import { SectionId, STORAGE_KEY } from './types';
 import { apiService } from './services/apiService';
-import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X } from 'lucide-react';
+import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X, Settings } from 'lucide-react';
+import { liteMode, litePilot, setLitePreference, isPhotoCaptureBusy } from './services/liteMode';
+import { pruneConfirmedPhotos } from './services/litePhotos';
+import { confirmQueuedVisit } from './services/confirmQueuedVisit';
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT, type SessionEndReason } from './services/session';
 import { HttpRequestError } from './services/httpClient';
@@ -84,6 +87,9 @@ const App: React.FC = () => {
   const [pendingSyncs, setPendingSyncs] = useState<PendingSyncView[]>([]);
   const [showSyncStatus, setShowSyncStatus] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+  const [deviceSettingBusy, setDeviceSettingBusy] = useState(false);
+  const [deviceSettingError, setDeviceSettingError] = useState<string | null>(null);
   const persistenceAlertShown = useRef(false);
   const lastSessionRefresh = useRef(0);
   const automaticUploadBusy = useRef(false);
@@ -114,7 +120,7 @@ const App: React.FC = () => {
               create: (payload) => { requireSameOwner(); return apiService.createVisit(payload); },
               start: (id) => { requireSameOwner(); return apiService.startBackgroundSync(id); },
             });
-            if (result === 'sent') await removeQueuedVisit(ownerId, queued.visitId);
+            if (result === 'sent') await confirmQueuedVisit(ownerId, queued.visitId, 'enviado');
             else await updateQueuedVisit(ownerId, queued.visitId, { status: 'syncing', error: null });
           } catch (error) {
             if (cancelled || getSession()?.user.id !== ownerId) break;
@@ -368,7 +374,7 @@ const App: React.FC = () => {
       try {
         const remote = await apiService.getSyncStatus(queuedVisit.visitId);
         if (remote.syncStatus === 'enviado') {
-          await removeQueuedVisit(ownerId, queuedVisit.visitId);
+          await confirmQueuedVisit(ownerId, queuedVisit.visitId, remote.syncStatus);
           queueChanged = true;
           continue;
         }
@@ -460,9 +466,9 @@ const App: React.FC = () => {
         const status = await apiService.getSyncStatus(serverVisitId);
 
         if (status.syncStatus === 'enviado') {
-          await removeQueuedVisit(ownerId, serverVisitId);
+          await confirmQueuedVisit(ownerId, serverVisitId, status.syncStatus);
           if (serverVisitId !== queuedVisit.visitId) {
-            await removeQueuedVisit(ownerId, queuedVisit.visitId);
+            await confirmQueuedVisit(ownerId, queuedVisit.visitId, status.syncStatus);
           }
           notifyQueueChanged();
           continue;
@@ -515,6 +521,41 @@ const App: React.FC = () => {
       window.removeEventListener('criativa-sync-queue-updated', handleResume);
     };
   }, [visitState.user?.id, draftHydrated, loading]);
+
+  useEffect(() => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || !draftHydrated || loading || hasStartedVisit(visitState)) return;
+    let busy = false;
+    const clean = async () => {
+      if (busy || document.visibilityState === 'hidden') return;
+      busy = true;
+      try { await pruneConfirmedPhotos(ownerId); }
+      catch (error) { console.warn('Limpeza adiada; fotos locais preservadas.', error); }
+      finally { busy = false; }
+    };
+    void clean();
+    const timer = window.setInterval(clean, 60_000);
+    return () => window.clearInterval(timer);
+  }, [visitState.user?.id, draftHydrated, loading, visitState.visitId, visitState.checkInDone]);
+
+  const changeDeviceMode = async () => {
+    if (deviceSettingBusy || litePilot) return;
+    setDeviceSettingBusy(true);
+    setDeviceSettingError(null);
+    try {
+      const ownerId = visitState.user?.id;
+      if (!ownerId || hasStartedVisit(visitState) || isPhotoCaptureBusy() || promptSyncing || automaticUploadBusy.current
+        || await getQueuedVisitCount(ownerId) > 0) {
+        setDeviceSettingError('Finalize a visita e confirme os envios pendentes antes de trocar o modo.');
+        return;
+      }
+      await saveVisitDraft(STORAGE_KEY, { ...visitState, step: activeSection });
+      setLitePreference(!liteMode);
+      window.location.reload();
+    } catch {
+      setDeviceSettingError('Nao foi possivel trocar o modo. Os registros foram preservados.');
+    } finally { setDeviceSettingBusy(false); }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -780,6 +821,9 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {visitState.user?.role === 'FIELD_OPS' && <button type="button" onClick={() => setShowDeviceSettings(true)}
+              className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${liteMode ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-500'}`}
+              title="Preferencias do aparelho" aria-label="Preferencias do aparelho"><Settings size={18} /></button>}
             <div className="hidden md:block text-right mr-4">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Última Sincronização</p>
               <p className="text-[10px] font-bold text-slate-600">
@@ -841,6 +885,19 @@ const App: React.FC = () => {
           />
         </div>
       </main>
+      {showDeviceSettings && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-5">
+        <div role="dialog" aria-modal="true" aria-labelledby="device-settings-title" className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 id="device-settings-title" className="text-lg font-semibold">Preferencias do aparelho</h2>
+            <button type="button" onClick={() => setShowDeviceSettings(false)} disabled={deviceSettingBusy} aria-label="Fechar preferencias" title="Fechar" className="p-2"><X size={18}/></button>
+          </div>
+          <label className="flex items-center justify-between gap-4 text-sm font-semibold">
+            Modo Lite
+            <input type="checkbox" checked={liteMode} disabled={deviceSettingBusy || litePilot} onChange={() => void changeDeviceMode()} className="h-5 w-5" />
+          </label>
+          {deviceSettingError && <p role="alert" className="mt-4 text-sm text-orange-700">{deviceSettingError}</p>}
+        </div>
+      </div>}
     </div>
   );
 };

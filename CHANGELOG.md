@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [2026-10-30] - Modo Lite por aparelho no endereco oficial
+
+### Causa
+- Disponibilizar o modo validado no Moto G84 sem trocar o link operacional nem migrar filas reais. O cofre de fotos do piloto ainda nao tinha coleta segura dos arquivos confirmados.
+
+### Solucao aplicada
+- Preferencias do aparelho com ativacao/desativacao local do Modo Lite; padrao normal preservado.
+- Troca recusada durante visita, processamento de foto, envio automatico ou fila pendente. Estado salvo antes da recarga.
+- Confirmacao remota registra recibo local antes de remover a fila. Limpeza somente apos 24 horas, sem fila ou evidencia de visita aberta, para fotos do mesmo dono/visita confirmada.
+- Web Locks coordenam gravacoes locais e limpeza. Sem suporte, a limpeza e adiada. Transacao interrompida reverte exclusoes.
+- Build normal usa `/api` e catalogos reais; flag de catalogo sintetico exige build de piloto explicito.
+
+### Checklist
+- [x] 167 testes e TypeScript aprovados; build normal concluido.
+- [x] Modo normal com rascunho antigo, 100 fotos, fila antiga e falha de conexao verificado no Chrome.
+- [x] Lite com captura, recarga, fila offline, retomada e confirmacao verificado com APIs simuladas.
+- [x] Engrenagem testada em 320 px: ativar/desativar sem pendencia; bloquear com visita ou fila; sem erro JavaScript ou rolagem horizontal.
+- [ ] Conferencia final do preview e da publicacao oficial.
+
+### Seguranca
+- Sem exclusao de fotos do Drive, migracao de rascunhos antigos ou atualizacao forcada das telas abertas.
+- Nenhuma limpeza remota da fila dos promotores; coleta local condicionada aos recibos e guardas de preservacao.
+- Guia operacional em `LITE_USO_REAL.md`. Nao retornar a build anterior ao suporte de referencias enquanto houver dados Lite pendentes.
+
+### Testes realizados
+- Confirmacao obrigatoria, retencao, isolamento de dono, fila e rascunho bloqueando limpeza, orfaos preservados, falta de Web Locks e transacao de limpeza abortada.
+- Os ensaios reais anteriores confirmaram quatro fotos automatizadas e cinco fotos do piloto Moto G84 ate Drive/planilha; nesta etapa, interface e guardas locais foram testadas em ambiente isolado.
+
 ## [2026-10-30] - Piloto Lite confirmado no Moto G84
 
 ### Causa

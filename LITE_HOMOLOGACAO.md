@@ -1,6 +1,6 @@
 # Piloto Lite
 
-Status: piloto em homologacao validado no Moto G84 e no backend. Nao liberar amplamente antes dos itens pendentes.
+Historico do piloto validado no Moto G84 e no backend. Para a ativacao por aparelho no endereco oficial, consultar `LITE_USO_REAL.md`; os itens pendentes abaixo registram a situacao de cada etapa anterior.
 
 Preview inicial: `6ae4a1fbdabad6722181e5c3`, bundle `index-sfvEe8Lr.js` (substituido para o teste real).
 Preview para o Moto G84: `6ae4ac537bda385b9deb0003`, bundle `index-DmBBrbsv.js`.

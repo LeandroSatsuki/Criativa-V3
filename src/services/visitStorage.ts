@@ -1,4 +1,5 @@
 import type { VisitState } from '../types';
+import { withLocalVisitLock } from './localVisitLock.ts';
 
 const DB_NAME = 'criativa-field-ops';
 const DB_VERSION = 1;
@@ -137,7 +138,7 @@ const flushPendingSaves = async () => {
     const sameContent = committedDraft?.storageKey === current.storageKey
       && sameVisitContent(committedDraft.state, current.state);
     if (sameContent && committedDraft!.state.step === current.state.step) continue;
-    await writeIndexedDraft(current.state, sameContent);
+    await withLocalVisitLock(() => writeIndexedDraft(current.state, sameContent));
     localStorage.setItem(
       current.storageKey,
       JSON.stringify(stripPhotosForCompatibility(current.state)),

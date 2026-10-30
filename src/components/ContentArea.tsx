@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { analyzeProductPhoto } from '../services/geminiService';
-import { liteMode } from '../services/liteMode';
+import { liteMode, litePilot, setPhotoCaptureBusy } from '../services/liteMode';
 import { storeLocalPhoto, isLocalPhoto } from '../services/litePhotos';
 import { getSession } from '../services/session';
 import PhotoPreview from './PhotoPreview';
@@ -537,6 +537,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
   const handlePhotoCapture = async (section: string, file: File, industryOverride?: string) => {
     if (photoProcessingRef.current) return;
     photoProcessingRef.current = true;
+    setPhotoCaptureBusy(true);
     setIsProcessingPhoto(true);
     try {
       const activeIndustry = industryOverride || selectedIndustry;
@@ -623,6 +624,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       alert(error.message || 'Não foi possível processar a foto.');
     } finally {
       photoProcessingRef.current = false;
+      setPhotoCaptureBusy(false);
       setIsProcessingPhoto(false);
     }
   };
@@ -1799,7 +1801,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto">
-      {liteMode && <p className="mb-4 text-xs font-semibold text-amber-700" role="status">Lite - Homologacao</p>}
+      {liteMode && <p className="mb-4 text-xs font-semibold text-emerald-700" role="status">{litePilot ? 'Lite - Homologacao' : 'Modo Lite'}</p>}
       {automaticClosing && (
         <div className="fixed inset-0 z-[110] bg-white/95 flex items-center justify-center p-6" role="status" aria-live="polite">
           <div className="flex items-center gap-3 text-sm font-semibold"><Loader2 className="animate-spin text-blue-600" size={24} /> Salvando encerramento da visita...</div>

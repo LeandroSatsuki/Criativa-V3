@@ -1,3 +1,4 @@
+import { withLocalVisitLock } from './localVisitLock.ts';
 export type QueueStatus = 'pending' | 'syncing' | 'error' | 'synced';
 
 export type QueuedVisit = {
@@ -332,7 +333,7 @@ export const upsertQueuedVisit = async (
       createdAt: existing?.createdAt || now,
       updatedAt: now,
     };
-    await writeIndexedVisit(result);
+    await withLocalVisitLock(() => writeIndexedVisit(result!));
   });
   await mutationSequence;
   return result!;
@@ -352,7 +353,7 @@ export const updateQueuedVisit = async (ownerId: string, visitId: string, patch:
       ownerId: normalizedOwnerId,
       updatedAt: new Date().toISOString(),
     };
-    await writeIndexedVisit(result);
+    await withLocalVisitLock(() => writeIndexedVisit(result!));
   });
   await mutationSequence;
   return result;
@@ -364,7 +365,7 @@ export const removeQueuedVisit = async (ownerId: string, visitId: string) => {
   mutationSequence = mutationSequence.catch(() => undefined).then(async () => {
     const existing = await readIndexedVisit(visitId);
     if (!existing || getQueuedVisitOwnerId(existing) !== normalizedOwnerId) return;
-    await deleteIndexedVisit(visitId);
+    await withLocalVisitLock(() => deleteIndexedVisit(visitId));
   });
   await mutationSequence;
 };
