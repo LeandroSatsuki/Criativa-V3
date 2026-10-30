@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2026-10-30] - Piloto Lite confirmado no Moto G84
+
+### Causa
+- Validar em aparelho Android real a camera, a reabertura e o envio do modo Lite antes da liberacao operacional.
+
+### Solucao aplicada
+- Usuario executou o roteiro no Moto G84 e confirmou funcionamento sem aviso de memoria, demora ou travamento.
+- Registro `VISIT-5F8E6908` conferido no backend: cinco fotos, cinco comprovantes e finalizacao concluida, sem erro.
+
+### Checklist
+- [x] Camera e reabertura confirmadas pelo usuario no aparelho.
+- [x] FACHADA, ANTES, ESTOQUE, DEPOIS e CHECKOUT confirmados no manifesto.
+- [x] Linha criada `RELATORIO_VISITAS!A2415:AD2415`, status enviado, sem lotes pendentes nem referencias locais no servidor.
+- [ ] Limpeza segura de fotos locais, ativacao por aparelho no link oficial e tratamento de visitas antigas antes da liberacao ampla.
+
+### Seguranca
+- Nenhuma alteracao de producao ou exclusao de registros realizada nesta conferencia. Homologacao continua separada.
+- Resultado valida um aparelho/fluxo; nao mede a RAM do Moto G84 nem garante comportamento identico em todos os dispositivos.
+
+### Testes realizados
+- Teste fisico executado pelo usuario, com confirmacao no chat.
+- Conferencia somente de leitura do registro, manifesto, finalizacao, linha e indice de pendencias do servidor. Nao houve inspecao visual autenticada de cada foto no Drive.
+
 ## [2026-10-30] - Ensaio real Lite autorizado e acesso para Moto G84
 
 ### Causa

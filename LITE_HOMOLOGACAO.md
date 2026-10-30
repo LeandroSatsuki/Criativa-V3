@@ -1,6 +1,6 @@
 # Piloto Lite
 
-Status: implementacao inicial em homologacao. Nao liberar para a operacao.
+Status: piloto em homologacao validado no Moto G84 e no backend. Nao liberar amplamente antes dos itens pendentes.
 
 Preview inicial: `6ae4a1fbdabad6722181e5c3`, bundle `index-sfvEe8Lr.js` (substituido para o teste real).
 Preview para o Moto G84: `6ae4ac537bda385b9deb0003`, bundle `index-DmBBrbsv.js`.
@@ -30,7 +30,7 @@ Conferido apos publicacao: login e PWA sem erro JavaScript; 20 funcoes e health 
 
 - O backend compartilha sessoes e dados com producao. O usuario autorizou expressamente `lorena.costa` para este teste, inclusive a desconexao do outro aparelho. Nao usar outras contas da operacao sem reserva para teste.
 - Dados locais sao separados por origem. Nao orientar Keutily a trocar de link, reinstalar ou limpar dados com visita/fila pendente.
-- Ainda falta testar camera real e retorno apos encerramento do navegador no Moto G84. O envio real ate Drive/planilha foi concluido na visita abaixo.
+- O usuario confirmou camera e reabertura sem aviso de memoria, demora ou travamento no Moto G84. O envio correspondente ate Drive/planilha foi conferido no registro abaixo. Nao houve medicao direta de RAM do aparelho.
 - Ainda falta implementar coleta segura de fotos locais sem uso. Nesta versao, nenhuma foto do cofre e excluida automaticamente, inclusive apos envio ou cancelamento. Isso preserva recuperacao, mas pode acumular armazenamento; impede liberacao ampla.
 - Ainda falta migracao segura das visitas grandes antigas, caso se confirme necessidade no aparelho.
 - Envio enquanto a visita esta em andamento nao foi ativado; nesta etapa o envio e sequencial por partes na finalizacao.
@@ -58,7 +58,19 @@ Conferido apos publicacao: login e PWA sem erro JavaScript; 20 funcoes e health 
 - Pasta confirmada pelos recibos: https://drive.google.com/drive/folders/1tB5_Mdbitj_R85i006hSHtw3DWWALfN1 . Nao foi feita inspecao visual autenticada de cada arquivo no Drive; a verificacao foi pelos comprovantes do worker e manifesto final.
 - Para eliminar a divergencia no piloto, o novo build isolado usa proxy `/lite-api` para o backend oficial ja validado. Login real pelo proxy foi confirmado; uma segunda passagem da interface parou apos a conta entrar em outro aparelho. Nenhum segundo upload real foi concluido por essa passagem.
 - Nao insistir em logins paralelos: o Moto G84 deve ser o unico aparelho usando a conta durante o teste. Ensaio local da nova compilacao com APIs simuladas passou em captura, recarga, fila offline, retomada e confirmacao de envio.
-- A camera nativa do Moto G84 e o fluxo inteiro exclusivamente pelo novo proxy permanecem como validacao do piloto no aparelho.
+- A camera nativa e o fluxo do novo preview foram executados pelo usuario no Moto G84 e confirmados no ensaio abaixo.
+
+## Resultado do piloto no Moto G84
+
+- Em 30/10/2026, o usuario informou que o teste no Android Moto G84, incluindo camera e reabertura, funcionou sem aviso de memoria, demora ou travamento.
+- Visita encontrada no backend: `VISIT-5F8E6908`, conta Lorena ID 101, PDV `HOMOLOGACAO LITE - NAO OPERACIONAL`.
+- Entrada `2026-10-30T16:30:46.808Z`, saida `2026-10-30T16:31:28.424Z`; registro recebido as 13:32:54 de Brasilia e finalizado as 13:33:34.
+- Cinco fotos com cinco comprovantes de arquivo/URL: FACHADA, ANTES, ESTOQUE, DEPOIS e CHECKOUT.
+- `syncStatus=enviado`, sem erro, sem identificador de lote ou finalizacao pendente, sem referencias locais no payload do servidor.
+- Linha criada `RELATORIO_VISITAS!A2415:AD2415`; pasta de homologacao igual a do teste anterior.
+- Indice de pendencias da Lorena sem registros pendentes na consulta. Isso nao substitui a verificacao de dados que existam somente em outros aparelhos.
+- Piloto aprovado para esse aparelho e esse fluxo. Nao generalizar o resultado para todos os Androids nem afirmar eliminacao definitiva do aviso.
+- Antes de liberar para a equipe: concluir coleta segura das fotos locais confirmadas, ativacao por aparelho no endereco oficial, plano de retorno compativel com referencias e tratamento das visitas antigas que ainda contenham base64.
 
 ## Roteiro no Moto G84
 
