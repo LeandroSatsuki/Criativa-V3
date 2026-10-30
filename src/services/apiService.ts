@@ -15,6 +15,7 @@ import { isNetworkRequestFailure } from './networkStatus';
 import { hasLocalPhotos, readLocalPhoto } from './litePhotos';
 import { sendLiteVisit } from './liteUpload';
 import { getSession } from './session';
+import { liteTestCatalog } from './liteMode';
 import {
   DIRECT_VISIT_PAYLOAD_MAX_BYTES,
   getMissingChunkIndexes,
@@ -158,6 +159,7 @@ const createChunkedVisit = async (payload: any, serializedPayload: string) => {
 
 export const apiService = {
   getAppConfig: async (force = false) => {
+    if (liteTestCatalog) return { industries: ['HOMOLOGACAO LITE'], timestamp: null };
     if (!force) {
       const cached = readCachedConfig();
       if (cached) return cached;
@@ -220,6 +222,10 @@ export const apiService = {
   },
 
   getOperationalData: async (user: User, industries: string[]) => {
+    if (liteTestCatalog) return {
+      stores: [{ id: 'HOMOLOG-LITE', name: 'HOMOLOGACAO LITE - NAO OPERACIONAL' }],
+      industries: ['HOMOLOGACAO LITE'], source: 'cache' as const,
+    };
     try {
       const query = new URLSearchParams({ userId: user.id });
       const stores = await requestJson<any[]>(`/stores?${query.toString()}`);

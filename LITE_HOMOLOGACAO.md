@@ -2,13 +2,15 @@
 
 Status: implementacao inicial em homologacao. Nao liberar para a operacao.
 
-Preview tecnico: `6ae4a1fbdabad6722181e5c3`, bundle `index-sfvEe8Lr.js`.
+Preview inicial: `6ae4a1fbdabad6722181e5c3`, bundle `index-sfvEe8Lr.js` (substituido para o teste real).
+Preview para o Moto G84: `6ae4ac537bda385b9deb0003`, bundle `index-DmBBrbsv.js`.
 Conferido apos publicacao: login e PWA sem erro JavaScript; 20 funcoes e health Google. O deploy oficial permaneceu `6ae1f58c3c646eebc5f8d7a6`, saudavel em `google-v1`.
 
 ## Ativacao
 
 - Branch `agent/lite-homologacao`.
 - Build com `VITE_LITE_PILOT=true`; sem essa variavel, novas capturas seguem o modo normal.
+- Para o piloto real, usar `npm run build:lite-preview`: gera `dist-lite`, ativa catalogo sintetico e API `/lite-api`, com proxy somente desse build para o backend oficial. Publicar com `netlify deploy --no-build --dir dist-lite --skip-functions-cache`, sem `--prod`.
 - Usar apenas preview, sem `--prod`. A origem oficial permanece na versao anterior.
 - O modo por aparelho e a liberacao pelo mesmo link oficial pertencem a etapa posterior ao piloto.
 
@@ -26,9 +28,9 @@ Conferido apos publicacao: login e PWA sem erro JavaScript; 20 funcoes e health 
 
 ## Limites antes de liberar
 
-- Nao usar conta de promotora ativa no preview: o backend compartilha sessoes e dados com producao. Uma conta de teste dedicada deve ser definida antes do ensaio real no Drive.
+- O backend compartilha sessoes e dados com producao. O usuario autorizou expressamente `lorena.costa` para este teste, inclusive a desconexao do outro aparelho. Nao usar outras contas da operacao sem reserva para teste.
 - Dados locais sao separados por origem. Nao orientar Keutily a trocar de link, reinstalar ou limpar dados com visita/fila pendente.
-- Ainda falta testar camera real e retorno apos encerramento do navegador no Android afetado, alem do envio real ate Drive/planilha com a conta de teste.
+- Ainda falta testar camera real e retorno apos encerramento do navegador no Moto G84. O envio real ate Drive/planilha foi concluido na visita abaixo.
 - Ainda falta implementar coleta segura de fotos locais sem uso. Nesta versao, nenhuma foto do cofre e excluida automaticamente, inclusive apos envio ou cancelamento. Isso preserva recuperacao, mas pode acumular armazenamento; impede liberacao ampla.
 - Ainda falta migracao segura das visitas grandes antigas, caso se confirme necessidade no aparelho.
 - Envio enquanto a visita esta em andamento nao foi ativado; nesta etapa o envio e sequencial por partes na finalizacao.
@@ -43,7 +45,32 @@ Conferido apos publicacao: login e PWA sem erro JavaScript; 20 funcoes e health 
 - Comparacao dos eventos de foto e finalizacao Google: mesmos dados, IDs e destinos logicos para conteudo igual.
 - Chrome com backend simulado: captura, gravacao individual, recarga da pagina, exibicao, finalizacao com hash valido e ausencia de chamada IA.
 - Build normal: abertura com 100 fotos e tres filas antigas, rascunho legado, login vazio e falha de conexao.
-- Os testes nao criaram fotos ou visitas reais no Drive/planilha.
+- Os testes simulados nao criaram fotos/visitas reais. O ensaio real autorizado abaixo criou um registro identificado como homologacao.
+
+## Ensaio real autorizado com Lorena
+
+- Conta `lorena.costa`, ID `101`, autorizada pelo usuario para o teste mesmo que desconectasse outro aparelho.
+- Visita `VISIT-7C86A59C`; PDV sintetico `HOMOLOGACAO LITE - NAO OPERACIONAL`, ID `HOMOLOG-LITE`; industria sintetica `HOMOLOGACAO LITE`.
+- Quatro imagens sinteticas rotuladas: FACHADA, ANTES, DEPOIS e CHECKOUT, capturadas pela interface do preview no Chrome.
+- O upload Lite foi aceito, mas o worker do preview inicial recebeu HTTP 401 do Google. Metadados de configuracao confirmaram URL Google diferente entre preview e producao. Credenciais nao foram expostas nem alteradas.
+- A MESMA visita foi retomada uma unica vez pelo endpoint autenticado de background do backend oficial, sem recriar o registro.
+- Resultado conferido no armazenamento do servidor: `syncStatus=enviado`, 4/4 comprovantes com arquivo e URL, `finalizedAt=2026-10-30T11:37:59-03:00`, linha criada `RELATORIO_VISITAS!A2406:AD2406`, sem pendencia no indice do servidor.
+- Pasta confirmada pelos recibos: https://drive.google.com/drive/folders/1tB5_Mdbitj_R85i006hSHtw3DWWALfN1 . Nao foi feita inspecao visual autenticada de cada arquivo no Drive; a verificacao foi pelos comprovantes do worker e manifesto final.
+- Para eliminar a divergencia no piloto, o novo build isolado usa proxy `/lite-api` para o backend oficial ja validado. Login real pelo proxy foi confirmado; uma segunda passagem da interface parou apos a conta entrar em outro aparelho. Nenhum segundo upload real foi concluido por essa passagem.
+- Nao insistir em logins paralelos: o Moto G84 deve ser o unico aparelho usando a conta durante o teste. Ensaio local da nova compilacao com APIs simuladas passou em captura, recarga, fila offline, retomada e confirmacao de envio.
+- A camera nativa do Moto G84 e o fluxo inteiro exclusivamente pelo novo proxy permanecem como validacao do piloto no aparelho.
+
+## Roteiro no Moto G84
+
+1. Usar Chrome no aparelho de teste, sem trocar o link de um aplicativo que tenha visitas/fila pendente. A producao continua no endereco oficial habitual.
+2. Abrir https://6ae4ac537bda385b9deb0003--criativa-field-ops-574.netlify.app e entrar com `lorena.costa`, com a senha habitual, sem divulgar a senha no chat.
+3. Conferir o aviso `Lite - Homologacao`. A lista deste build deve oferecer apenas `HOMOLOGACAO LITE - NAO OPERACIONAL` e a industria `HOMOLOGACAO LITE`.
+4. Registrar fachada, uma foto de Antes e uma de Depois. Aguardar cada foto aparecer antes de prosseguir. Na etapa Trocas, responder Nao para esse ensaio.
+5. Antes de finalizar, fechar e reabrir esse mesmo endereco. Conferir se a visita e as fotos continuam presentes.
+6. Registrar a foto de saida e sincronizar. Aguardar o status do servidor; se houver erro, manter os dados e anotar o ID da visita. Nao limpar fila ou reinstalar.
+7. Informar o ID da visita e se o aviso de memoria apareceu, indicando em qual etapa. A conclusao e os comprovantes serao conferidos no backend.
+
+Este link e exclusivo do teste controlado, nao substitui o aplicativo da equipe. Nao e necessario instalar um segundo atalho para esta validacao. O registro real do teste aparece identificado na planilha e deve ser considerado homologacao, nao atendimento de loja.
 
 ## Validacao adicional em 30/10/2026
 

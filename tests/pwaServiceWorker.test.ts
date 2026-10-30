@@ -74,6 +74,8 @@ test('rotas operacionais e autenticadas ficam fora do cache', async () => {
   const { policy } = await loadPolicy();
 
   for (const pathname of [
+    '/lite-api',
+    '/lite-api/auth/login',
     '/api',
     '/api/auth/login',
     '/api/auth/session',

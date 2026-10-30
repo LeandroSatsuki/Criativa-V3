@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## [2026-10-30] - Ensaio real Lite autorizado e acesso para Moto G84
+
+### Causa
+- O worker do preview inicial retornou HTTP 401 no Google; preview e producao possuem URLs Google diferentes. O envio pelo cliente Lite foi recebido, mas faltava confirmar Drive e planilha.
+
+### Solucao aplicada
+- Com autorizacao explicita, conta Lorena ID 101 usada para visita sintetica `VISIT-7C86A59C`, rotulada `HOMOLOGACAO LITE - NAO OPERACIONAL`.
+- Mesmo registro retomado pelo worker oficial: quatro fotos com comprovantes e finalizacao, linha `RELATORIO_VISITAS!A2406:AD2406`, status enviado e indice de pendencias sem esse ID.
+- Build separado `build:lite-preview`, em `dist-lite`, com catalogo somente de homologacao e proxy `/lite-api` para o backend oficial. Preview `6ae4ac537bda385b9deb0003`, sem publicacao na origem oficial.
+
+### Checklist
+- [x] 164 testes, TypeScript e build aprovados; APIs do proxy fora do cache da PWA.
+- [x] Envio real do cliente Lite ate o servidor e quatro fotos/finalizacao Google confirmados apos retomada no worker oficial.
+- [x] Login real via novo proxy e fluxo local simulado da compilacao nova aprovados.
+- [ ] Camera real e fluxo completo pelo novo proxy no Moto G84; roteiro em `LITE_HOMOLOGACAO.md`.
+- [ ] Limpeza automatica segura das fotos individuais continua pendente.
+
+### Seguranca
+- Nenhuma credencial ou configuracao de producao foi alterada. Producao mantida no deploy anterior e saudavel.
+- Durante a segunda passagem de interface, a conta entrou em outro aparelho e a sessao foi encerrada. Logins automaticos interrompidos para nao disputar acesso.
+- Fotos de teste permanecem identificadas no Drive/planilha. Nenhuma foto de promotora foi movida ou excluida.
+
+### Testes realizados
+- Manifesto e recibos da visita real conferidos: 4/4 e linha criada. Nao houve inspecao visual autenticada de cada imagem no Drive.
+- Novo build em Chrome com APIs simuladas: captura, recarga, fila offline, retomada, hash e confirmacao; sem erros JavaScript.
+
 ## [2026-10-30] - Validacoes adicionais do piloto Lite
 
 ### Causa

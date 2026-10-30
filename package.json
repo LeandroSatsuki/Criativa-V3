@@ -8,6 +8,7 @@
     "dev": "vite --host 0.0.0.0 --port 3000",
     "dev:full": "npx netlify dev --target-port 3000",
     "build": "vite build",
+    "build:lite-preview": "node scripts/build-lite-preview.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "lint": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts"
