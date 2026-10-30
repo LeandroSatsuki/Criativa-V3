@@ -17,7 +17,7 @@
 - [x] Modo normal com rascunho antigo, 100 fotos, fila antiga e falha de conexao verificado no Chrome.
 - [x] Lite com captura, recarga, fila offline, retomada e confirmacao verificado com APIs simuladas.
 - [x] Engrenagem testada em 320 px: ativar/desativar sem pendencia; bloquear com visita ou fila; sem erro JavaScript ou rolagem horizontal.
-- [ ] Conferencia final do preview e da publicacao oficial.
+- [x] Preview `6ae4c9e798a4de4e3a20596f` e publicacao oficial `6ae4ca435a610694913e6e34` conferidos. Publicado em 30/10/2026 as 13:48 de Brasilia, bundle `index-B6WUAAZV.js`.
 
 ### Seguranca
 - Sem exclusao de fotos do Drive, migracao de rascunhos antigos ou atualizacao forcada das telas abertas.
@@ -27,6 +27,7 @@
 ### Testes realizados
 - Confirmacao obrigatoria, retencao, isolamento de dono, fila e rascunho bloqueando limpeza, orfaos preservados, falta de Web Locks e transacao de limpeza abortada.
 - Os ensaios reais anteriores confirmaram quatro fotos automatizadas e cinco fotos do piloto Moto G84 ate Drive/planilha; nesta etapa, interface e guardas locais foram testadas em ambiente isolado.
+- Apos publicar: login no endereco oficial e PWA sem erro JavaScript; health Google saudavel, 20 funcoes e agendamento de conciliacao preservados.
 
 ## [2026-10-30] - Piloto Lite confirmado no Moto G84
 

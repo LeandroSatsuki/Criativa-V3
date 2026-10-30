@@ -2,6 +2,8 @@
 
 Endereco: https://criativa-field-ops-574.netlify.app/
 
+Publicado em 30/10/2026 as 13:48 de Brasilia. Deploy `6ae4ca435a610694913e6e34`, bundle `index-B6WUAAZV.js`.
+
 1. Concluir a visita atual e aguardar a confirmacao dos envios pendentes.
 2. Entrar no aplicativo habitual e abrir a engrenagem `Preferencias do aparelho` no topo.
 3. Ativar `Modo Lite`. O aplicativo salva o estado e recarrega; a tela passa a indicar `Modo Lite`.
