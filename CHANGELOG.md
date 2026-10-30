@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2026-10-30] - Validacoes adicionais do piloto Lite
+
+### Causa
+- Necessidade de verificar persistencia apos reinicio real do navegador, funcionamento offline e consumo de memoria do rascunho Lite antes de qualquer piloto operacional.
+
+### Solucao aplicada
+- Validacoes executadas em perfis isolados e APIs simuladas, com novo teste para bloquear finalizacao se o conteudo mudar entre as duas leituras do envio.
+
+### Checklist
+- [x] 164 testes e TypeScript aprovados.
+- [x] Fechamento e reabertura do Chrome com rede desativada: 100 fotos recuperadas.
+- [x] Falha de rede pela interface preserva fila; nova abertura retoma envio; resposta simulada `enviado` retira somente a fila.
+- [ ] Camera real Android e envio real Drive/planilha: dependem de aparelho e conta/PDV dedicados de homologacao, nao encontrados nesta maquina/cadastro.
+- [ ] Limpeza automatica segura das fotos individuais ainda pendente.
+
+### Seguranca
+- Nenhum login de promotora ativa nem imagem enviada ao Drive real. Producao permaneceu no deploy `6ae1f58c3c646eebc5f8d7a6`, saudavel em `google-v1`.
+- A remocao da fila foi testada com confirmacao simulada; fotos individuais permanecem preservadas nesta etapa.
+
+### Testes realizados
+- No ensaio sintetico de 100 fotos, rascunho passou de 12.121.420 para 5.247 bytes em referencias. Heap JavaScript do Chrome desktop apos GC: 15.139.208 para 3.011.100 bytes. Nao representa memoria total, pico nem medicao do Android.
+- Procedimentos, limitacoes e resultados completos em `LITE_HOMOLOGACAO.md`.
+
 ## [2026-10-30] - Piloto Lite isolado da producao
 
 ### Causa

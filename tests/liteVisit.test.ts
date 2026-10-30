@@ -32,6 +32,9 @@ test('foto individual, rascunho e fila preservam referencias e isolamento por do
   assert.equal(queued?.payload.photos.FACHADA[0], id);
   assert.ok(JSON.stringify(queued).length < 1000);
   assert.equal(await readLocalPhoto('lite-owner', queued!.payload.photos.FACHADA[0]), photo);
+  await queue.removeQueuedVisit('lite-owner', 'VISIT-LITE');
+  assert.equal(await queue.getQueuedVisit('lite-owner', 'VISIT-LITE'), null);
+  assert.equal(await readLocalPhoto('lite-owner', id), photo);
 });
 
 test('100 fotos sao enviadas sequencialmente com hash e contrato iguais ao JSON original', async () => {
@@ -129,4 +132,15 @@ test('contrato Google recebe mesmas fotos, pastas e IDs da visita original', asy
   const manifest = { photos: {} } as any;
   assert.deepEqual(buildMakeVisitFinalizeEvent(resolved, buildMakePhotoEvents(resolved), manifest),
     buildMakeVisitFinalizeEvent(original, buildMakePhotoEvents(original), manifest));
+});
+
+test('mudanca do conteudo entre leituras bloqueia finalizacao', async () => {
+  let reads = 0;
+  let finalizeCalls = 0;
+  await assert.rejects(sendLiteVisit({ visitId: 'VISIT-MUTATE', photos: ['criativa-photo-v1:owner:one'] },
+    async () => ++reads === 1 ? 'AAAA' : 'BBBB', async body => {
+      if (body.action === 'finalize') finalizeCalls++;
+      return { receivedIndexes: [] };
+    }), /conteudo local mudou/);
+  assert.equal(finalizeCalls, 0);
 });

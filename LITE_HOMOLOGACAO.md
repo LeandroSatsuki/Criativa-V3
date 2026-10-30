@@ -37,10 +37,22 @@ Conferido apos publicacao: login e PWA sem erro JavaScript; 20 funcoes e health 
 
 ## Verificacao concluida
 
-- 163 testes aprovados; TypeScript e builds normal/Lite aprovados.
+- 164 testes aprovados; TypeScript e builds normal/Lite aprovados.
 - 100 fotos sinteticas: rascunho leve, resolucao de uma foto por vez e transporte sequencial; integridade conferida com hash nativo Node.
 - Interrupcao e retomada sem reenviar fragmentos confirmados, isolamento por dono, foto ausente e transacao de gravacao abortada.
 - Comparacao dos eventos de foto e finalizacao Google: mesmos dados, IDs e destinos logicos para conteudo igual.
 - Chrome com backend simulado: captura, gravacao individual, recarga da pagina, exibicao, finalizacao com hash valido e ausencia de chamada IA.
 - Build normal: abertura com 100 fotos e tres filas antigas, rascunho legado, login vazio e falha de conexao.
 - Os testes nao criaram fotos ou visitas reais no Drive/planilha.
+
+## Validacao adicional em 30/10/2026
+
+- Dois perfis persistentes isolados do Chrome receberam o mesmo conjunto sintetico de 100 fotos. O navegador foi fechado e iniciado de novo com a rede desativada; a PWA abriu pelo cache e recuperou as 100 fotos em ambos os casos, incluindo o conteudo da ultima foto.
+- Rascunho serializado: 12.121.420 bytes no formato antigo e 5.247 bytes em referencias no Lite. Os arquivos de imagem continuam no armazenamento individual; nao foram eliminados nem comprimidos adicionalmente.
+- Apos coleta de lixo solicitada pelo DevTools, `JSHeapUsedSize` foi 15.139.208 bytes no caso antigo e 3.011.100 bytes no Lite (cerca de 80% menos neste ensaio). Esta e uma medicao pontual de heap JavaScript no Chrome desktop, nao pico, memoria total do navegador nem medicao do Android da Keutily.
+- Pela interface, uma captura foi salva, a pagina recarregada e a foto voltou a aparecer. A tentativa de envio com falha de rede preservou a fila; depois de nova recarga, o envio simulado concluiu com hash valido. Somente a resposta remota simulada `enviado` retirou a visita da fila. Nenhum backend real recebeu essas imagens.
+- Teste adicional impede a finalizacao se a foto mudar entre o calculo inicial do hash e a segunda leitura.
+- Remover a visita da fila nao exclui a foto individual nesta etapa; verificacao automatizada confirma a preservacao. A limpeza automatica continua pendente, nao foi considerada validada.
+- Cadastro real consultado: nenhuma conta ou PDV identificado como teste/homologacao. Nao houve login com conta de promotora ativa, criacao de credenciais ou gravacao na planilha para contornar essa ausencia.
+- Nao foi localizado ADB/Android SDK nesta maquina para testar um aparelho conectado. O ensaio de camera nativa e a validacao em Android continuam dependentes de aparelho de teste.
+- Producao conferida apos os ensaios: mesmo deploy `6ae1f58c3c646eebc5f8d7a6`, health saudavel e provedor `google-v1`.
