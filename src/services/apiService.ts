@@ -12,6 +12,9 @@ import {
   writeOperationalCache,
 } from './operationalCache';
 import { isNetworkRequestFailure } from './networkStatus';
+import { hasLocalPhotos, readLocalPhoto } from './litePhotos';
+import { sendLiteVisit } from './liteUpload';
+import { getSession } from './session';
 import {
   DIRECT_VISIT_PAYLOAD_MAX_BYTES,
   getMissingChunkIndexes,
@@ -272,6 +275,17 @@ export const apiService = {
       ...payload,
       visitId: payload.visitId || buildVisitName('VISIT'),
     };
+    if (hasLocalPhotos(payloadWithVisitId)) {
+      const ownerId = String(getSession()?.user.id || '');
+      return sendLiteVisit(payloadWithVisitId, id => readLocalPhoto(ownerId, id), body => {
+        if (getSession()?.user.id !== ownerId) throw new Error('A sessao mudou. Dados preservados.');
+        return requestJson('/visits/upload', {
+          method: 'POST', retries: body.action === 'finalize' ? 0 : 1,
+          headers: body.action === 'finalize' ? { 'X-Criativa-Start-Sync': 'background' } : undefined,
+          body: toJsonBody(body),
+        });
+      });
+    }
     const serializedPayload = toJsonBody(payloadWithVisitId);
 
     if (getUtf8ByteLength(serializedPayload) > DIRECT_VISIT_PAYLOAD_MAX_BYTES) {

@@ -7,6 +7,10 @@ import React, { useState, useEffect } from 'react';
 import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { analyzeProductPhoto } from '../services/geminiService';
+import { liteMode } from '../services/liteMode';
+import { storeLocalPhoto, isLocalPhoto } from '../services/litePhotos';
+import { getSession } from '../services/session';
+import PhotoPreview from './PhotoPreview';
 import {
   getQueuedVisit,
   getQueuedVisitCount,
@@ -69,9 +73,10 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   columnsClassName,
   onRemove,
 }) => {
-  const latestPage = Math.max(0, Math.ceil(photos.length / PHOTO_PREVIEW_PAGE_SIZE) - 1);
+  const pageSize = liteMode ? 1 : PHOTO_PREVIEW_PAGE_SIZE;
+  const latestPage = Math.max(0, Math.ceil(photos.length / pageSize) - 1);
   const [requestedPage, setRequestedPage] = useState(latestPage);
-  const preview = getPhotoPreviewPage(photos, requestedPage);
+  const preview = getPhotoPreviewPage(photos, requestedPage, pageSize);
 
   useEffect(() => {
     setRequestedPage(latestPage);
@@ -85,7 +90,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         {preview.items.map(({ photo, originalIndex }) => {
           return (
             <div key={originalIndex} className="aspect-square bg-slate-200 rounded-2xl overflow-hidden relative group">
-              <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${photo}`} className="w-full h-full object-cover" alt={alt} />
+              <PhotoPreview photo={photo} className="w-full h-full object-cover" alt={alt} />
               {onRemove && (
                 <button
                   type="button"
@@ -535,10 +540,16 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     setIsProcessingPhoto(true);
     try {
       const activeIndustry = industryOverride || selectedIndustry;
-      const compressedBase64 = await processPhotoForReport(file);
+      const base64 = await processPhotoForReport(file);
+      if (String(getSession()?.user.id || '') !== queueOwnerId) throw new Error('A sessao mudou. Tente novamente com o usuario da visita.');
+      const photoVisitId = visitState.visitId || generateVisitId();
+      const compressedBase64 = liteMode ? await storeLocalPhoto(queueOwnerId, base64, {
+        visitId: photoVisitId, storeId: visitState.currentStoreId, section,
+        industry: activeIndustry || '', capturedAt: getBrasiliaISO(),
+      }) : base64;
 
       if (section === SectionId.Facade) {
-        if (!visitState.visitId) updateVisit('visitId', generateVisitId());
+        if (!visitState.visitId) updateVisit('visitId', photoVisitId);
         if (!visitState.checkInTime) updateVisit('checkInTime', getBrasiliaISO());
       }
         
@@ -820,7 +831,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             <div className="max-w-md mx-auto space-y-6">
               <div className="aspect-[4/3] bg-slate-100 rounded-[32px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden relative group">
                 {facadePhotos[0] ? (
-                  <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${facadePhotos[0]}`} className="w-full h-full object-cover" alt="Fachada" />
+                  <PhotoPreview photo={facadePhotos[0]} className="w-full h-full object-cover" alt="Fachada" />
                 ) : (
                   <Camera className="w-16 h-16 text-slate-300" />
                 )}
@@ -1217,7 +1228,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   navigateTo(SectionId.Dashboard);
 
                   // Run AI analysis in background without blocking the user
-                  if (currentPhotos[0]) {
+                  if (currentPhotos[0] && !liteMode && !isLocalPhoto(currentPhotos[0])) {
                     analyzeProductPhoto({
                       base64Image: currentPhotos[0],
                       industries: [visitState.selectedIndustry || 'Veneza'],
@@ -1664,7 +1675,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Foto de Saída</p>
                 <div className="max-w-xs mx-auto aspect-[4/3] bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden relative group">
                   {checkoutPhoto ? (
-                    <img loading="lazy" decoding="async" src={`data:image/jpeg;base64,${checkoutPhoto}`} className="w-full h-full object-cover" alt="Saída" />
+                    <PhotoPreview photo={checkoutPhoto} className="w-full h-full object-cover" alt="Saída" />
                   ) : (
                     <Camera className="w-12 h-12 text-slate-300" />
                   )}
@@ -1788,6 +1799,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto">
+      {liteMode && <p className="mb-4 text-xs font-semibold text-amber-700" role="status">Lite - Homologacao</p>}
       {automaticClosing && (
         <div className="fixed inset-0 z-[110] bg-white/95 flex items-center justify-center p-6" role="status" aria-live="polite">
           <div className="flex items-center gap-3 text-sm font-semibold"><Loader2 className="animate-spin text-blue-600" size={24} /> Salvando encerramento da visita...</div>
@@ -1871,7 +1883,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-      <AnimatePresence mode="wait">
+      {liteMode ? renderSection() : <AnimatePresence mode="wait">
         <motion.div
           key={sectionId}
           initial={{ opacity: 0, y: 10 }}
@@ -1881,7 +1893,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         >
           {renderSection()}
         </motion.div>
-      </AnimatePresence>
+      </AnimatePresence>}
     </div>
   );
 };

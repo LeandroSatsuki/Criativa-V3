@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## [2026-10-30] - Piloto Lite isolado da producao
+
+### Causa
+- A visita e a fila mantinham o conteudo de todas as fotos em strings grandes; reduzir gravacoes repetidas nao elimina essa carga durante a abertura.
+
+### Solucao aplicada
+- Piloto com flag de build, em branch e preview separados: novas fotos salvas individualmente no IndexedDB e referencias pequenas no rascunho/fila.
+- Galeria com uma foto por pagina, sem IA e sem transicao animada entre secoes.
+- Envio sequencial em fragmentos, com SHA-256 incremental e verificacao de integridade compativel com o servidor existente.
+
+### Checklist
+- [x] 163 testes, TypeScript, builds normal/Lite e fluxos simulados no Chrome aprovados.
+- [x] Contrato de fotos e finalizacao Google comparado com o original.
+- [x] Preview `6ae4a1fbdabad6722181e5c3` pronto, login/PWA sem erro JavaScript; deploy oficial `6ae1f58c3c646eebc5f8d7a6` mantido e health Google saudavel.
+- [ ] Ensaio real no Android e no Drive com conta de teste dedicada.
+- [ ] Coleta segura de fotos locais sem uso, migracao de rascunhos antigos e ativacao por aparelho antes de liberar amplamente.
+
+### Seguranca
+- Producao nao publicada nem filas reais migradas ou apagadas. Nenhum envio real ao Drive foi executado pelo piloto.
+- Preview compartilha backend e sessoes; nao usar conta ativa da operacao. Orientacoes e limites em `LITE_HOMOLOGACAO.md`.
+- O piloto ainda usa a camera nativa e nao permite garantir o fim do aviso no celular.
+
+### Testes realizados
+- Persistencia individual e restauracao por referencia, isolamento de dono, falha de gravacao, foto ausente e JSON misto antigo/novo.
+- 100 fotos, hash reconstruido compativel, envio sequencial, interrupcao e retomada apenas dos fragmentos ausentes.
+- Captura pela interface, recarga e finalizacao no backend simulado; modo normal preservado nos cenarios de abertura e offline.
+
 ## [2026-10-28] - Reducao de copias do rascunho durante abertura e navegacao
 
 ### Causa

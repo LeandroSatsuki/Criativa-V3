@@ -19,3 +19,10 @@ test('galeria preserva o indice original ao navegar pelas fotos anteriores', () 
   assert.deepEqual(preview.items.map((item) => item.originalIndex), [6, 7, 8, 9, 10, 11]);
   assert.deepEqual(preview.items.map((item) => item.photo), photos.slice(6, 12));
 });
+
+test('galeria lite monta uma foto por vez e preserva ordem e indice de exclusao', () => {
+  const photos = Array.from({ length: 30 }, (_, index) => `foto-${index}`);
+  const preview = getPhotoPreviewPage(photos, 17, 1);
+  assert.equal(preview.totalPages, 30);
+  assert.deepEqual(preview.items, [{ photo: 'foto-17', originalIndex: 17 }]);
+});

@@ -31,7 +31,7 @@ test('seletores podem recapturar e miniaturas usam decodificacao assincrona', as
 test('galerias limitam miniaturas montadas e supervisor carrega sob demanda', async () => {
   const contentArea = await readSource('../src/components/ContentArea.tsx');
 
-  assert.match(contentArea, /getPhotoPreviewPage\(photos, requestedPage\)/);
+  assert.match(contentArea, /getPhotoPreviewPage\(photos, requestedPage, pageSize\)/);
   assert.doesNotMatch(contentArea, /currentPhotos\.map\(/);
   assert.doesNotMatch(contentArea, /estoquePhotos\.map\(/);
   assert.doesNotMatch(contentArea, /returnsPhotos\.map\(/);
