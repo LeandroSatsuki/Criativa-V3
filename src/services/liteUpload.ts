@@ -1,7 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { isLocalPhoto } from './litePhotos.ts';
-import { getUtf8ByteLength, splitUtf8Text, VISIT_PAYLOAD_CHUNK_MAX_BYTES } from './visitPayload.ts';
+import { getUtf8ByteLength, splitUtf8Text, utf8Character, VISIT_PAYLOAD_CHUNK_MAX_BYTES } from './visitPayload.ts';
 
 type ResolvePhoto = (id: string) => Promise<string>;
 type Send = (body: any) => Promise<any>;
@@ -34,10 +34,28 @@ async function* jsonTokens(value: any, resolve: ResolvePhoto): AsyncGenerator<st
   }
 }
 
-export async function* liteChunks(payload: any, resolve: ResolvePhoto, limit = VISIT_PAYLOAD_CHUNK_MAX_BYTES) {
+export async function* liteChunks(payload: any, resolve: ResolvePhoto, limit = VISIT_PAYLOAD_CHUNK_MAX_BYTES, exactBoundaries = false) {
+  if (!Number.isInteger(limit) || limit <= 0) throw new Error('Limite de fragmento invalido.');
   let buffer = '';
   let size = 0;
   for await (const token of jsonTokens(payload, resolve)) {
+    if (exactBoundaries) {
+      // Legacy uploads already stored in the server use fixed UTF-8 boundaries.
+      // Preserve every index byte for byte, without serializing the entire visit.
+      let start = 0;
+      for (let index = 0; index < token.length; index++) {
+        const bytes = utf8Character(token, index);
+        if (bytes > limit) throw new Error('Limite de fragmento insuficiente.');
+        if (size + bytes > limit) {
+          buffer += token.slice(start, index);
+          yield buffer; buffer = ''; size = 0; start = index;
+        }
+        size += bytes;
+        if (bytes === 4) index++;
+      }
+      buffer += token.slice(start);
+      continue;
+    }
     for (const part of splitUtf8Text(token, limit)) {
       const bytes = getUtf8ByteLength(part);
       if (size + bytes > limit && buffer) { yield buffer; buffer = ''; size = 0; }
@@ -48,11 +66,11 @@ export async function* liteChunks(payload: any, resolve: ResolvePhoto, limit = V
   if (buffer) yield buffer;
 }
 
-export const sendLiteVisit = async (payload: any, resolve: ResolvePhoto, send: Send) => {
+export const sendLiteVisit = async (payload: any, resolve: ResolvePhoto, send: Send, exactBoundaries = false) => {
   const digest = sha256.create();
   let total = 0;
   let bytes = 0;
-  for await (const chunk of liteChunks(payload, resolve)) {
+  for await (const chunk of liteChunks(payload, resolve, VISIT_PAYLOAD_CHUNK_MAX_BYTES, exactBoundaries)) {
     digest.update(new TextEncoder().encode(chunk));
     bytes += getUtf8ByteLength(chunk);
     if (++total > 48 || bytes > 64 * 1024 * 1024) throw new Error('Visita acima do limite seguro. Dados preservados.');
@@ -63,7 +81,7 @@ export const sendLiteVisit = async (payload: any, resolve: ResolvePhoto, send: S
   const received = new Set(Array.isArray(status.receivedIndexes) ? status.receivedIndexes : []);
   const verification = sha256.create();
   let index = 0;
-  for await (const chunk of liteChunks(payload, resolve)) {
+  for await (const chunk of liteChunks(payload, resolve, VISIT_PAYLOAD_CHUNK_MAX_BYTES, exactBoundaries)) {
     verification.update(new TextEncoder().encode(chunk));
     if (!received.has(index)) await send({ ...envelope, action: 'chunk', index, chunk });
     index++;

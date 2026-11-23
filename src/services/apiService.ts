@@ -226,6 +226,7 @@ export const apiService = {
       ...payload,
       visitId: payload.visitId || buildVisitName('VISIT'),
     };
+    const hasPhotoReferences = hasLocalPhotos(payloadWithVisitId);
     const sendInChunks = () => {
       const ownerId = String(getSession()?.user.id || '');
       return sendLiteVisit(payloadWithVisitId, id => readLocalPhoto(ownerId, id), body => {
@@ -235,9 +236,9 @@ export const apiService = {
           headers: body.action === 'finalize' ? { 'X-Criativa-Start-Sync': 'background' } : undefined,
           body: toJsonBody(body),
         });
-      });
+      }, !hasPhotoReferences);
     };
-    if (hasLocalPhotos(payloadWithVisitId) || hasLargeVisitStrings(payloadWithVisitId)) return sendInChunks();
+    if (hasPhotoReferences || hasLargeVisitStrings(payloadWithVisitId)) return sendInChunks();
     const serializedPayload = toJsonBody(payloadWithVisitId);
 
     if (getUtf8ByteLength(serializedPayload) > DIRECT_VISIT_PAYLOAD_MAX_BYTES) {

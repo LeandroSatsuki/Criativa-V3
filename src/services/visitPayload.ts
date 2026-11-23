@@ -15,7 +15,7 @@ export const hasLargeVisitStrings = (value: unknown, budget = 1024 * 1024): bool
 };
 
 // Count UTF-8 bytes without allocating a second copy of the photo payload.
-const utf8Character = (value: string, index: number) => {
+export const utf8Character = (value: string, index: number) => {
   const code = value.charCodeAt(index);
   if (code < 0x80) return 1;
   if (code < 0x800) return 2;

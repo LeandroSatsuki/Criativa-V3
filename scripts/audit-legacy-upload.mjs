@@ -10,7 +10,12 @@ const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const page = await browser.newPage({ serviceWorkers: 'block' });
-  const chunks = new Map(); let fail = true, duplicates = 0, finalized = 0, expectedHash;
+  const oldPayload = { visitId: 'VISIT-LEGACY-AUDIT', user: { id: 'audit-upload' }, photos: { FACHADA: Array.from({ length: 100 }, (_, i) => `PHOTO:${i}:` + 'A'.repeat(120000)) } };
+  const oldSerialized = JSON.stringify(oldPayload);
+  // Simulate a fragment left by the previous production release, not by the
+  // new implementation. A resume must remain byte-for-byte compatible.
+  const chunks = new Map([[0, oldSerialized.slice(0, Math.floor(1.5 * 1024 * 1024))]]);
+  let fail = true, duplicates = 0, finalized = 0, expectedHash = createHash('sha256').update(oldSerialized).digest('hex').slice(0, 32);
   await page.route('**/*', async route => {
     const url = new URL(route.request().url()); assert.equal(url.origin, origin);
     if (url.pathname === '/audit-fixture') return route.fulfill({ contentType: 'text/html', body: '<html></html>' });
@@ -55,5 +60,5 @@ try {
   assert.equal(result.wholePayloadSerializations, 0); assert.equal(result.photosPreserved, 100);
   assert.ok(result.maxEncodeBytes <= Math.floor(1.5 * 1024 * 1024));
   assert.equal(duplicates, 0); assert.equal(finalized, 1);
-  console.log(JSON.stringify({ ...result, chunks: chunks.size, interruptedAndResumed: true, duplicateChunks: duplicates, hashMatches: true, realRequests: false }));
+  console.log(JSON.stringify({ ...result, chunks: chunks.size, interruptedAndResumed: true, resumedPreviousRelease: true, duplicateChunks: duplicates, hashMatches: true, realRequests: false }));
 } finally { await browser.close(); await server.close(); }

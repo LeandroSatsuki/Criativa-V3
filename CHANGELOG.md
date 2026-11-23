@@ -13,14 +13,14 @@
 - Falha ao ler o banco bloqueia a substituicao por copia sem fotos e oferece nova tentativa. Arquivos locais por dono tambem bloqueiam a limpeza de suas fotos.
 - Conciliacao confere o registro completo, atualiza somente os indices de visitas concluidas e procura a proxima elegivel, com ate oito verificacoes e um processamento por execucao. Mantido o agendamento a cada cinco minutos.
 - JPEG/PNG com cabecalho reconhecido solicita bitmap reduzido no navegador, preservando aspecto e orientacao EXIF. Bitmap, URL temporaria e canvas sao liberados. Formatos/aparelhos incompativeis usam o caminho anterior.
-- Envios grandes, inclusive antigos em base64, usam o transporte incremental ja utilizado no Lite. Mesmos IDs, hash, confirmacao e retomada; sem montar o JSON integral desses registros. Envio direto pequeno preservado.
+- Envios grandes, inclusive antigos em base64, usam o transporte incremental ja utilizado no Lite. Para o legado, mantidas exatamente as fronteiras UTF-8 dos fragmentos da versao anterior; para o Lite, mantidas as fronteiras que ja utilizava. Mesmos IDs, hash, confirmacao e retomada; sem montar o JSON integral desses registros. Envio direto pequeno preservado.
 
 ### Checklist
-- [x] 176 testes automatizados da aplicacao aprovados; TypeScript e build aprovados.
+- [x] 177 testes automatizados da aplicacao aprovados; TypeScript e build aprovados.
 - [x] Navegador: rascunho sem sessao preservado em normal/Lite e retomado apos login do mesmo dono; falha de leitura e nova abertura preservam a visita.
 - [x] Troca de conta, arquivamento interrompido, retorno do dono e nao ressuscitar visita encerrada testados.
 - [x] Capturas de 12/48 MP, orientacao EXIF, arquivo invalido, falha de gravacao, recarga e galeria verificadas em perfis isolados.
-- [x] Upload legado de 100 fotos interrompido e retomado com mesmo hash: oito fragmentos, zero duplicacoes, zero serializacoes integrais e buffer codificado maximo de 1.560.228 bytes.
+- [x] Upload legado de 100 fotos, iniciado com fragmento da versao anterior, interrompido e retomado com mesmo hash: oito fragmentos, zero duplicacoes, zero serializacoes integrais e buffer codificado maximo de 1.572.864 bytes.
 - [x] Inicializacao de 100 fotos, fila antiga, offline, captura/envio Lite e preferencias de aparelho aprovados.
 - [x] Previa `6b046e70002ab57ede7de2ba`: login sem erros JavaScript, health HTTP 200 e `google-v1`.
 

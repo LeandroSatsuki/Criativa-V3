@@ -144,3 +144,13 @@ test('mudanca do conteudo entre leituras bloqueia finalizacao', async () => {
     }), /conteudo local mudou/);
   assert.equal(finalizeCalls, 0);
 });
+
+test('upload legado preserva exatamente os fragmentos anteriores incluindo fronteiras Unicode', async () => {
+  const { splitUtf8Text } = await import('../src/services/visitPayload.ts');
+  const payload = { visitId: 'VISIT-LEGACY-RESUME', photos: ['A'.repeat(160001), 'B'.repeat(160001)], text: 'ã😀€'.repeat(20), nested: [undefined, { n: null, text: 'escape\n"test' }] };
+  for (const limit of [20, 1572864, 160015]) {
+    const actual: string[] = [];
+    for await (const chunk of liteChunks(payload, async value => value, limit, true)) actual.push(chunk);
+    assert.deepEqual(actual, splitUtf8Text(JSON.stringify(payload), limit));
+  }
+});
