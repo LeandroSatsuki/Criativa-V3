@@ -1,5 +1,75 @@
 # CHANGELOG
 
+## [2026-11-23] - Correcao urgente de preservacao, conciliacao e picos de memoria
+
+### Causa
+- A tela sem sessao podia substituir o rascunho persistido. A troca de conta usava um unico slot sem guardar a visita do dono anterior.
+- Indices antigos de visitas ja enviadas ocupavam a selecao unica da conciliacao automatica.
+- Fotos originais grandes chegavam ao canvas; envios legados grandes criavam o JSON inteiro, a lista de fragmentos e outro buffer para o hash.
+
+### Solucao aplicada
+- Tela sem sessao nao carrega as fotos nem grava estado vazio. Login restaura apenas o rascunho do mesmo dono.
+- Troca de dono arquiva o rascunho anterior na mesma transacao IndexedDB e promove o rascunho do usuario atual. Conclusao/reset nao ressuscita arquivo antigo. Sem alteracao de versao do banco nem migracao em massa.
+- Falha ao ler o banco bloqueia a substituicao por copia sem fotos e oferece nova tentativa. Arquivos locais por dono tambem bloqueiam a limpeza de suas fotos.
+- Conciliacao confere o registro completo, atualiza somente os indices de visitas concluidas e procura a proxima elegivel, com ate oito verificacoes e um processamento por execucao. Mantido o agendamento a cada cinco minutos.
+- JPEG/PNG com cabecalho reconhecido solicita bitmap reduzido no navegador, preservando aspecto e orientacao EXIF. Bitmap, URL temporaria e canvas sao liberados. Formatos/aparelhos incompativeis usam o caminho anterior.
+- Envios grandes, inclusive antigos em base64, usam o transporte incremental ja utilizado no Lite. Mesmos IDs, hash, confirmacao e retomada; sem montar o JSON integral desses registros. Envio direto pequeno preservado.
+
+### Checklist
+- [x] 176 testes automatizados da aplicacao aprovados; TypeScript e build aprovados.
+- [x] Navegador: rascunho sem sessao preservado em normal/Lite e retomado apos login do mesmo dono; falha de leitura e nova abertura preservam a visita.
+- [x] Troca de conta, arquivamento interrompido, retorno do dono e nao ressuscitar visita encerrada testados.
+- [x] Capturas de 12/48 MP, orientacao EXIF, arquivo invalido, falha de gravacao, recarga e galeria verificadas em perfis isolados.
+- [x] Upload legado de 100 fotos interrompido e retomado com mesmo hash: oito fragmentos, zero duplicacoes, zero serializacoes integrais e buffer codificado maximo de 1.560.228 bytes.
+- [x] Inicializacao de 100 fotos, fila antiga, offline, captura/envio Lite e preferencias de aparelho aprovados.
+- [x] Previa `6b046e70002ab57ede7de2ba`: login sem erros JavaScript, health HTTP 200 e `google-v1`.
+
+### Seguranca
+- Nenhuma limpeza de filas de promotores, exclusao de fotos, alteracao de credenciais ou login em conta operacional nos testes.
+- Organizacao do Drive, qualidade/tamanho final de foto, manifestos e finalizacao da visita preservados.
+- Modo normal/Lite escolhido no aparelho permanece. Atualizacao nao forca recarga de telas abertas.
+- A reducao comprovada e do bitmap entregue ao canvas e das copias de envio. Memoria total e camera nativa do Android ainda dependem de confirmacao nos aparelhos afetados; nao ha garantia de eliminar todo aviso de memoria.
+
+### Testes realizados
+- Os dois cenarios que falhavam na auditoria agora preservam a visita. Falhas de gravacao/arquivamento revertem a transacao.
+- No Chrome isolado, uma imagem 8000x6000 chegou ao canvas como bitmap 832x624; a foto com EXIF rotacionado chegou como 832x1110 e terminou em 624x832. Nenhum bitmap ou URL de captura ficou aberto no ensaio.
+- Ensaios locais usam dados sinteticos e APIs simuladas; nao geraram fotos ou visitas de teste em producao nem trafego no Make.
+- Publicacao e conferencia posterior registradas abaixo apos conclusao.
+
+## [2026-11-23] - Auditoria de memoria e recuperacao, sem publicacao
+
+### Causa
+- Novos relatos de insuficiencia de memoria antes de abrir a camera e apos as fotos. Nao foi confirmado se os aparelhos afetados ativaram o Modo Lite.
+- O modo normal continua padrao, mantem fotos em base64 no estado e serializa a visita inteira para enviar. Lite reduz esses caminhos para novas capturas; rascunhos antigos nao sao migrados automaticamente.
+- Os dois modos abrem a imagem original com `Image` antes de desenhar o canvas de 832 px. Essa etapa pode pressionar a memoria nativa ao retornar da camera; o heap JavaScript do computador nao mede essa pressao nem a RAM do Android.
+
+### Solucao aplicada
+- Auditoria e roteiro reproduzivel `scripts/audit-browser-memory.mjs`, com APIs inteiramente simuladas e bloqueio de conexoes externas. Nenhuma correcao funcional publicada nesta etapa.
+- Identificada falha critica de recuperacao: reabrir sem sessao local, com visita ainda nao enviada, sobrescreve `active-visit` com estado vazio. Reproduzido em normal e Lite. No Lite a foto individual permaneceu no cofre, mas o rascunho perdeu a referencia; no normal a evidencia estava no proprio rascunho substituido.
+- Detectadas duas entradas antigas no indice remoto de pendencias cujos registros completos ja estao `enviado`. A rotina agendada seleciona uma entrada por vez e retorna se ela ja foi enviada, sem reparar o indice nem selecionar a seguinte. Isso pode impedir a recuperacao automatica de outra visita; nao significa que as duas visitas verificadas estejam sem envio.
+
+### Checklist
+- [x] 167 testes existentes da aplicacao e 22 do servico Google aprovados; TypeScript e build aprovados.
+- [x] Build local reproduziu o bundle oficial `index-B6WUAAZV.js`; producao continua no deploy `6ae4ca435a610694913e6e34`.
+- [x] Inicializacao com rascunho de 100 fotos, fila legada, login vazio e modo offline; captura Lite, recarga, falha de rede, retomada e confirmacao testados no Chrome isolado.
+- [x] Preferencias em 320 px: troca de modo permitida sem pendencias e recusada com visita/fila.
+- [x] Ensaio adicional em cada modo: 100 fotos iniciais, sete capturas de 12 MP e uma de 48 MP, imagem invalida, recarga e 50 mudancas da galeria. Falha de gravacao tambem injetada no Lite. Fotos anteriores preservadas nesses casos e nenhuma URL temporaria de captura permaneceu aberta.
+- [x] Regressao sem sessao reproduzida duas vezes; roteiro encerra com falha intencional enquanto a preservacao nao for corrigida. A suite existente aprovada nao cobria esse cenario.
+- [ ] Proteger a restauracao e a persistencia do rascunho quando faltar sessao; validar retorno do mesmo dono e isolamento entre contas antes de publicar.
+- [ ] Reparar a selecao da conciliacao diante de indices desatualizados, com verificacao do registro completo.
+- [ ] Validar camera nativa em Android afetado e confirmar versao/modo em uso; nao houve acesso a RAM desses aparelhos.
+
+### Seguranca
+- Sem deploy, login de promotora, alteracao de configuracao ou exclusao de dados reais. Nenhum upload de teste enviado a Make, Drive ou planilha.
+- Consultas remotas limitadas a saude, metadados de deploy, logs e verificacao pontual das pendencias. Nenhuma fila de aparelho foi limpa.
+- Nao orientar reinstalacao ou limpeza dos dados de aparelhos com registros pendentes. A falha sem sessao exige prioridade antes de orientar sair da conta com visita aberta.
+
+### Testes realizados
+- Com 100 fotos sinteticas validas: heap apos coleta de lixo de aproximadamente 20,4 MB no normal e 3,5 MB no Lite antes da captura. Apos oito capturas: 20,2 MB e 4,4 MB. Nao foi observado crescimento continuo no ensaio curto; esses numeros nao incluem camera nativa, imagens decodificadas, GPU ou memoria total do navegador.
+- Ensaio independente de reinicio offline: 100 fotos preservadas em ambos os modos; heap JavaScript de 15.380.076 para 3.247.648 bytes (78,9% menor no Lite) com a mesma massa sintetica desse ensaio.
+- Origem oficial e health responderam HTTP 200 com provedor `google-v1`. Consulta de logs de uma hora retornou 50 entradas `info`; filtro de 24 horas nao retornou `warn/error/fatal`. Isso nao fornece telemetria de encerramentos por memoria nos celulares nem prova ausencia de todos os erros HTTP.
+- Uma visita real vista em processamento durante a consulta concluiu como `enviado`, sem erro, em leitura posterior. Dados ainda apenas no celular nao aparecem no indice do servidor.
+
 ## [2026-10-30] - Modo Lite por aparelho no endereco oficial
 
 ### Causa

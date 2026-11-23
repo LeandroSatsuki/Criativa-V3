@@ -48,6 +48,13 @@ export const getVisit = async (visitId: string) => {
   return visitStore.get<VisitRecord>(keyFor(visitId));
 };
 
+export const repairCompletedVisitSummary = async (record: VisitRecord) => {
+  if (record.syncStatus !== 'enviado') return;
+  // Derived indexes only: never overwrite the payload, receipts or visit record.
+  await visitSummaryStore.set(summaryKeyFor(record.visitId), buildVisitSummary(record));
+  await pendingVisitSummaryStore.remove(summaryKeyFor(record.visitId));
+};
+
 export const saveVisit = async (record: VisitRecord) => {
   await visitStore.set(keyFor(record.visitId), record);
   const summary = buildVisitSummary(record);

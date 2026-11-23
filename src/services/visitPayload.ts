@@ -1,6 +1,19 @@
 export const DIRECT_VISIT_PAYLOAD_MAX_BYTES = 4 * 1024 * 1024;
 export const VISIT_PAYLOAD_CHUNK_MAX_BYTES = Math.floor(1.5 * 1024 * 1024);
 
+// Check without serializing or copying image strings. Leave headroom for JSON
+// escaping and request metadata; large legacy drafts also use bounded streaming.
+export const hasLargeVisitStrings = (value: unknown, budget = 1024 * 1024): boolean => {
+  let remaining = budget;
+  const visit = (item: unknown): boolean => {
+    if (typeof item === 'string') { remaining -= item.length; return remaining > 0; }
+    if (Array.isArray(item)) return item.every(visit);
+    if (item && typeof item === 'object') return Object.values(item).every(visit);
+    return true;
+  };
+  return !visit(value);
+};
+
 // Count UTF-8 bytes without allocating a second copy of the photo payload.
 const utf8Character = (value: string, index: number) => {
   const code = value.charCodeAt(index);

@@ -87,6 +87,7 @@ const App: React.FC = () => {
   const [pendingSyncs, setPendingSyncs] = useState<PendingSyncView[]>([]);
   const [showSyncStatus, setShowSyncStatus] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
+  const [draftRestoreFailed, setDraftRestoreFailed] = useState(false);
   const [showDeviceSettings, setShowDeviceSettings] = useState(false);
   const [deviceSettingBusy, setDeviceSettingBusy] = useState(false);
   const [deviceSettingError, setDeviceSettingError] = useState<string | null>(null);
@@ -161,10 +162,15 @@ const App: React.FC = () => {
     let cancelled = false;
 
     const restoreDraft = async () => {
-      const saved = await loadVisitDraft(STORAGE_KEY);
+      const session = getSession();
+      // A signed-out screen must neither hydrate photo evidence nor replace it.
+      if (!session?.user) {
+        if (!cancelled) setDraftHydrated(true);
+        return;
+      }
+      const saved = await loadVisitDraft(STORAGE_KEY, session.user.id);
       if (cancelled) return;
 
-      const session = getSession();
       if (saved) {
         const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
         const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
@@ -190,7 +196,7 @@ const App: React.FC = () => {
 
     restoreDraft().catch((error) => {
       console.error('Erro ao restaurar rascunho da visita:', error);
-      if (!cancelled) setDraftHydrated(true);
+      if (!cancelled) { setDraftRestoreFailed(true); setDraftHydrated(true); }
     });
 
     return () => {
@@ -309,7 +315,7 @@ const App: React.FC = () => {
   }, [visitState.user?.id, draftHydrated, loading]);
 
   useEffect(() => {
-    if (!draftHydrated) return;
+    if (!draftHydrated || draftRestoreFailed || !visitState.user) return;
 
     saveVisitDraft(STORAGE_KEY, { ...visitState, step: activeSection }).catch((error) => {
       console.error('Erro ao persistir rascunho da visita:', error);
@@ -318,7 +324,7 @@ const App: React.FC = () => {
         alert('Não foi possível salvar o progresso neste aparelho. Verifique o espaço disponível antes de fechar o aplicativo.');
       }
     });
-  }, [visitState, activeSection, draftHydrated]);
+  }, [visitState, activeSection, draftHydrated, draftRestoreFailed]);
 
   useEffect(() => {
     if (loading || !visitState.user) return;
@@ -567,12 +573,12 @@ const App: React.FC = () => {
     try {
       const userData = await apiService.login(loginForm);
       setLoginForm({ user: userData.user, pass: '' });
-      const sameDraftOwner = !visitState.draftOwnerId || visitState.draftOwnerId === userData.id;
-      const hasActiveVisit = sameDraftOwner && hasStartedVisit(visitState);
-      setVisitState((prev: any) => sameDraftOwner
-        ? { ...prev, user: userData, draftOwnerId: userData.id }
-        : { ...INITIAL_STATE, user: userData, draftOwnerId: userData.id });
-      setActiveSection(resolveSessionSection(userData.role, visitState.step, hasActiveVisit));
+      const saved = visitState.draftOwnerId === userData.id ? visitState
+        : await loadVisitDraft(STORAGE_KEY, userData.id);
+      const restored = saved && (!saved.draftOwnerId || saved.draftOwnerId === userData.id)
+        ? recoverUnstartedVisit(saved) : null;
+      setVisitState({ ...INITIAL_STATE, ...(restored || {}), user: userData, draftOwnerId: userData.id });
+      setActiveSection(resolveSessionSection(userData.role, restored?.step, Boolean(restored && hasStartedVisit(restored))));
     } catch (err: any) { 
       setLoginError(err.message);
     } finally {
@@ -590,6 +596,15 @@ const App: React.FC = () => {
       step: activeSection,
     }));
   };
+
+  if (draftRestoreFailed) {
+    return <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center gap-5">
+      <AlertCircle size={40} className="text-orange-600" />
+      <h1 className="text-xl font-black">Não foi possível abrir os registros salvos</h1>
+      <p className="max-w-sm text-slate-600">Seus dados foram preservados. Feche a câmera e outros aplicativos e tente novamente. Não limpe os dados do aplicativo.</p>
+      <button className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-bold" onClick={() => window.location.reload()}>Tentar novamente</button>
+    </div>;
+  }
 
   if (loading || !draftHydrated) {
     return (

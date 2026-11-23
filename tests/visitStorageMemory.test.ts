@@ -88,7 +88,7 @@ test('navegacao e renovacao da sessao nao regravam fotos; evidencia continua sal
     const edited = { ...state, step: 'DEPOIS', photos: { ...state.photos, CHECKOUT: ['nova-foto'] }, tasks: { CHECKOUT: true } };
     writes.length = 0;
     await storage.saveVisitDraft('memory-test', edited);
-    assert.deepEqual(writes, ['active-visit', 'active-visit-position']);
+    assert.deepEqual(writes, ['active-visit', 'active-visit-position', 'active-visit-owner']);
     restored = await storage.loadVisitDraft('memory-test') as any;
     assert.equal(restored.photos.CHECKOUT[0], 'nova-foto');
     assert.equal(restored.tasks.CHECKOUT, true);
@@ -139,4 +139,54 @@ test('falha na compatibilidade nao impede repetir salvamento integral', async ()
   const restored = await storage.loadVisitDraft('retry-test') as any;
   assert.equal(restored.photos.ANTES[0], 'foto-retry');
   assert.ok(memoryStorage.has('retry-test'));
+});
+
+test('troca de conta arquiva atomicamente a visita anterior e restaura somente seu dono', async () => {
+  const draft = (owner: string) => ({ user: { id: owner }, draftOwnerId: owner, visitId: `VISIT-${owner}`, step: 'ANTES', checkInDone: true, photos: { FACHADA: [`foto-${owner}`] }, industryExecutions: {} }) as any;
+  const a = draft('archive-a'), b = draft('archive-b');
+  await storage.saveVisitDraft('archives', a);
+  await storage.saveVisitDraft('archives', { ...a, step: 'DEPOIS' });
+  await storage.saveVisitDraft('archives', b);
+  assert.equal(await storage.loadVisitDraft('archives', 'stranger'), null);
+  const restoredA = await storage.loadVisitDraft('archives', 'archive-a');
+  assert.equal(restoredA?.step, 'DEPOIS');
+  assert.deepEqual(restoredA?.photos, a.photos);
+  await storage.saveVisitDraft('archives', restoredA!);
+  assert.equal((await storage.loadVisitDraft('archives'))?.visitId, a.visitId);
+  assert.deepEqual((await storage.loadVisitDraft('archives', 'archive-b'))?.photos, b.photos);
+  // Completing/resetting A must not resurrect the archived copy later.
+  await storage.saveVisitDraft('archives', { ...restoredA!, visitId: null, photos: {}, checkInDone: false });
+  await storage.saveVisitDraft('archives', b);
+  assert.equal((await storage.loadVisitDraft('archives', 'archive-a'))?.visitId, null);
+});
+
+test('falha de leitura nao converte copia sem fotos em rascunho vazio', async () => {
+  const before = { user: { id: 'read-error' }, draftOwnerId: 'read-error', visitId: 'VISIT-READ-ERROR', photos: { FACHADA: ['preservada'] }, industryExecutions: {} } as any;
+  await storage.saveVisitDraft('read-error', before);
+  const original = IDBObjectStore.prototype.get;
+  IDBObjectStore.prototype.get = function(key: IDBValidKey) {
+    const request = original.call(this, key);
+    if (key === 'active-visit') request.addEventListener('success', () => this.transaction.abort());
+    return request;
+  };
+  try { await assert.rejects(storage.loadVisitDraft('read-error', 'read-error')); }
+  finally { IDBObjectStore.prototype.get = original; }
+  assert.deepEqual((await storage.loadVisitDraft('read-error', 'read-error'))?.photos, before.photos);
+});
+
+test('interromper arquivamento reverte troca de dono sem perder as fotos', async () => {
+  const a = { user: { id: 'atomic-a' }, draftOwnerId: 'atomic-a', visitId: 'VISIT-ATOMIC-A', photos: { FACHADA: ['foto-a'] }, industryExecutions: {} } as any;
+  const b = { ...a, user: { id: 'atomic-b' }, draftOwnerId: 'atomic-b', visitId: 'VISIT-ATOMIC-B', photos: { FACHADA: ['foto-b'] } };
+  await storage.saveVisitDraft('atomic', a);
+  const original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function(value: any, key?: IDBValidKey) {
+    const request = original.call(this, value, key);
+    if (key === 'owner-draft:atomic-a') request.addEventListener('success', () => this.transaction.abort());
+    return request;
+  };
+  try { await assert.rejects(storage.saveVisitDraft('atomic', b)); }
+  finally { IDBObjectStore.prototype.put = original; }
+  assert.deepEqual((await storage.loadVisitDraft('atomic'))?.photos, a.photos);
+  await storage.saveVisitDraft('atomic', b);
+  assert.deepEqual((await storage.loadVisitDraft('atomic', 'atomic-a'))?.photos, a.photos);
 });

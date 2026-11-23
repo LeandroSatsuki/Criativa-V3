@@ -77,7 +77,7 @@ export const markPhotosConfirmed = async (ownerId: string, visitId: string, payl
   });
 };
 
-const readGuard = async (name: string, store: string, key?: string): Promise<any> => {
+const readGuard = async (name: string, store: string, key?: string, countOnly = false): Promise<any> => {
   const db = await new Promise<IDBDatabase | null>((resolve, reject) => {
     let missing = false;
     const request = indexedDB.open(name);
@@ -89,7 +89,7 @@ const readGuard = async (name: string, store: string, key?: string): Promise<any
   if (!db.objectStoreNames.contains(store)) { db.close(); return null; }
   return new Promise((resolve, reject) => {
     const tx = db.transaction(store);
-    const request = key ? tx.objectStore(store).get(key) : tx.objectStore(store).count();
+    const request = key ? (countOnly ? tx.objectStore(store).count(key) : tx.objectStore(store).get(key)) : tx.objectStore(store).count();
     tx.oncomplete = () => { db.close(); resolve(request.result); };
     tx.onabort = tx.onerror = () => { db.close(); reject(tx.error); };
   });
@@ -102,6 +102,7 @@ export const pruneConfirmedPhotos = async (ownerId: string, now = Date.now()) =>
   return withLocalVisitLock(async () => {
     const queued = await readGuard('criativa-field-ops-sync', 'queued-visits');
     if (queued) return 0;
+    if (await readGuard('criativa-field-ops', 'visit-drafts', `owner-draft:${encodeURIComponent(ownerId)}`, true)) return 0;
     const draft = await readGuard('criativa-field-ops', 'visit-drafts', 'active-visit');
     if (draft && (draft.checkInDone || draft.tasks?.CHECKIN || localPhotoIds(draft).size
       || Object.values(draft.photos || {}).some((photos: any) => photos?.length))) return 0;

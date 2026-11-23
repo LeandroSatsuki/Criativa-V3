@@ -6,6 +6,8 @@ const DB_VERSION = 1;
 const STORE_NAME = 'visit-drafts';
 const ACTIVE_DRAFT_KEY = 'active-visit';
 const POSITION_KEY = 'active-visit-position';
+const OWNER_KEY = 'active-visit-owner';
+const ownerDraftKey = (ownerId: string) => `owner-draft:${encodeURIComponent(ownerId)}`;
 
 type PersistedVisitState = VisitState & {
   draftOwnerId?: string | null;
@@ -48,25 +50,31 @@ const openDatabase = () => new Promise<IDBDatabase>((resolve, reject) => {
   request.onsuccess = () => resolve(request.result);
 });
 
-const readIndexedDraft = async () => {
+const readIndexedDraft = async (ownerId?: string) => {
   const database = await openDatabase();
 
-  return new Promise<PersistedVisitState | null>((resolve, reject) => {
+  return new Promise<{ state: PersistedVisitState | null; active: boolean }>((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.get(ACTIVE_DRAFT_KEY);
     const position = store.get(POSITION_KEY);
+    let archived: IDBRequest | null = null;
+    request.onsuccess = () => {
+      if (ownerId && (!request.result || draftOwner(request.result) !== ownerId)) {
+        archived = store.get(ownerDraftKey(ownerId));
+      }
+    };
     request.onerror = () => reject(request.error || new Error('Falha ao ler o rascunho local.'));
     transaction.onerror = () => { database.close(); reject(transaction.error); };
     transaction.onabort = () => { database.close(); reject(transaction.error); };
     transaction.oncomplete = () => {
       database.close();
-      const state = request.result as PersistedVisitState | undefined;
+      const state = (archived ? archived.result : request.result) as PersistedVisitState | undefined;
       const savedPosition = position.result;
       if (state && savedPosition && savedPosition.ownerId === draftOwner(state)
         && savedPosition.visitId === (state.visitId || null) && typeof savedPosition.step === 'string') {
-        resolve({ ...state, step: savedPosition.step });
-      } else resolve(state || null);
+        resolve({ state: { ...state, step: savedPosition.step }, active: !archived });
+      } else resolve({ state: state || null, active: !archived });
     };
   });
 };
@@ -77,13 +85,38 @@ const writeIndexedDraft = async (state: PersistedVisitState, positionOnly: boole
   return new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    if (!positionOnly) store.put(state, ACTIVE_DRAFT_KEY);
-    store.put(draftPosition(state), POSITION_KEY);
     transaction.onerror = () => { database.close(); reject(transaction.error || new Error('Falha ao salvar o rascunho local.')); };
     transaction.onabort = () => { database.close(); reject(transaction.error || new Error('O salvamento local foi interrompido.')); };
     transaction.oncomplete = () => {
       database.close();
       resolve();
+    };
+    const write = (forceFull = false, initializeOwner = false) => {
+      if (!positionOnly || forceFull) store.put(state, ACTIVE_DRAFT_KEY);
+      store.put(draftPosition(state), POSITION_KEY);
+      if (!positionOnly || forceFull || initializeOwner) {
+        store.put({ ownerId: draftOwner(state) }, OWNER_KEY);
+        if (draftOwner(state)) store.delete(ownerDraftKey(draftOwner(state)!));
+      }
+    };
+    const metadata = store.get(OWNER_KEY);
+    metadata.onsuccess = () => {
+      if (metadata.result?.ownerId === draftOwner(state)) { write(); return; }
+      // Archive a different account atomically before changing the active slot.
+      const previous = store.get(ACTIVE_DRAFT_KEY);
+      const position = store.get(POSITION_KEY);
+      previous.onsuccess = () => {
+        const old = previous.result as PersistedVisitState | undefined;
+        if (old && draftOwner(old) && draftOwner(old) !== draftOwner(state)) {
+          position.onsuccess = () => {
+            const saved = position.result;
+            const snapshot = saved?.ownerId === draftOwner(old) && saved.visitId === (old.visitId || null)
+              ? { ...old, step: saved.step } : old;
+            store.put(snapshot, ownerDraftKey(draftOwner(old)!));
+            write(true);
+          };
+        } else write(!old, true);
+      };
     };
   });
 };
@@ -114,18 +147,22 @@ export const readLegacyVisitState = (storageKey: string): PersistedVisitState | 
   }
 };
 
-export const loadVisitDraft = async (storageKey: string) => {
+export const loadVisitDraft = async (storageKey: string, ownerId?: string) => {
   try {
-    const indexedDraft = await readIndexedDraft();
-    if (indexedDraft) {
-      if (!saveSequence && !pendingSave) committedDraft = { storageKey, state: indexedDraft };
-      return indexedDraft;
+    const indexedDraft = await readIndexedDraft(ownerId);
+    if (indexedDraft.state) {
+      if (!saveSequence && !pendingSave) committedDraft = indexedDraft.active
+        ? { storageKey, state: indexedDraft.state } : null;
+      return indexedDraft.state;
     }
   } catch (error) {
-    console.warn('IndexedDB indisponivel ao restaurar visita; usando copia de compatibilidade.', error);
+    // A compatibility copy can omit photos. Never treat a failed read as an
+    // empty draft and then overwrite the real evidence when storage recovers.
+    throw error;
   }
 
-  return readLegacyVisitState(storageKey);
+  const legacy = readLegacyVisitState(storageKey);
+  return legacy && (!ownerId || draftOwner(legacy) === ownerId) ? legacy : null;
 };
 
 let pendingSave: { storageKey: string; state: PersistedVisitState } | null = null;

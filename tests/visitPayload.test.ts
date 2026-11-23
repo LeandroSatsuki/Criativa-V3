@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  hasLargeVisitStrings,
   getMissingChunkIndexes,
   getUtf8ByteLength,
   splitUtf8Text,
   VISIT_PAYLOAD_CHUNK_MAX_BYTES,
 } from '../src/services/visitPayload.ts';
+
+test('detecta visita grande sem serializar nem copiar fotos antigas', () => {
+  assert.equal(hasLargeVisitStrings({ photos: ['a'.repeat(600_000), 'b'.repeat(600_000)] }), true);
+  assert.equal(hasLargeVisitStrings({ photos: ['a'.repeat(100_000)], missing: undefined, count: 40 }), false);
+});
 
 test('divide e remonta um payload grande sem alterar o conteúdo', () => {
   const payload = JSON.stringify({

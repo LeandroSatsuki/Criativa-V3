@@ -18,9 +18,8 @@ import { getSession } from './session';
 import { liteTestCatalog } from './liteMode';
 import {
   DIRECT_VISIT_PAYLOAD_MAX_BYTES,
-  getMissingChunkIndexes,
+  hasLargeVisitStrings,
   getUtf8ByteLength,
-  splitUtf8Text,
 } from './visitPayload';
 
 const APP_CONFIG_CACHE = 'CRIATIVA_APP_CONFIG_CACHE';
@@ -102,60 +101,6 @@ const buildVisitName = (prefix: string) => {
 };
 
 const toJsonBody = (data: unknown) => JSON.stringify(data);
-
-const buildUploadId = async (serializedPayload: string) => {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(serializedPayload),
-  );
-  return Array.from(new Uint8Array(digest))
-    .slice(0, 16)
-    .map((value) => value.toString(16).padStart(2, '0'))
-    .join('');
-};
-
-const createChunkedVisit = async (payload: any, serializedPayload: string) => {
-  const visitId = String(payload.visitId || buildVisitName('VISIT'));
-  const chunks = splitUtf8Text(serializedPayload);
-  const uploadId = await buildUploadId(serializedPayload);
-  const uploadStatus = await requestJson<{ receivedIndexes?: number[] }>('/visits/upload', {
-    method: 'POST',
-    retries: 1,
-    body: toJsonBody({
-      action: 'status',
-      uploadId,
-      visitId,
-      total: chunks.length,
-    }),
-  });
-  const missingIndexes = getMissingChunkIndexes(chunks.length, uploadStatus.receivedIndexes);
-
-  for (const index of missingIndexes) {
-    await requestJson('/visits/upload', {
-      method: 'POST',
-      retries: 2,
-      body: toJsonBody({
-        action: 'chunk',
-        uploadId,
-        visitId,
-        index,
-        total: chunks.length,
-        chunk: chunks[index],
-      }),
-    });
-  }
-
-  return requestJson<any>('/visits/upload', {
-    method: 'POST',
-    headers: { 'X-Criativa-Start-Sync': 'background' },
-    body: toJsonBody({
-      action: 'finalize',
-      uploadId,
-      visitId,
-      total: chunks.length,
-    }),
-  });
-};
 
 export const apiService = {
   getAppConfig: async (force = false) => {
@@ -281,7 +226,7 @@ export const apiService = {
       ...payload,
       visitId: payload.visitId || buildVisitName('VISIT'),
     };
-    if (hasLocalPhotos(payloadWithVisitId)) {
+    const sendInChunks = () => {
       const ownerId = String(getSession()?.user.id || '');
       return sendLiteVisit(payloadWithVisitId, id => readLocalPhoto(ownerId, id), body => {
         if (getSession()?.user.id !== ownerId) throw new Error('A sessao mudou. Dados preservados.');
@@ -291,11 +236,12 @@ export const apiService = {
           body: toJsonBody(body),
         });
       });
-    }
+    };
+    if (hasLocalPhotos(payloadWithVisitId) || hasLargeVisitStrings(payloadWithVisitId)) return sendInChunks();
     const serializedPayload = toJsonBody(payloadWithVisitId);
 
     if (getUtf8ByteLength(serializedPayload) > DIRECT_VISIT_PAYLOAD_MAX_BYTES) {
-      return createChunkedVisit(payloadWithVisitId, serializedPayload);
+      return sendInChunks();
     }
 
     return requestJson<any>('/visits', {

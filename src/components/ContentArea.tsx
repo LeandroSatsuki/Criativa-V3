@@ -29,6 +29,7 @@ import {
   compressStampedPhoto,
   drawPhotoInPortrait,
 } from '../services/imageCompression';
+import { decodeReportPhoto } from '../services/photoDecoder';
 import CriativaIcon from './CriativaIcon';
 import { 
   MapPin, 
@@ -469,35 +470,22 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     return lines.slice(0, 3).length * lineHeight;
   };
 
-  const processPhotoForReport = (file: File) => new Promise<string>((resolve, reject) => {
-    const imageUrl = URL.createObjectURL(file);
-    const img = new Image();
-    const releaseSourceImage = () => {
-      img.onload = null;
-      img.onerror = null;
-      img.removeAttribute('src');
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(imageUrl);
-      releaseSourceImage();
-      reject(new Error('Não foi possível processar a foto.'));
-    };
-    img.onload = async () => {
-      URL.revokeObjectURL(imageUrl);
+  const processPhotoForReport = async (file: File): Promise<string> => {
+    const decoded = await decodeReportPhoto(file);
+    const releaseSourceImage = decoded.release;
       let canvas: HTMLCanvasElement | null = null;
       try {
         canvas = document.createElement('canvas');
-        const layout = buildPortraitPhotoLayout(img.width, img.height);
+        const layout = buildPortraitPhotoLayout(decoded.width, decoded.height);
         canvas.width = layout.canvasWidth;
         canvas.height = layout.canvasHeight;
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          reject(new Error('Não foi possível preparar a foto.'));
-          return;
+          throw new Error('Não foi possível preparar a foto.');
         }
 
-        drawPhotoInPortrait(ctx, img, layout);
+        drawPhotoInPortrait(ctx, decoded.source, layout);
         releaseSourceImage();
 
         const padding = Math.max(18, Math.round(canvas.width * 0.035));
@@ -520,9 +508,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         drawStampLine(ctx, visitState.currentStore || 'Loja não informada', x, y, maxTextWidth, lineHeight);
 
         const compressed = await compressStampedPhoto(canvas);
-        resolve(compressed.base64);
-      } catch (error) {
-        reject(error);
+        return compressed.base64;
       } finally {
         if (canvas) {
           canvas.width = 1;
@@ -530,9 +516,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         }
         releaseSourceImage();
       }
-    };
-    img.src = imageUrl;
-  });
+  };
 
   const handlePhotoCapture = async (section: string, file: File, industryOverride?: string) => {
     if (photoProcessingRef.current) return;

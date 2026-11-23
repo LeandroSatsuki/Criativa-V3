@@ -12,7 +12,7 @@ test('captura impede compressoes simultaneas e libera o canvas', async () => {
   assert.match(contentArea, /photoProcessingRef\.current = true/);
   assert.match(contentArea, /finally \{[\s\S]*?photoProcessingRef\.current = false/);
   assert.match(contentArea, /canvas\.width = 1;[\s\S]*?canvas\.height = 1/);
-  assert.match(contentArea, /drawPhotoInPortrait\(ctx, img, layout\);[\s\S]*?releaseSourceImage\(\);/);
+  assert.match(contentArea, /drawPhotoInPortrait\(ctx, decoded.source, layout\);[\s\S]*?releaseSourceImage\(\);/);
   assert.match(imageCompression, /finally \{[\s\S]*?releaseTemporaryCanvas\(lastCanvas, sourceCanvas\)/);
 });
 
