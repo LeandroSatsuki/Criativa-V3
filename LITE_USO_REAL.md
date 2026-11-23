@@ -2,7 +2,9 @@
 
 Endereco: https://criativa-field-ops-574.netlify.app/
 
-Publicado em 30/10/2026 as 13:48 de Brasilia. Deploy `6ae4ca435a610694913e6e34`, bundle `index-B6WUAAZV.js`.
+Modo Lite liberado em 30/10/2026. Correcao urgente publicada em 23/11/2026 as 13:56 de Brasilia: deploy `6b047037992fe12250e6b2a7`, bundle `index-Ctv3zdaR.js`.
+
+A correcao protege rascunhos sem sessao, guarda rascunhos de donos diferentes, reduz a imagem antes do canvas em navegadores compativeis e evita copias integrais no envio de visitas grandes, incluindo as antigas. O modo escolhido no aparelho permanece. Fotos e visitas que ja estavam apagadas antes da atualizacao nao sao reconstruidas automaticamente.
 
 1. Concluir a visita atual e aguardar a confirmacao dos envios pendentes.
 2. Entrar no aplicativo habitual e abrir a engrenagem `Preferencias do aparelho` no topo.

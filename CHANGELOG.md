@@ -34,7 +34,9 @@
 - Os dois cenarios que falhavam na auditoria agora preservam a visita. Falhas de gravacao/arquivamento revertem a transacao.
 - No Chrome isolado, uma imagem 8000x6000 chegou ao canvas como bitmap 832x624; a foto com EXIF rotacionado chegou como 832x1110 e terminou em 624x832. Nenhum bitmap ou URL de captura ficou aberto no ensaio.
 - Ensaios locais usam dados sinteticos e APIs simuladas; nao geraram fotos ou visitas de teste em producao nem trafego no Make.
-- Publicacao e conferencia posterior registradas abaixo apos conclusao.
+- Primeira publicacao de protecao em `6b046f234dcbb8733c6c49ea`, as 13:52 de Brasilia. A execucao agendada seguinte normalizou automaticamente as duas entradas antigas; indice de pendencias com zero entradas na leitura de 13:55:56, sem alterar os registros completos enviados.
+- Publicacao final em 23/11/2026 as 13:56:32 de Brasilia: deploy `6b047037992fe12250e6b2a7`, bundle `index-Ctv3zdaR.js`, fonte `dd86d16` enviada ao GitHub na branch `agent/google-sync-production`.
+- Apos publicar: endereco oficial/login HTTP 200, sem erro JavaScript, health HTTP 200 com `google-v1`, 20 funcoes presentes e nenhum warn/error/fatal retornado na consulta de logs dos dez minutos anteriores. Sem login em conta de promotora. Pendencias ainda somente nos aparelhos nao fazem parte dessa consulta.
 
 ## [2026-11-23] - Auditoria de memoria e recuperacao, sem publicacao
 
