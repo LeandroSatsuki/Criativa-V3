@@ -32,7 +32,9 @@
 - Fila manual em syncing e 404 remoto retoma com mesmo ID; concorrencia compartilha uma criacao; rede/502 preservam payload; troca de dono impede envio; erro remoto nao sobrescreve registro.
 - Fila mais rica preservada, saida/horario original mantidos, divergencia recusada e transacao abortada nao libera nem apaga o rascunho.
 - Chrome isolado em 390 px: seis cenarios aprovados sem erro JavaScript. Falha de gravacao mantem a visita ativa e a foto de saida intactas.
-- Publicacao e verificacoes remotas registradas apos conclusao.
+- Previa `6b056bf0aaa837020fc6353a` e publicacao oficial `6b056c1e2307e4fb89e75d24` conferidas. Publicado em 24/11/2026 as 07:51:20 de Brasilia, bundle `index-BLXEQdDT.js`, fonte `ca97322` enviada ao GitHub na branch `agent/google-sync-production`.
+- Apos publicar: origem/login e health HTTP 200, provedor `google-v1`, nenhuma excecao JavaScript no Chrome isolado e filtro de logs de dez minutos sem warn/error/fatal retornados.
+- As 07:51:45 de Brasilia, a visita `VISIT-9ADC2CA2` ainda nao havia chegado ao servidor. Usuario orientado a solicitar que Lorena reabra a atualizacao com internet e use `Enviar visita salva` caso necessario, sem sair da conta, reinstalar ou limpar dados. Recuperacao real permanece pendente dessa acao no aparelho.
 
 ## [2026-11-23] - Correcao urgente de preservacao, conciliacao e picos de memoria
 
