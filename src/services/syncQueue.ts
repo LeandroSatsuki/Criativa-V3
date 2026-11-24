@@ -1,4 +1,5 @@
 import { withLocalVisitLock } from './localVisitLock.ts';
+import { wasVisitDiscarded } from './authorizedQueueDiscard.ts';
 export type QueueStatus = 'pending' | 'syncing' | 'error' | 'synced';
 
 export type QueuedVisit = {
@@ -319,6 +320,7 @@ export const upsertQueuedVisit = async (
   mutationSequence = mutationSequence.catch(() => undefined).then(async () => {
     const now = new Date().toISOString();
     const resolvedVisitId = visitId || payload.visitId || generateId();
+    if (wasVisitDiscarded(normalizedOwnerId, resolvedVisitId)) throw new Error('Este envio antigo foi removido por autorizacao. Os outros registros foram preservados.');
     const existing = await readIndexedVisit(resolvedVisitId);
     if (existing && getQueuedVisitOwnerId(existing) !== normalizedOwnerId) {
       throw new Error('A visita pertence a outra fila local.');

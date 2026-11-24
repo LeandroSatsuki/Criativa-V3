@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## [2026-11-24] - Abandono autorizado de uma unica pendencia antiga
+
+### Causa
+- Operador autorizou abrir mao da visita antiga `VISIT-9ADC2CA2`, da conta `lorena.costa` (ID 101), em BH PRAIA DA COSTA 539. Fotos locais indisponiveis impedem concluir o upload; Lorena ja consegue trabalhar em novas visitas.
+
+### Solucao aplicada
+- Acao `Remover envio antigo autorizado` aparece somente para esse ID, dono e login. Confirmacao explicita identifica visita/loja e informa que ela nao sera enviada. Nenhum botao de limpeza geral foi introduzido.
+- Antes da remocao, o registro da fila e arquivado em chave separada do banco de rascunhos. Essa copia preserva o payload/referencias existentes, sem reconstruir imagens que ja estejam ausentes.
+- Marcador local impede a versao atual de recriar ou reenviar o ID abandonado. Restauracao de tela antiga ignora somente esse rascunho; rascunho novo e demais filas permanecem intactos.
+- Upload ativo impede a acao. Falha no arquivamento ou no marcador preserva a fila; falha na remocao permite repetir.
+
+### Checklist
+- [x] 196 testes automatizados aprovados; TypeScript e build normal concluidos.
+- [x] Ensaio de interface: cancelar mantem a pendencia; confirmar remove apenas o ID autorizado, preservando uma fila nova e um rascunho novo em andamento.
+- [x] Cópia local preservada e reabertura de rascunho antigo nao recria o envio. Regressao de checkout/retomada, fotos ausentes, sessao e concorrencia conferida.
+- [ ] Lorena deve abrir a atualizacao e confirmar a acao no proprio aparelho. Nao afirmar que a fila fisica dela foi removida antes dessa confirmacao.
+
+### Seguranca
+- Nenhuma exclusao em Drive/planilha/servidor ou limpeza de fotos, cache ou dados do aplicativo. O arquivamento usa chave propria, sem alterar o schema do banco.
+- Autorizacao restrita a uma visita especifica; outra conta, login ou ID sao recusados. Novas visitas nao recebem essa acao de descarte.
+- Copia arquivada fica no armazenamento local, sem carregamento periodico na RAM. A remocao desta pendencia nao garante ausencia de falhas futuras de aparelho/rede; as protecoes de retomada e liberacao operacional continuam ativas.
+
+### Testes realizados
+- Isolamento de dono/ID, preservacao da visita ativa e de filas novas/outras contas, falha de backup, falha de marcador, tentativa durante upload e bloqueio de recriacao.
+- Navegador em 390 px, dados sinteticos e APIs simuladas: confirmacao/cancelamento e reabertura aprovados sem excecao JavaScript. Nenhum login na conta operacional.
+- Publicacao e verificacoes remotas registradas apos conclusao.
+
 ## [2026-11-24] - Conferencia local para foto indisponivel na fila da Lorena
 
 ### Causa

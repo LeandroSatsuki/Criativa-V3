@@ -2,6 +2,7 @@ import { getQueuedVisit, updateQueuedVisit } from './syncQueue.ts';
 import { confirmQueuedVisit } from './confirmQueuedVisit.ts';
 import { submitAutomaticVisit } from './submitAutomaticVisit.ts';
 import { classifyQueuedSyncFailure } from './syncPolicy.ts';
+import { wasVisitDiscarded } from './authorizedQueueDiscard.ts';
 
 type Transport = Parameters<typeof submitAutomaticVisit>[2];
 const inFlight = new Map<string, Promise<'sent' | 'syncing' | 'missing'>>();
@@ -17,6 +18,7 @@ export const deliverQueuedVisit = (ownerId: string, visitId: string, transport: 
   };
   const operation = (async () => {
     requireOwner();
+    if (wasVisitDiscarded(ownerId, visitId)) return 'missing' as const;
     const queued = await getQueuedVisit(ownerId, visitId);
     if (!queued) return 'missing' as const;
     try {

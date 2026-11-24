@@ -29,6 +29,8 @@ import { deliverQueuedVisit, isQueuedVisitUploading } from './services/queuedVis
 import { createSingleFlight } from './services/singleFlight';
 import { auditLocalVisitPhotos, type LocalPhotoAudit } from './services/localPhotoAudit';
 import { getQueuedVisit } from './services/syncQueue';
+import { canDiscardAuthorizedVisit, wasVisitDiscarded } from './services/authorizedQueueDiscard';
+import { discardAuthorizedQueue } from './services/discardAuthorizedQueue';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -98,6 +100,31 @@ const App: React.FC = () => {
   const statusChecks = useRef(createSingleFlight<void>());
   const [photoAudit, setPhotoAudit] = useState<{ ownerId: string; visitId: string; report?: LocalPhotoAudit; error?: string } | null>(null);
   const photoAuditBusy = useRef(false);
+  const [discardBusy, setDiscardBusy] = useState(false);
+  const [discardMessage, setDiscardMessage] = useState<string | null>(null);
+  const activeVisitIdentity = useRef({ ownerId: visitState.user?.id, visitId: visitState.visitId });
+  activeVisitIdentity.current = { ownerId: visitState.user?.id, visitId: visitState.visitId };
+
+  const discardOldAuthorizedVisit = async (visitId: string) => {
+    const user = getSession()?.user;
+    if (!canDiscardAuthorizedVisit(user, visitId) || !user || discardBusy) return;
+    if (!window.confirm(`Remover somente o envio antigo ${visitId}, de BH PRAIA DA COSTA 539?\nEssa visita não será enviada. As visitas novas serão mantidas.`)) return;
+    setDiscardBusy(true); setDiscardMessage(null);
+    try {
+      await discardAuthorizedQueue(user, visitId, () => getSession()?.user.id || null);
+      if (getSession()?.user.id !== user.id) return;
+      if (activeVisitIdentity.current.ownerId === user.id && activeVisitIdentity.current.visitId === visitId) {
+        setVisitState((prev: any) => prev.user?.id === user.id && prev.visitId === visitId
+          ? { ...INITIAL_STATE, user: prev.user, draftOwnerId: user.id, industries: prev.industries, availableStores: prev.availableStores } : prev);
+        setActiveSection(SectionId.CheckIn);
+      }
+      await refreshSyncStatus();
+      setPromptQueueCount(await getQueuedVisitCount(user.id));
+      setDiscardMessage('Somente o envio antigo foi removido. As outras visitas foram mantidas.');
+      window.dispatchEvent(new Event('criativa-sync-queue-updated'));
+    } catch (error: any) { setDiscardMessage(error.message || 'Nao foi possivel remover a pendencia antiga.'); }
+    finally { setDiscardBusy(false); }
+  };
 
   const inspectSavedPhotos = async (visitId: string) => {
     const ownerId = getSession()?.user.id;
@@ -179,7 +206,7 @@ const App: React.FC = () => {
       if (saved) {
         const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
         const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
-        const restored = sessionMatchesDraft ? recoverUnstartedVisit(saved) : null;
+        const restored = sessionMatchesDraft && !wasVisitDiscarded(session.user.id, saved.visitId) ? recoverUnstartedVisit(saved) : null;
         setVisitState({
           ...INITIAL_STATE,
           ...(restored || {}),
@@ -573,7 +600,7 @@ const App: React.FC = () => {
       setLoginForm({ user: userData.user, pass: '' });
       const saved = visitState.draftOwnerId === userData.id ? visitState
         : await loadVisitDraft(STORAGE_KEY, userData.id);
-      const restored = saved && (!saved.draftOwnerId || saved.draftOwnerId === userData.id)
+      const restored = saved && !wasVisitDiscarded(userData.id, saved.visitId) && (!saved.draftOwnerId || saved.draftOwnerId === userData.id)
         ? recoverUnstartedVisit(saved) : null;
       setVisitState({ ...INITIAL_STATE, ...(restored || {}), user: userData, draftOwnerId: userData.id });
       setActiveSection(resolveSessionSection(userData.role, restored?.step, Boolean(restored && hasStartedVisit(restored))));
@@ -828,11 +855,20 @@ const App: React.FC = () => {
                               : 'Tentar novamente'}
                         </button>
                       )}
+                      {canDiscardAuthorizedVisit(visitState.user, sync.visitId) && (
+                        <button type="button" disabled={discardBusy || isQueuedVisitUploading(visitState.user!.id, sync.visitId)}
+                          onClick={() => void discardOldAuthorizedVisit(sync.visitId)}
+                          className="w-full border border-red-200 bg-red-50 text-red-700 py-3 rounded-xl font-bold text-xs disabled:opacity-50">
+                          {discardBusy ? 'Removendo envio antigo...' : 'Remover envio antigo autorizado'}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
+
+            {discardMessage && <p role="status" className="text-sm font-semibold text-slate-700">{discardMessage}</p>}
 
             <button
               onClick={() => void refreshSyncStatus()}

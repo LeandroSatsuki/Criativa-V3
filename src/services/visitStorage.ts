@@ -204,3 +204,17 @@ export const requestPersistentVisitStorage = async () => {
     return false;
   }
 };
+
+// Keep a recovery copy under its own key. Never replace the active draft,
+// another account's archive, or any photo while abandoning a specific queue.
+export const archiveAbandonedQueue = async (ownerId: string, visitId: string, queued: unknown) => {
+  await withLocalVisitLock(async () => {
+    const database = await openDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put({ ownerId, visitId, queued, abandonedAt: new Date().toISOString(), reason: 'operator-authorized-2026-11-24' }, `abandoned-queue:${encodeURIComponent(ownerId)}:${visitId}`);
+      tx.oncomplete = () => { database.close(); resolve(); };
+      tx.onabort = tx.onerror = () => { database.close(); reject(tx.error || new Error('Nao foi possivel preservar a copia de seguranca.')); };
+    });
+  });
+};
