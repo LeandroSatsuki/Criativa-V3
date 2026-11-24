@@ -25,7 +25,9 @@
 ### Testes realizados
 - Isolamento de dono/ID, preservacao da visita ativa e de filas novas/outras contas, falha de backup, falha de marcador, tentativa durante upload e bloqueio de recriacao.
 - Navegador em 390 px, dados sinteticos e APIs simuladas: confirmacao/cancelamento e reabertura aprovados sem excecao JavaScript. Nenhum login na conta operacional.
-- Publicacao e verificacoes remotas registradas apos conclusao.
+- Previa `6b057b4f481092791af05bcc` e publicacao oficial `6b057b7e2dbfe61d70014923` conferidas. Publicado em 24/11/2026 as 08:56:57 de Brasilia, bundle `index-CYpSLHoB.js`, fonte `80aba9c` enviada ao GitHub na branch `agent/google-sync-production`.
+- Origem/login e health HTTP 200 com `google-v1`, sem excecao JavaScript no Chrome e sem warn/error/fatal retornados no filtro de dez minutos. Nenhum login na conta da promotora ou exclusao remota realizada.
+- Remocao fisica da pendencia no celular continua dependente do clique e confirmacao de Lorena; o servidor nao tem acesso direto a essa fila local.
 
 ## [2026-11-24] - Conferencia local para foto indisponivel na fila da Lorena
 
