@@ -15,14 +15,13 @@ import {
   getQueuedVisit,
   getQueuedVisitCount,
   listQueuedVisitSummaries,
-  removeQueuedVisit,
   upsertQueuedVisit,
-  updateQueuedVisit,
 } from '../services/syncQueue';
-import { classifyQueuedSyncFailure } from '../services/syncPolicy';
 import { generateVisitId } from '../services/visitId';
 import { hasStartedVisit } from '../services/visitLifecycle';
 import { buildAutomaticCheckout } from '../services/automaticCheckout';
+import { isConfirmedCheckout, preserveCompletedVisit } from '../services/completedVisitQueue';
+import { deliverQueuedVisit } from '../services/queuedVisitDelivery';
 import { getPhotoPreviewPage, PHOTO_PREVIEW_PAGE_SIZE } from '../services/photoGallery';
 import {
   buildPortraitPhotoLayout,
@@ -169,19 +168,25 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     const closeDueVisit = async () => {
       if (document.visibilityState === 'hidden' || photoProcessingRef.current
         || syncOperationRef.current || automaticClosingRef.current || Date.now() - lastAttempt < 60_000) return;
-      const snapshot = buildAutomaticCheckout(latestVisitRef.current);
+      const manualCompleted = isConfirmedCheckout(latestVisitRef.current);
+      const snapshot = manualCompleted ? latestVisitRef.current : buildAutomaticCheckout(latestVisitRef.current);
       if (!snapshot) return;
       lastAttempt = Date.now();
       automaticClosingRef.current = true;
       setAutomaticClosing(true);
       try {
-        const existing = await getQueuedVisit(queueOwnerId, snapshot.visitId!);
-        if (!existing) await upsertQueuedVisit(queueOwnerId, snapshot, snapshot.visitId!, 'pending');
+        if (manualCompleted) await preserveCompletedVisit(queueOwnerId, snapshot);
+        else {
+          const existing = await getQueuedVisit(queueOwnerId, snapshot.visitId!);
+          if (!existing) await upsertQueuedVisit(queueOwnerId, snapshot, snapshot.visitId!, 'pending');
+        }
         // Release the draft only after the queue transaction has committed.
         if (mounted && latestVisitRef.current.visitId === snapshot.visitId) {
           resetVisitRef.current();
           setShowVisitExitDialog(false);
-          setAutomaticNotice('Visita encerrada às 18h. Os registros foram salvos e aguardam a confirmação do envio.');
+          setAutomaticNotice(manualCompleted
+            ? 'Visita finalizada e salva no aparelho. O envio sera retomado sem bloquear novas visitas.'
+            : 'Visita encerrada às 18h. Os registros foram salvos e aguardam a confirmação do envio.');
         }
         window.dispatchEvent(new Event('criativa-sync-queue-updated'));
       } catch (error) {
@@ -641,68 +646,6 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     }
   };
 
-  const syncQueuedVisit = async (payload: any, queueVisitId?: string, useRetryEndpoint = false) => {
-    const queued = await upsertQueuedVisit(queueOwnerId, payload, queueVisitId || payload.visitId, useRetryEndpoint ? 'syncing' : 'pending');
-    const resolvedVisitId = queued.visitId;
-    let activeVisitId = resolvedVisitId;
-    updateVisit('visitId', resolvedVisitId);
-
-    try {
-      await updateQueuedVisit(queueOwnerId, resolvedVisitId, {
-        status: 'syncing',
-        error: null,
-        payload: { ...payload, visitId: resolvedVisitId },
-      });
-
-      const draft = await apiService.createVisit({ ...payload, visitId: resolvedVisitId });
-      const serverVisitId = draft.visitId || resolvedVisitId;
-      activeVisitId = serverVisitId;
-      updateVisit('visitId', serverVisitId);
-
-      if (serverVisitId !== resolvedVisitId) {
-        await removeQueuedVisit(queueOwnerId, resolvedVisitId);
-        await upsertQueuedVisit(queueOwnerId, payload, serverVisitId, 'pending');
-      }
-
-      setSyncMessage(useRetryEndpoint ? 'Reenvio iniciado em segundo plano.' : 'Envio iniciado em segundo plano.');
-      const result = draft.syncStarted
-        ? {
-          visitId: serverVisitId,
-          syncStatus: 'enviando',
-          syncError: null,
-        }
-        : await apiService.startBackgroundSync(serverVisitId);
-      await updateQueuedVisit(queueOwnerId, serverVisitId, {
-        status: 'syncing',
-        error: null,
-        payload: { ...payload, visitId: serverVisitId },
-      });
-      setQueueCount(await getQueuedVisitCount(queueOwnerId));
-      window.dispatchEvent(new Event('criativa-sync-queue-updated'));
-      return {
-        started: true as const,
-        result,
-        visitId: serverVisitId,
-      };
-    } catch (error: any) {
-      const failure = classifyQueuedSyncFailure(error);
-      await updateQueuedVisit(queueOwnerId, activeVisitId, {
-        status: failure.status,
-        error: failure.message,
-        attempts: queued.attempts + 1,
-        payload: { ...payload, visitId: activeVisitId },
-      });
-      setQueueCount(await getQueuedVisitCount(queueOwnerId));
-      window.dispatchEvent(new Event('criativa-sync-queue-updated'));
-      return {
-        started: false as const,
-        error: failure.message,
-        releaseVisit: failure.releaseVisit,
-        visitId: activeVisitId,
-      };
-    }
-  };
-
   const handleSync = async () => {
     if (syncOperationRef.current || automaticClosingRef.current) return;
     console.log(">>> BOTAO SINCRONIZAR CLICADO <<<");
@@ -727,21 +670,16 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     setIsSyncing(true);
     setSyncMessage('Iniciando sincronização...');
     try {
-      const attempt = await syncQueuedVisit({
+      await preserveCompletedVisit(queueOwnerId, {
         ...visitState,
-        timestamp: getBrasiliaISO()
-      }, visitState.visitId || undefined);
+        visitId: visitState.visitId || generateVisitId(),
+        checkOutTime: visitState.checkOutTime || getBrasiliaISO(),
+        tasks: { ...visitState.tasks, [SectionId.CheckOut]: true },
+      });
 
-      if (!attempt.started) {
-        if (attempt.releaseVisit) {
-          setSyncMessage('Visita salva no aparelho. O envio será retomado quando houver conexão.');
-          setQueueCount(await getQueuedVisitCount(queueOwnerId));
-          onReset();
-          return;
-        }
-        throw new Error(attempt.error);
-      }
-
+      // Only the committed local transaction can release the visit. The App
+      // resumes transport independently; slow/offline requests never block PDVs.
+      window.dispatchEvent(new Event('criativa-sync-queue-updated'));
       setSyncMessage('Visita salva. As fotos continuarão sendo enviadas em segundo plano.');
       setSyncSuccess(true);
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
@@ -773,13 +711,14 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         const queuedVisit = await getQueuedVisit(queueOwnerId, queuedSummary.visitId);
         if (!queuedVisit) continue;
         setSyncMessage(`Reenviando ${queuedVisit.visitId}...`);
-        const attempt = await syncQueuedVisit(queuedVisit.payload, queuedVisit.visitId, true);
-        if (!attempt.started) throw new Error(attempt.error);
+        await deliverQueuedVisit(queueOwnerId, queuedVisit.visitId, {
+          status: apiService.getSyncStatus, create: apiService.createVisit, start: apiService.startBackgroundSync,
+        }, () => getSession()?.user.id || null);
       }
 
       setSyncSuccess(true);
       setQueueCount(await getQueuedVisitCount(queueOwnerId));
-      onReset();
+      window.dispatchEvent(new Event('criativa-sync-queue-updated'));
     } catch (error: any) {
       setSyncError(formatSyncError(error.message || 'Não foi possível reenviar a fila local.'));
     } finally {
@@ -1681,16 +1620,13 @@ const ContentArea: React.FC<ContentAreaProps> = ({
               </div>
 
               <button 
-                disabled={!checkoutPhoto}
-                onClick={() => {
-                  updateVisit('checkOutTime', getBrasiliaISO());
-                  updateVisit('tasks', (prev: any) => ({ ...prev, [SectionId.CheckOut]: true }));
-                  navigateTo(SectionId.Sync);
-                }}
+                disabled={!checkoutPhoto || isProcessingPhoto || isSyncing || automaticClosing}
+                onClick={handleSync}
                 className={`w-full py-6 rounded-3xl font-black uppercase tracking-widest shadow-xl transition-all ${checkoutPhoto ? 'bg-[#0F172A] text-white shadow-slate-900/20' : 'bg-slate-100 text-slate-300'}`}
               >
-                Registro da Saída
+                {isSyncing ? 'Salvando visita...' : 'Registro da Saída'}
               </button>
+              <p className="text-xs text-slate-500 text-center">Ao registrar a saída, as fotos ficam salvas neste aparelho e o envio continua sem bloquear a próxima loja.</p>
             </div>
           </div>
         );

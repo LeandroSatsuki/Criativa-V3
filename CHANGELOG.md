@@ -1,5 +1,39 @@
 # CHANGELOG
 
+## [2026-11-24] - Retomada da fila manual e desbloqueio seguro da saida
+
+### Causa
+- Relato da conta `lorena.costa`, visita `VISIT-9ADC2CA2`, loja BH PRAIA DA COSTA 539: telas mostram 27 fotos e uma fila local antiga. Na consulta, nao havia registro dessa visita nem fragmentos de upload do dono 101 no servidor; o conteudo permanecia no aparelho.
+- Retomada automatica era restrita a filas `automaticCheckout` com status `pending`. Visitas manuais e uploads interrompidos em `syncing` dependiam de outro envio manual.
+- Consulta HTTP 404 era exibida como preparacao indefinida, sem acao especifica para enviar o conteudo local. Atualizar status nao retomava o transporte.
+- Uma saida ja registrada bloqueava o encerramento automatico das 18h; falhas de envio podiam deixar o rascunho concluido ocupando a visita ativa.
+- O erro que interrompeu a primeira tentativa dessa promotora nao pode ser determinado pelos dados disponiveis no servidor. A causa da permanencia sem retomada foi confirmada no fluxo e reproduzida com dados sinteticos.
+
+### Solucao aplicada
+- Retomada automatica de filas manuais e automaticas `pending`/`syncing`, com intervalo minimo de um minuto por visita, duas por rodada e ordenacao pela ultima tentativa para evitar monopolio das primeiras entradas.
+- Transporte consulta o status remoto primeiro: cria apenas em 404, nao sobrescreve visita existente e remove fila somente depois de `enviado`. Cliques manuais e retomada automatica da mesma visita compartilham a mesma operacao.
+- HTTP 404 no painel identifica registro salvo no aparelho e oferece `Enviar visita salva`. Erros de rede/transitorios preservam a fila para retomada; erro remoto continua usando o retry controlado do servidor.
+- Saidas manuais antigas com horario, tarefa de checkout e foto confirmados sao preservadas na fila antes de liberar a lista de lojas. Mantidos ID, fotos e horario original. Copia mais rica nao e reduzida; divergencias de fotos preservam ambas as copias e impedem a liberacao automatica.
+- `Registro da Saida` agora confirma o salvamento local e libera a proxima loja; o envio corre separadamente. A tela Sync antiga continua atendida. Reenviar outra visita nao redefine o rascunho atual.
+
+### Checklist
+- [x] 185 testes automatizados aprovados, TypeScript e build normal concluidos.
+- [x] Ensaio de navegador em seis cenarios: fila manual offline, Lite com `syncing` interrompido, registro ja enviado, falha de gravacao, nova finalizacao e retomada automatica online.
+- [x] Mesmo ID, 27 fotos preservadas, nenhuma recriacao de visita ja enviada e remocao somente apos confirmacao simulada.
+- [x] Regressao sem sessao/login, inicializacao com 100 fotos/fila antiga/offline, upload legado parcial e preferencias Lite verificadas.
+- [ ] Confirmar recebimento real da `VISIT-9ADC2CA2` apos o aparelho abrir a atualizacao e retomar o envio. Nao afirmar resgate antes dessa confirmacao.
+
+### Seguranca
+- Sem login na conta operacional, exclusao de fotos/filas ou alteracao de Drive, planilha, credenciais, camera ou armazenamento do aparelho da promotora.
+- Nenhum upload de teste real; testes usam APIs simuladas e bloqueiam conexoes externas. Atualizacao preserva os dados locais e nao forca recarga das telas em uso.
+- O servidor nao consegue buscar fotos que continuam somente no celular: a promotora precisa abrir a versao atualizada com conexao. Nao reinstalar nem limpar dados.
+
+### Testes realizados
+- Fila manual em syncing e 404 remoto retoma com mesmo ID; concorrencia compartilha uma criacao; rede/502 preservam payload; troca de dono impede envio; erro remoto nao sobrescreve registro.
+- Fila mais rica preservada, saida/horario original mantidos, divergencia recusada e transacao abortada nao libera nem apaga o rascunho.
+- Chrome isolado em 390 px: seis cenarios aprovados sem erro JavaScript. Falha de gravacao mantem a visita ativa e a foto de saida intactas.
+- Publicacao e verificacoes remotas registradas apos conclusao.
+
 ## [2026-11-23] - Correcao urgente de preservacao, conciliacao e picos de memoria
 
 ### Causa

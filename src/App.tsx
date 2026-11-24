@@ -17,19 +17,15 @@ import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT, type SessionEndReason } from './services/session';
 import { HttpRequestError } from './services/httpClient';
 import {
-  getQueuedVisit,
   getQueuedVisitCount,
   listQueuedVisitSummaries,
-  removeQueuedVisit,
   updateQueuedVisit,
 } from './services/syncQueue';
 import { loadVisitDraft, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
 import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
 import { isStaleSync } from './services/syncAge';
-import { submitAutomaticVisit } from './services/submitAutomaticVisit';
-import { classifyQueuedSyncFailure } from './services/syncPolicy';
-import { isRetryableHttpStatus } from './services/httpPolicy';
+import { deliverQueuedVisit, isQueuedVisitUploading } from './services/queuedVisitDelivery';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -39,6 +35,7 @@ const INITIAL_STATE = {
 };
 
 type PendingSyncView = {
+  localOnly?: boolean;
   visitId: string;
   createdAt: string;
   store: string;
@@ -105,33 +102,20 @@ const App: React.FC = () => {
       automaticUploadBusy.current = true;
       try {
         const summaries = await listQueuedVisitSummaries(ownerId);
-        const pending = summaries.filter((item) => item.automaticCheckout && item.status === 'pending'
-          && Date.now() - (automaticUploadAttempts.current.get(item.visitId) || 0) >= 60_000).slice(0, 2);
+        const pending = summaries.filter((item) => (item.status === 'pending' || item.status === 'syncing')
+          && Date.now() - (automaticUploadAttempts.current.get(item.visitId) || 0) >= 60_000)
+          .sort((left, right) => (automaticUploadAttempts.current.get(left.visitId) || 0) - (automaticUploadAttempts.current.get(right.visitId) || 0))
+          .slice(0, 2);
         for (const summary of pending) {
           if (cancelled || !navigator.onLine) break;
           automaticUploadAttempts.current.set(summary.visitId, Date.now());
-          const queued = await getQueuedVisit(ownerId, summary.visitId);
-          if (!queued || queued.status !== 'pending') continue;
-          const requireSameOwner = () => {
-            if (cancelled || getSession()?.user.id !== ownerId) throw new Error('A sessao mudou. O envio foi preservado.');
-          };
           try {
-            const result = await submitAutomaticVisit(queued.visitId, queued.payload, {
-              status: (id) => { requireSameOwner(); return apiService.getSyncStatus(id); },
-              create: (payload) => { requireSameOwner(); return apiService.createVisit(payload); },
-              start: (id) => { requireSameOwner(); return apiService.startBackgroundSync(id); },
-            });
-            if (result === 'sent') await confirmQueuedVisit(ownerId, queued.visitId, 'enviado');
-            else await updateQueuedVisit(ownerId, queued.visitId, { status: 'syncing', error: null });
+            if (isPhotoCaptureBusy()) break;
+            await deliverQueuedVisit(ownerId, summary.visitId, {
+              status: apiService.getSyncStatus, create: apiService.createVisit, start: apiService.startBackgroundSync,
+            }, () => cancelled ? null : getSession()?.user.id || null);
           } catch (error) {
             if (cancelled || getSession()?.user.id !== ownerId) break;
-            const failure = classifyQueuedSyncFailure(error);
-            const transient = error instanceof HttpRequestError
-              && (isRetryableHttpStatus(error.status) || error.status === 429 || error.status === 500);
-            await updateQueuedVisit(ownerId, queued.visitId, {
-              status: transient ? 'pending' : failure.status,
-              error: transient ? 'Servidor temporariamente indisponivel. O envio sera retomado automaticamente.' : failure.message,
-            });
           }
           window.dispatchEvent(new Event('criativa-sync-queue-updated'));
         }
@@ -403,13 +387,15 @@ const App: React.FC = () => {
           total: Number(remote.progress?.total || 0),
           retry: remote.retry,
         });
-      } catch {
+      } catch (error: any) {
+        const localOnly = error instanceof HttpRequestError && error.status === 404;
         next.push({
           visitId: queuedVisit.visitId,
           createdAt: queuedVisit.createdAt,
           store: queuedVisit.store,
           status: queuedVisit.status,
-          error: queuedVisit.error,
+          localOnly,
+          error: localOnly ? queuedVisit.error || 'Visita salva neste aparelho. O envio ao servidor ainda nao foi concluido.' : queuedVisit.error,
           sent: 0,
           total: 0,
         });
@@ -422,7 +408,7 @@ const App: React.FC = () => {
 
   const retryPendingSync = async (sync: PendingSyncView) => {
     const ownerId = visitState.user?.id;
-    if (!ownerId || !sync.retry?.available) return;
+    if (!ownerId || (!sync.localOnly && !sync.retry?.available)) return;
 
     setPromptSyncError(null);
     setPendingSyncs((current) => current.map((item) => item.visitId === sync.visitId
@@ -430,13 +416,22 @@ const App: React.FC = () => {
       : item));
 
     try {
+      if (sync.localOnly) {
+        automaticUploadAttempts.current.set(sync.visitId, Date.now());
+        await deliverQueuedVisit(ownerId, sync.visitId, {
+          status: apiService.getSyncStatus, create: apiService.createVisit, start: apiService.startBackgroundSync,
+        }, () => getSession()?.user.id || null);
+        await refreshSyncStatus();
+        notifyQueueChanged();
+        return;
+      }
       const result = await apiService.retrySync(sync.visitId);
       await updateQueuedVisit(ownerId, sync.visitId, { status: 'syncing', error: null });
       if (result.syncStatus === 'enviando') await apiService.startBackgroundSync(sync.visitId);
       await refreshSyncStatus();
       notifyQueueChanged();
     } catch (error: any) {
-      await updateQueuedVisit(ownerId, sync.visitId, {
+      if (!sync.localOnly && getSession()?.user.id === ownerId) await updateQueuedVisit(ownerId, sync.visitId, {
         status: 'error',
         error: error.message || 'Nao foi possivel tentar novamente.',
       });
@@ -459,34 +454,11 @@ const App: React.FC = () => {
     try {
       for (let index = 0; index < queuedVisits.length; index += 1) {
         const queuedSummary = queuedVisits[index];
-        const queuedVisit = await getQueuedVisit(ownerId, queuedSummary.visitId);
-        if (!queuedVisit) continue;
         setPromptSyncMessage(`Sincronizando ${index + 1}/${queuedVisits.length}...`);
-        await updateQueuedVisit(ownerId, queuedVisit.visitId, {
-          status: 'syncing',
-          error: null,
-        });
-
-        const draft = await apiService.createVisit({ ...queuedVisit.payload, visitId: queuedVisit.visitId });
-        const serverVisitId = draft.visitId || queuedVisit.visitId;
-        const status = await apiService.getSyncStatus(serverVisitId);
-
-        if (status.syncStatus === 'enviado') {
-          await confirmQueuedVisit(ownerId, serverVisitId, status.syncStatus);
-          if (serverVisitId !== queuedVisit.visitId) {
-            await confirmQueuedVisit(ownerId, queuedVisit.visitId, status.syncStatus);
-          }
-          notifyQueueChanged();
-          continue;
-        }
-
-        if (status.syncStatus !== 'enviando') {
-          await apiService.startBackgroundSync(serverVisitId);
-        }
-        await updateQueuedVisit(ownerId, serverVisitId, {
-          status: 'syncing',
-          error: null,
-        });
+        automaticUploadAttempts.current.set(queuedSummary.visitId, Date.now());
+        await deliverQueuedVisit(ownerId, queuedSummary.visitId, {
+          status: apiService.getSyncStatus, create: apiService.createVisit, start: apiService.startBackgroundSync,
+        }, () => getSession()?.user.id || null);
       }
 
       notifyQueueChanged();
@@ -779,7 +751,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex items-center justify-between gap-3 text-[9px] font-black uppercase tracking-widest">
                         <span className={hasError ? 'text-orange-600' : 'text-slate-500'}>
-                          {hasError ? 'Erro no envio' : sync.total > 0 ? 'Enviando fotos' : 'Preparando envio'}
+                          {hasError ? 'Erro no envio' : sync.localOnly ? 'Salvo no aparelho' : sync.total > 0 ? 'Enviando fotos' : 'Preparando envio'}
                         </span>
                         <span className="text-slate-400">{sync.sent}/{sync.total || '--'}</span>
                       </div>
@@ -787,7 +759,14 @@ const App: React.FC = () => {
                       {isStaleSync(sync.createdAt) && (
                         <p className="text-[10px] font-bold text-orange-700">Pendente há mais de 24 horas. Sincronize com conexão estável.</p>
                       )}
-                      {hasError && sync.retry?.retryable && (
+                      {sync.localOnly && (
+                        <button type="button" onClick={() => void retryPendingSync(sync)}
+                          disabled={isQueuedVisitUploading(visitState.user!.id, sync.visitId)}
+                          className="w-full bg-orange-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50">
+                          {isQueuedVisitUploading(visitState.user!.id, sync.visitId) ? 'Enviando ao servidor...' : 'Enviar visita salva'}
+                        </button>
+                      )}
+                      {!sync.localOnly && hasError && sync.retry?.retryable && (
                         <button
                           type="button"
                           disabled={!sync.retry.available}
