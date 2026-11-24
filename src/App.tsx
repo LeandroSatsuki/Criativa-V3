@@ -222,7 +222,6 @@ const App: React.FC = () => {
         setActiveSection(resolveSessionSection(session.user.role));
       }
 
-      await requestPersistentVisitStorage();
       if (!cancelled) setDraftHydrated(true);
     };
 
@@ -235,6 +234,12 @@ const App: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    // Covers the first login as well as authenticated openings. A permission
+    // denial must not block login, draft restoration or offline work.
+    if (visitState.user?.id) void requestPersistentVisitStorage();
+  }, [visitState.user?.id]);
 
   useEffect(() => {
     document.title = appConfig.title;

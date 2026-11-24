@@ -1,5 +1,38 @@
 # CHANGELOG
 
+## [2026-11-24] - Protecao da gravacao local de novas fotos e visitas
+
+### Causa
+- Foto indisponivel na visita antiga da Lorena nao revela quando/por que seus bytes deixaram de ser acessiveis. Sem o diagnostico do banco do aparelho, nao atribuir o incidente a falta de internet, limpeza automatica ou falta de RAM.
+- Ensaio reproduziu uma lacuna: primeiro login nao solicitava persistencia do armazenamento; apenas reabertura autenticada fazia isso. Gravacoes criticas usavam durabilidade padrao, sem solicitar flush estrito. Referencia Lite era aceita depois do commit, mas sem releitura independente.
+- Fila, rascunho e fotos continuam em bancos separados. Essa alteracao reduz janelas de risco, sem prometer atomicidade entre bancos ou protecao contra limpeza de dados, perda do aparelho ou falha fisica.
+
+### Solucao aplicada
+- Solicitar persistencia tambem no primeiro login, uma vez por carregamento da pagina, sem bloquear entrada/restauracao se o navegador negar ou demorar.
+- Solicitar durabilidade estrita para novas fotos Lite, conteudo do rascunho e gravacao individual de visitas na fila. Navegadores que recusam a opcao seguem pela assinatura antiga; erros reais de quota, banco e interrupcao continuam sendo reportados.
+- Foto Lite somente entrega referencia para a interface depois do commit e de releitura do mesmo dono com conteudo identico. Falha de verificacao rejeita a captura, preservando os dados existentes. Verificacao de uma foto por vez, sem carregar a visita inteira na RAM.
+- Sem alteracao de schema, contratos, tamanho/qualidade das imagens, pastas do Drive, transporte, limpeza ou IDs ja existentes. Modo normal recebe a protecao do rascunho/fila; releitura individual refere-se ao cofre Lite.
+
+### Checklist
+- [x] 200 testes automatizados, TypeScript e build normal aprovados.
+- [x] Primeiro login e reabertura solicitam persistencia; permissao negada nao bloqueia o trabalho.
+- [x] 27 fotos de aproximadamente 100 KB cada preservadas em fila, rascunho e sem confirmacao, simulando 30 dias. Nenhuma excluida.
+- [x] Captura normal/Lite, quota simulada, restauracao, checkout, reconexao e concorrencia revalidados em navegador isolado.
+- [ ] Conferencia da previa/publicacao e monitoramento depois da atualizacao.
+
+### Seguranca
+- Nenhum login na conta operacional, upload de teste real, exclusao de imagem, limpeza de dados ou reinstalacao. Fila antiga nao e reescrita nem migrada.
+- Confirmacao de recebimento do servidor continua obrigatoria antes de retirar uma visita da fila. Foto ausente nao e omitida para simular sucesso.
+- Persistencia e durabilidade sao protecoes adicionais, nao garantia de backup. Chrome documenta durabilidade: https://developer.chrome.com/blog/indexeddb-durability-mode-now-defaults-to-relaxed . Eviccao normal atua na origem inteira, portanto nao explica isoladamente uma foto ausente com fila preservada: https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria .
+
+### Testes realizados
+- Compatibilidade com navegadores que recusam opcoes de transacao; erros reais nao sao repetidos como fallback. Commit abortado e releitura ausente/divergente recusam referencia, sem excluir arquivo gravado.
+- Ensaio de 100 fotos existentes por modo, oito capturas de 12/48 MP e 50 navegacoes de galeria; reabertura preserva evidencia, fontes/bitmaps liberados. Simulacao de armazenamento cheio preserva visita Lite.
+- Sete cenarios de checkout/retomada, incluindo offline, reconexao automatica, visita ja recebida e uma foto ausente: fila removida somente apos confirmacao; 26 fotos restantes e pendencia preservadas no caso incompleto.
+- Quinze eventos simultaneos continuam resultando em uma consulta de status e tres leituras completas da fila sintetica de 12 MB. Sem regressao observada na deduplicacao ou aumento de paralelismo.
+- Ensaio em Chrome de computador nao reproduz energia/RAM/camera nativa de Android; nenhum teste de perda fisica de disco foi realizado.
+- Auditoria adicional demonstrou que IDs novos truncados em oito caracteres podem colidir com UUIDs diferentes. Nao foi constatada colisao na visita de Lorena; mudanca de identidade foi separada deste reforco de armazenamento para manter escopo reduzido.
+
 ## [2026-11-24] - Abandono autorizado de uma unica pendencia antiga
 
 ### Causa

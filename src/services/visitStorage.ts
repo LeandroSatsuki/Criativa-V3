@@ -1,5 +1,6 @@
 import type { VisitState } from '../types';
 import { withLocalVisitLock } from './localVisitLock.ts';
+import { evidenceTransaction } from './durableStorage.ts';
 
 const DB_NAME = 'criativa-field-ops';
 const DB_VERSION = 1;
@@ -83,7 +84,7 @@ const writeIndexedDraft = async (state: PersistedVisitState, positionOnly: boole
   const database = await openDatabase();
 
   return new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, 'readwrite');
+    const transaction = positionOnly ? database.transaction(STORE_NAME, 'readwrite') : evidenceTransaction(database, STORE_NAME);
     const store = transaction.objectStore(STORE_NAME);
     transaction.onerror = () => { database.close(); reject(transaction.error || new Error('Falha ao salvar o rascunho local.')); };
     transaction.onabort = () => { database.close(); reject(transaction.error || new Error('O salvamento local foi interrompido.')); };
@@ -195,14 +196,14 @@ export const saveVisitDraft = (storageKey: string, state: PersistedVisitState) =
   return saveSequence;
 };
 
-export const requestPersistentVisitStorage = async () => {
-  if (!navigator.storage?.persist) return false;
-
-  try {
-    return await navigator.storage.persist();
-  } catch {
-    return false;
-  }
+let persistenceRequest: Promise<boolean> | null = null;
+export const requestPersistentVisitStorage = () => {
+  if (!persistenceRequest) persistenceRequest = (async () => {
+    if (!navigator.storage?.persist) return false;
+    try { return await navigator.storage.persist(); }
+    catch { return false; }
+  })();
+  return persistenceRequest;
 };
 
 // Keep a recovery copy under its own key. Never replace the active draft,

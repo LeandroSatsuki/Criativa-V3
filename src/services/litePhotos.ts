@@ -1,4 +1,5 @@
 import { withLocalVisitLock, hasLocalVisitLocks } from './localVisitLock.ts';
+import { evidenceTransaction } from './durableStorage.ts';
 const PREFIX = 'criativa-photo-v1:';
 const DB = 'criativa-lite-photos';
 const STORE = 'photos';
@@ -37,12 +38,21 @@ export const storeLocalPhoto = async (ownerId: string, base64: string, context?:
   if (!ownerId || !base64) throw new Error('Foto ou proprietario nao identificado.');
   const id = `${PREFIX}${encodeURIComponent(ownerId)}:${crypto.randomUUID()}`;
   const db = await openPhotos();
-  await withLocalVisitLock(() => new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).add({ id, ownerId, base64, context });
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onabort = tx.onerror = () => { db.close(); reject(tx.error || new Error('Foto nao salva.')); };
-  }));
+  try {
+    await withLocalVisitLock(async () => {
+      await new Promise<void>((resolve, reject) => {
+        const tx = evidenceTransaction(db, STORE);
+        tx.objectStore(STORE).add({ id, ownerId, base64, context });
+        tx.oncomplete = () => resolve();
+        tx.onabort = tx.onerror = () => reject(tx.error || new Error('Foto nao salva.'));
+      });
+      // One photo at a time: do not publish a reference before a fresh read of
+      // the committed record confirms its owner and exact bytes.
+      if (await readLocalPhoto(ownerId, id) !== base64) {
+        throw new Error('Nao foi possivel confirmar a foto salva. Tente tirar a foto novamente.');
+      }
+    });
+  } finally { db.close(); }
   return id;
 };
 

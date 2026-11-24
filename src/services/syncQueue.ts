@@ -1,4 +1,5 @@
 import { withLocalVisitLock } from './localVisitLock.ts';
+import { evidenceTransaction } from './durableStorage.ts';
 import { wasVisitDiscarded } from './authorizedQueueDiscard.ts';
 export type QueueStatus = 'pending' | 'syncing' | 'error' | 'synced';
 
@@ -144,7 +145,7 @@ const countIndexedSummaries = async (ownerId: string) => {
 const writeIndexedVisit = async (visit: QueuedVisit) => {
   const database = await openDatabase();
   return new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction([STORE_NAME, SUMMARY_STORE_NAME], 'readwrite');
+    const transaction = evidenceTransaction(database, [STORE_NAME, SUMMARY_STORE_NAME]);
     transaction.objectStore(STORE_NAME).put(visit);
     transaction.objectStore(SUMMARY_STORE_NAME).put(toQueuedVisitSummary(visit));
     transaction.onerror = () => reject(transaction.error || new Error('Falha ao salvar a visita na fila.'));
