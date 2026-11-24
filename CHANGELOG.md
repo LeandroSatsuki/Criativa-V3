@@ -18,7 +18,7 @@
 - [x] Primeiro login e reabertura solicitam persistencia; permissao negada nao bloqueia o trabalho.
 - [x] 27 fotos de aproximadamente 100 KB cada preservadas em fila, rascunho e sem confirmacao, simulando 30 dias. Nenhuma excluida.
 - [x] Captura normal/Lite, quota simulada, restauracao, checkout, reconexao e concorrencia revalidados em navegador isolado.
-- [ ] Conferencia da previa/publicacao e monitoramento depois da atualizacao.
+- [x] Previa e publicacao oficial conferidas, login/health HTTP 200 e filtro de logs apos atualizacao sem ocorrencias retornadas.
 
 ### Seguranca
 - Nenhum login na conta operacional, upload de teste real, exclusao de imagem, limpeza de dados ou reinstalacao. Fila antiga nao e reescrita nem migrada.
@@ -32,6 +32,9 @@
 - Quinze eventos simultaneos continuam resultando em uma consulta de status e tres leituras completas da fila sintetica de 12 MB. Sem regressao observada na deduplicacao ou aumento de paralelismo.
 - Ensaio em Chrome de computador nao reproduz energia/RAM/camera nativa de Android; nenhum teste de perda fisica de disco foi realizado.
 - Auditoria adicional demonstrou que IDs novos truncados em oito caracteres podem colidir com UUIDs diferentes. Nao foi constatada colisao na visita de Lorena; mudanca de identidade foi separada deste reforco de armazenamento para manter escopo reduzido.
+- Previa `6b057eab00b007744825c471` e publicacao oficial `6b057ef3f4f7dc14edcf5488` conferidas. Publicado em 24/11/2026 as 09:11:41 de Brasilia, bundle `index-CBOIgtNS.js`, fonte `ebf6295` enviada ao GitHub na branch `agent/google-sync-production`.
+- Conferencia publica sem login operacional: pagina de acesso/health HTTP 200, provedor `google-v1` e nenhuma excecao JavaScript. Filtro Netlify warn/error/fatal dos ultimos dez minutos nao retornou ocorrencias; nao equivale a telemetria de RAM nem a garantia sobre todos os celulares.
+- Ensaio do descarte autorizado antigo reconferido: cancelar preserva, confirmar afeta somente o ID permitido, e fila/rascunho novos continuam intactos. Confirmacao fisica da Lorena no aparelho continua pendente.
 
 ## [2026-11-24] - Abandono autorizado de uma unica pendencia antiga
 
