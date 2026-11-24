@@ -31,7 +31,9 @@
 - Medicoes que usavam `setInputFiles` foram descartadas para analise de vazamento: retentores do DevTools mantinham inputs antigos. O ensaio valido injeta arquivo via DataTransfer e inspeciona recursos depois de terminar cada visita. As imagens sao sinteticas; camera nativa e RAM total do Android nao foram medidas.
 - Testes de coordenacao cobrem chamadas simultaneas, isolamento de contas, liberacao apos erro e confirmacao interrompida sem perda de fotos. Regressao de visita antiga, offline, Lite, transacao abortada, visita nova e retomada automatica aprovadas.
 - Achado adicional para acompanhamento separado: o indicador compartilhado de analise opcional pode manter o botao de validacao desabilitado enquanto uma analise anterior aguarda resposta. Esse caminho nao foi alterado nesta correcao focada em concorrencia de status/confirmacao.
-- Publicacao e verificacoes remotas registradas apos conclusao.
+- Previa `6b0571b76c4722e1d53e0b73` e publicacao oficial `6b057203c09c072e578f9f9f` conferidas. Publicado em 24/11/2026 as 08:16:29 de Brasilia, bundle `index-BqorOwwJ.js`, fonte `36d80ba` enviada ao GitHub na branch `agent/google-sync-production`.
+- Apos publicar: origem/login e health HTTP 200, `google-v1`, sem erro JavaScript no Chrome isolado e filtro de logs dos dez minutos anteriores sem warn/error/fatal retornados. Isso nao fornece telemetria da RAM dos celulares.
+- Consulta pontual da recuperacao anterior: `VISIT-9ADC2CA2` ainda ausente as 08:16:49 de Brasilia; continua pendente da retomada no aparelho da Lorena, sem novo login ou alteracao dessa conta.
 
 ## [2026-11-24] - Retomada da fila manual e desbloqueio seguro da saida
 
