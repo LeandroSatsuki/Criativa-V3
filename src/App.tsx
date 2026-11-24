@@ -26,6 +26,7 @@ import { resolveSessionSection } from './services/navigationPolicy';
 import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
 import { isStaleSync } from './services/syncAge';
 import { deliverQueuedVisit, isQueuedVisitUploading } from './services/queuedVisitDelivery';
+import { createSingleFlight } from './services/singleFlight';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -92,6 +93,7 @@ const App: React.FC = () => {
   const lastSessionRefresh = useRef(0);
   const automaticUploadBusy = useRef(false);
   const automaticUploadAttempts = useRef(new Map<string, number>());
+  const statusChecks = useRef(createSingleFlight<void>());
 
   useEffect(() => {
     const ownerId = visitState.user?.id;
@@ -349,20 +351,23 @@ const App: React.FC = () => {
     window.dispatchEvent(new Event('criativa-sync-queue-updated'));
   };
 
-  const refreshSyncStatus = async () => {
-    const ownerId = visitState.user?.id;
+  const refreshSyncStatus = () => {
+    const ownerId = getSession()?.user.id;
     if (!ownerId) {
       setPendingSyncs([]);
-      return;
+      return Promise.resolve();
     }
 
+    return statusChecks.current(ownerId, async () => {
     const queuedVisits = await listQueuedVisitSummaries(ownerId);
     const next: PendingSyncView[] = [];
     let queueChanged = false;
 
     for (const queuedVisit of queuedVisits) {
+      if (getSession()?.user.id !== ownerId) return;
       try {
         const remote = await apiService.getSyncStatus(queuedVisit.visitId);
+        if (getSession()?.user.id !== ownerId) return;
         if (remote.syncStatus === 'enviado') {
           await confirmQueuedVisit(ownerId, queuedVisit.visitId, remote.syncStatus);
           queueChanged = true;
@@ -402,8 +407,10 @@ const App: React.FC = () => {
       }
     }
 
+    if (getSession()?.user.id !== ownerId) return;
     setPendingSyncs(next);
     if (queueChanged) notifyQueueChanged();
+    });
   };
 
   const retryPendingSync = async (sync: PendingSyncView) => {

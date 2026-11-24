@@ -1,5 +1,38 @@
 # CHANGELOG
 
+## [2026-11-24] - Controle de consultas concorrentes para reduzir picos de memoria
+
+### Causa
+- Relatos de funcionamento normal no inicio e insuficiencia de memoria apos uso continuado. O teste anterior de uma captura/visita nao cobria consultas lentas sobrepostas.
+- `refreshSyncStatus` podia ser iniciado novamente por foco, retorno de conexao, atualizacao da fila e timer enquanto a consulta anterior ainda aguardava resposta.
+- Quando varias consultas recebiam `enviado`, cada uma chamava a confirmacao e lia novamente o payload completo do IndexedDB. A confirmacao tambem podia concorrer com o envio automatico.
+- Reproducao isolada com fila sintetica de 12 MB e 15 eventos: 16 consultas simultaneas, 33 leituras completas e pico amostrado de heap JavaScript de 212.059.180 bytes. Trata-se de pressao temporaria por concorrencia, nao prova de fotos permanentemente acumuladas nem medicao da RAM do Android.
+
+### Solucao aplicada
+- Consultas de status em andamento sao compartilhadas por conta; eventos adicionais aguardam a mesma operacao.
+- Confirmacoes concorrentes compartilham a operacao por dono/visita. Continua obrigatorio `enviado`, recibo local Lite antes da remocao e verificacao de propriedade.
+- A coordenacao nao guarda payloads/resultados apos concluir. Sucesso e erro liberam a chave para novas consultas; falha de transacao permite repetir sem perder registros.
+- Respostas de uma conta anterior nao atualizam o painel nem confirmam a fila depois de trocar a sessao.
+
+### Checklist
+- [x] 189 testes da aplicacao aprovados, TypeScript e build normal concluidos.
+- [x] Mesmo ensaio de rede lenta: uma consulta simultanea, tres leituras completas e pico amostrado de 29.065.296 bytes (86,3% menor nesse ensaio).
+- [x] Uso continuo: oito visitas no normal e oito no Lite, 18 capturas por visita, 288 fotos no total, com transporte e confirmacao simulados.
+- [x] Seis cenarios de finalizacao/recuperacao e restauracao sem sessao/login revalidados.
+- [ ] Confirmar melhora nos Androids afetados apos receberem a atualizacao; ausencia total de avisos nao foi comprovada nos aparelhos.
+
+### Seguranca
+- Sem alteracao de qualidade, fluxo de pastas, autenticacao, formato da fila, armazenamento de fotos ou exclusao de dados reais. Limites de retencao Lite e regras de reenvio preservados.
+- Sem login de promotora ou envio real de fotos nos testes. Nenhuma chamada de teste a Make/Drive/planilha. Publicacao nao forca recarga de telas abertas.
+
+### Testes realizados
+- `audit-sync-overlap.mjs`: eventos repetidos com resposta atrasada e payload local de 12 MB. Remove a fila somente apos confirmacao simulada. Pico varia conforme amostragem/coleta de lixo; nao representa memoria total do navegador ou aparelho.
+- `audit-continuous-memory.mjs`: capturas, validacoes, saida, upload e confirmacao consecutivos sem recarga. Apos coleta de lixo, normal passou de 5.516.756 para 6.207.276 bytes entre primeira e oitava visita; Lite de 4.909.808 para 5.364.428. Buffers externos ficaram proximos de 467 KB; nos pontos de medicao, zero bitmaps, URLs temporarias de captura e conexoes IndexedDB abertas. Contagem de nos/listeners permaneceu estavel entre as visitas.
+- Medicoes que usavam `setInputFiles` foram descartadas para analise de vazamento: retentores do DevTools mantinham inputs antigos. O ensaio valido injeta arquivo via DataTransfer e inspeciona recursos depois de terminar cada visita. As imagens sao sinteticas; camera nativa e RAM total do Android nao foram medidas.
+- Testes de coordenacao cobrem chamadas simultaneas, isolamento de contas, liberacao apos erro e confirmacao interrompida sem perda de fotos. Regressao de visita antiga, offline, Lite, transacao abortada, visita nova e retomada automatica aprovadas.
+- Achado adicional para acompanhamento separado: o indicador compartilhado de analise opcional pode manter o botao de validacao desabilitado enquanto uma analise anterior aguarda resposta. Esse caminho nao foi alterado nesta correcao focada em concorrencia de status/confirmacao.
+- Publicacao e verificacoes remotas registradas apos conclusao.
+
 ## [2026-11-24] - Retomada da fila manual e desbloqueio seguro da saida
 
 ### Causa

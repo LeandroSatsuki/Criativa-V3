@@ -3,6 +3,7 @@ import test from 'node:test';
 import 'fake-indexeddb/auto';
 import { upsertQueuedVisit, getQueuedVisit } from '../src/services/syncQueue.ts';
 import { deliverQueuedVisit } from '../src/services/queuedVisitDelivery.ts';
+import { confirmQueuedVisit } from '../src/services/confirmQueuedVisit.ts';
 
 const memory = new Map<string, string>();
 Object.assign(globalThis, { window: globalThis, localStorage: { getItem: (k: string) => memory.get(k) || null, setItem: (k: string, v: string) => memory.set(k, v), removeItem: (k: string) => memory.delete(k) } });
@@ -58,4 +59,33 @@ test('visita com erro remoto nao e sobrescrita nem reiniciada sem retry autoriza
     create: async () => { throw Error('nao sobrescrever'); }, start: async () => { throw Error('nao reiniciar'); },
   }, () => owner), /precisa suporte/);
   assert.equal((await getQueuedVisit(owner, id))?.status, 'error');
+});
+
+test('confirmacoes concorrentes nao leem copias repetidas da visita e falha permite repetir', async () => {
+  const id = 'VISIT-CONFIRM-SHARED'; await upsertQueuedVisit(owner, payload, id);
+  const original = IDBObjectStore.prototype.get; let reads = 0;
+  IDBObjectStore.prototype.get = function(key: IDBValidKey) { if (this.name === 'queued-visits' && key === id) reads++; return original.call(this, key); };
+  try {
+    const first = confirmQueuedVisit(owner, id, 'enviado');
+    const others = Array.from({ length: 25 }, () => confirmQueuedVisit(owner, id, 'enviado'));
+    assert.ok(others.every(promise => promise === first));
+    await assert.rejects(confirmQueuedVisit(owner, id, 'enviando'));
+    await Promise.all(others);
+    assert.equal(reads, 2); // Confirmation and ownership check for removal.
+  } finally { IDBObjectStore.prototype.get = original; }
+  assert.equal(await getQueuedVisit(owner, id), null);
+});
+
+test('falha ao retirar fila confirmada libera a operacao e preserva dados para repetir', async () => {
+  const id = 'VISIT-CONFIRM-ABORT'; await upsertQueuedVisit(owner, payload, id);
+  const original = IDBObjectStore.prototype.delete;
+  IDBObjectStore.prototype.delete = function(key: IDBValidKey) {
+    const request = original.call(this, key);
+    if (this.name === 'queued-visits' && key === id) request.addEventListener('success', () => this.transaction.abort());
+    return request;
+  };
+  try { await assert.rejects(confirmQueuedVisit(owner, id, 'enviado')); }
+  finally { IDBObjectStore.prototype.delete = original; }
+  assert.deepEqual((await getQueuedVisit(owner, id))?.payload.photos, payload.photos);
+  await confirmQueuedVisit(owner, id, 'enviado'); assert.equal(await getQueuedVisit(owner, id), null);
 });
