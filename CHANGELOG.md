@@ -28,7 +28,9 @@
 - Ausencia de uma referencia nao remove as demais; aliases sao contados uma vez; falha de banco e reportada como nao verificada, nao como arquivo apagado; outra conta nao e lida.
 - Fila com mais de uma semana continua bloqueando limpeza; todos os 26 arquivos restantes permaneceram iguais apos conferencia.
 - UI no Chrome isolado, 390 px, com report da falta de uma foto e hostname visivel. Os numeros do teste nao sao os numeros reais do aparelho da Lorena.
-- Publicacao e verificacoes remotas registradas apos conclusao.
+- Previa final `6b05795f2afe78722fb9d2e3` e publicacao oficial `6b057989294192faefc6ddd4` conferidas. Publicado em 24/11/2026 as 08:48:36 de Brasilia, bundle `index-BtkQuPgw.js`, fonte `23a4086` enviada ao GitHub na branch `agent/google-sync-production`.
+- Origem/login e health HTTP 200, provedor `google-v1`, sem excecao JavaScript no Chrome de conferencia. Nenhum login na conta operacional realizado.
+- Usuario confirmou que Lorena ja consegue trabalhar; nao sabe se os originais estao na galeria. Falta conferir as contagens reais usando o novo botao. O desbloqueio operacional esta confirmado, a recuperacao das fotos antigas ainda nao.
 
 ## [2026-11-24] - Controle de consultas concorrentes para reduzir picos de memoria
 
