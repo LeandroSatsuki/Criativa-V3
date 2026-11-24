@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## [2026-11-24] - Conferencia local para foto indisponivel na fila da Lorena
+
+### Causa
+- Retorno do aparelho mostra `Foto local indisponivel` na `VISIT-9ADC2CA2`. A atualizacao de retomada passou a executar o transporte e identificou que pelo menos uma referencia Lite nao pode ser resolvida em imagem.
+- Nova consulta nao encontrou a visita nos registros/resumos nem fragmentos de upload do dono 101. Nao existe copia remota recebida nesses armazenamentos para recuperar por esta via.
+- A mensagem anterior de preparacao nao mostrava essa causa. O erro nao comprova que todas as 27 fotos estejam ausentes e nao determina por si so quando/por que a imagem deixou de ser acessivel.
+- Revisao da limpeza atual: exige recibo de visita enviada, retencao minima de 24 horas, dono/visita correspondentes e ausencia de fila ou rascunho protegido. Testes confirmam que fila antiga nao e excluida por estar velha. Nao foi constatado acesso ao banco do aparelho para atribuir a origem da ausencia.
+
+### Solucao aplicada
+- Botao `Verificar fotos salvas` para a fila com erro local. Faz leitura sequencial das referencias, informa quantas possuem dados, quantas estao ausentes, quantas pertencem a outra conta e quantas nao puderam ser verificadas por erro do banco.
+- A conferencia mostra o hostname em uso para verificar o endereco do aplicativo e nao guarda imagens em memoria nem faz upload. Conta imagens diferentes por referencia/conteudo, sem duplicar aliases no payload. Presenca de dados nao equivale a validacao visual do JPEG.
+- Erros de foto tipados distinguem ausencia, proprietario e falha de leitura. O envio continua interrompido se faltar imagem: nao descarta fotos nem confirma visita incompleta como enviada.
+
+### Checklist
+- [x] 192 testes automatizados aprovados, TypeScript e build normal concluidos.
+- [x] Ensaio sintetico com 27 referencias e uma foto ausente: 26 com dados e uma indisponivel; fila e 26 fotos mantidas, nenhuma finalizacao.
+- [x] Regressao de seis cenarios de checkout/retomada, preservacao sem sessao e controle de consultas concorrentes revalidada.
+- [ ] Obter os numeros reais da conferencia no aparelho da Lorena e confirmar se ela tem os originais na galeria. Ainda nao foi recuperada a imagem ausente.
+
+### Seguranca
+- Conferencia somente de leitura, uma imagem por vez, com verificacao de dono e interrupcao se a sessao mudar. Sem varrer filas de outras pessoas, alterar referencias ou substituir imagens por suposicao.
+- Nenhuma mudanca na limpeza local, no schema do banco ou nos contratos de upload. Sem login em conta operacional, exclusao de dados ou testes com fotos reais.
+- Promotora deve preservar o aplicativo/fila e a galeria. Nao reinstalar ou limpar dados. Repetir envio nao reconstroi bytes que estejam ausentes.
+
+### Testes realizados
+- Ausencia de uma referencia nao remove as demais; aliases sao contados uma vez; falha de banco e reportada como nao verificada, nao como arquivo apagado; outra conta nao e lida.
+- Fila com mais de uma semana continua bloqueando limpeza; todos os 26 arquivos restantes permaneceram iguais apos conferencia.
+- UI no Chrome isolado, 390 px, com report da falta de uma foto e hostname visivel. Os numeros do teste nao sao os numeros reais do aparelho da Lorena.
+- Publicacao e verificacoes remotas registradas apos conclusao.
+
 ## [2026-11-24] - Controle de consultas concorrentes para reduzir picos de memoria
 
 ### Causa

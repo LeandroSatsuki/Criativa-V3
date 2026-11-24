@@ -8,6 +8,19 @@ export const PHOTO_RETENTION_MS = 24 * 60 * 60 * 1000;
 export const isLocalPhoto = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith(PREFIX);
 
+export class LocalPhotoUnavailableError extends Error {
+  readonly reason: 'missing' | 'owner';
+  readonly photoId: string;
+  constructor(reason: 'missing' | 'owner', photoId: string) {
+    super(reason === 'owner'
+      ? 'A foto pertence a outro usuario. Os dados foram preservados.'
+      : 'Foto local indisponivel. A visita foi preservada para recuperacao.');
+    this.name = 'LocalPhotoUnavailableError';
+    this.reason = reason;
+    this.photoId = photoId;
+  }
+}
+
 const openPhotos = () => new Promise<IDBDatabase>((resolve, reject) => {
   const request = indexedDB.open(DB, 2);
   request.onupgradeneeded = () => {
@@ -36,7 +49,7 @@ export const storeLocalPhoto = async (ownerId: string, base64: string, context?:
 export const readLocalPhoto = async (ownerId: string, id: string): Promise<string> => {
   if (!isLocalPhoto(id)) return id;
   if (!ownerId || !id.startsWith(`${PREFIX}${encodeURIComponent(ownerId)}:`)) {
-    throw new Error('A foto pertence a outro usuario. Os dados foram preservados.');
+    throw new LocalPhotoUnavailableError('owner', id);
   }
   const db = await openPhotos();
   return new Promise((resolve, reject) => {
@@ -44,9 +57,9 @@ export const readLocalPhoto = async (ownerId: string, id: string): Promise<strin
     const request = tx.objectStore(STORE).get(id);
     tx.oncomplete = () => {
       db.close();
-      if (request.result?.ownerId !== ownerId || !request.result?.base64) {
-        reject(new Error('Foto local indisponivel. A visita foi preservada para recuperacao.'));
-      } else resolve(request.result.base64);
+      if (!request.result?.base64) reject(new LocalPhotoUnavailableError('missing', id));
+      else if (request.result.ownerId !== ownerId) reject(new LocalPhotoUnavailableError('owner', id));
+      else resolve(request.result.base64);
     };
     tx.onabort = tx.onerror = () => { db.close(); reject(tx.error); };
   });

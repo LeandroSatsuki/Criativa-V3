@@ -27,6 +27,8 @@ import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycl
 import { isStaleSync } from './services/syncAge';
 import { deliverQueuedVisit, isQueuedVisitUploading } from './services/queuedVisitDelivery';
 import { createSingleFlight } from './services/singleFlight';
+import { auditLocalVisitPhotos, type LocalPhotoAudit } from './services/localPhotoAudit';
+import { getQueuedVisit } from './services/syncQueue';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -94,6 +96,23 @@ const App: React.FC = () => {
   const automaticUploadBusy = useRef(false);
   const automaticUploadAttempts = useRef(new Map<string, number>());
   const statusChecks = useRef(createSingleFlight<void>());
+  const [photoAudit, setPhotoAudit] = useState<{ ownerId: string; visitId: string; report?: LocalPhotoAudit; error?: string } | null>(null);
+  const photoAuditBusy = useRef(false);
+
+  const inspectSavedPhotos = async (visitId: string) => {
+    const ownerId = getSession()?.user.id;
+    if (!ownerId || photoAuditBusy.current) return;
+    photoAuditBusy.current = true;
+    setPhotoAudit({ ownerId, visitId });
+    try {
+      const queued = await getQueuedVisit(ownerId, visitId);
+      if (!queued) throw new Error('O registro nao esta mais na fila local. Atualize o status.');
+      const report = await auditLocalVisitPhotos(ownerId, queued.payload, () => getSession()?.user.id || null);
+      if (getSession()?.user.id === ownerId) setPhotoAudit({ ownerId, visitId, report });
+    } catch (error: any) {
+      if (getSession()?.user.id === ownerId) setPhotoAudit({ ownerId, visitId, error: error.message || 'Nao foi possivel conferir as fotos.' });
+    } finally { photoAuditBusy.current = false; }
+  };
 
   useEffect(() => {
     const ownerId = visitState.user?.id;
@@ -763,6 +782,28 @@ const App: React.FC = () => {
                         <span className="text-slate-400">{sync.sent}/{sync.total || '--'}</span>
                       </div>
                       {sync.error && <p className="text-[10px] font-bold text-orange-700 leading-relaxed">{sync.error}</p>}
+                      {sync.localOnly && /foto local indisponivel|foto pertence/i.test(sync.error || '') && (
+                        <div className="space-y-3">
+                          <button type="button" onClick={() => void inspectSavedPhotos(sync.visitId)} disabled={photoAuditBusy.current}
+                            className="w-full border border-slate-300 text-slate-700 py-3 rounded-xl font-bold text-xs disabled:opacity-50">
+                            {photoAuditBusy.current && photoAudit?.visitId === sync.visitId ? 'Conferindo fotos...' : 'Verificar fotos salvas'}
+                          </button>
+                          {photoAudit?.ownerId === visitState.user?.id && photoAudit.visitId === sync.visitId && (
+                            <div role="status" className="text-xs text-slate-700 space-y-2">
+                              {photoAudit.report && <>
+                                <p>Fotos com dados acessíveis: <strong>{photoAudit.report.readable}</strong></p>
+                                <p>Imagens indisponíveis: <strong>{photoAudit.report.missing}</strong></p>
+                                <p>Imagens diferentes no registro: {photoAudit.report.total}</p>
+                                {photoAudit.report.differentOwner > 0 && <p>{photoAudit.report.differentOwner} referencias nao correspondem a esta conta.</p>}
+                                {photoAudit.report.unverified > 0 && <p>{photoAudit.report.unverified} fotos nao puderam ser verificadas por falha de leitura.</p>}
+                                <p>A conferência não altera fotos nem a fila. Informe estes números ao suporte.</p>
+                              </>}
+                              {photoAudit.error && <p>{photoAudit.error}</p>}
+                              <p className="break-all text-slate-500">Endereço em uso: {window.location.hostname}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {isStaleSync(sync.createdAt) && (
                         <p className="text-[10px] font-bold text-orange-700">Pendente há mais de 24 horas. Sincronize com conexão estável.</p>
                       )}

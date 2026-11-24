@@ -19,7 +19,9 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
-  for (const scenario of ['manual-pending-offline', 'lite-syncing-interrupted', 'already-sent', 'queue-commit-fails', 'new-checkout', 'automatic-reconnect']) {
+  const scenarios = process.argv.includes('--photo-audit-only') ? ['lite-missing-photo-audit']
+    : ['manual-pending-offline', 'lite-syncing-interrupted', 'already-sent', 'queue-commit-fails', 'new-checkout', 'automatic-reconnect', 'lite-missing-photo-audit'];
+  for (const scenario of scenarios) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
     try {
       const page = await context.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -65,7 +67,7 @@ try {
         const raw = c.toDataURL('image/jpeg').split(',')[1]; c.width = c.height = 1;
         const photos = Array.from({ length: 27 }, (_, i) => raw + btoa(`audit-${i}`));
         const refs = lite ? photos.map((_, i) => `criativa-photo-v1:${user.id}:audit-${i}`) : photos;
-        if (lite) { const db = await open('criativa-lite-photos', 2, db => { db.createObjectStore('photos', { keyPath: 'id' }); db.createObjectStore('confirmed-visits', { keyPath: 'key' }); }); await put(db, 'photos', photos.map((base64, i) => [null, { id: refs[i], ownerId: user.id, base64, context: { visitId: id } }])); }
+        if (lite) { const db = await open('criativa-lite-photos', 2, db => { db.createObjectStore('photos', { keyPath: 'id' }); db.createObjectStore('confirmed-visits', { keyPath: 'key' }); }); await put(db, 'photos', photos.map((base64, i) => [null, { id: refs[i], ownerId: user.id, base64, context: { visitId: id } }]).filter((_, i) => scenario !== 'lite-missing-photo-audit' || i !== 7)); }
         const draft = { user, draftOwnerId: user.id, visitId: id, currentStore: 'LOJA DE AUDITORIA', currentStoreId: 'test', step: 'CHECKOUT', checkInDone: true, checkInTime: '2026-11-17T11:00:00Z', checkOutTime: '2026-11-17T14:00:00Z', tasks: { CHECKIN: true, CHECKOUT: true }, photos: { FACHADA: [refs[0]], CHECKOUT: [refs[26]] }, stockQuantities: {}, aiResults: {}, selectedIndustry: 'TESTE', returnsPhotosByIndustry: {}, hasReturns: false, availableStores: [], industries: ['TESTE'], industryExecutions: { TESTE: { industry: 'TESTE', status: 'concluido', tasks: { ANTES: true, DEPOIS: true, TROCAS: true }, photos: { ANTES: refs.slice(1, 14), DEPOIS: refs.slice(14, 26) }, hasReturns: false, stockQuantities: {}, aiResults: {} } } };
         if (scenario === 'new-checkout') { draft.checkInTime = new Date().toISOString(); draft.checkOutTime = null; draft.tasks.CHECKOUT = false; }
         const db = await open('criativa-field-ops', 1, db => db.createObjectStore('visit-drafts')); await put(db, 'visit-drafts', [['active-visit', draft]]);
@@ -94,6 +96,24 @@ try {
       if (await continueButton.isVisible()) await continueButton.click();
       console.log(JSON.stringify({ scenario, stage: 'stores-unblocked' }));
       assert.equal((await readState()).visitId, null, 'Rascunho concluido deve liberar a lista');
+      if (scenario === 'lite-missing-photo-audit') {
+        await page.getByRole('button', { name: /Status dos envios:/ }).click();
+        await page.getByRole('button', { name: 'Verificar fotos salvas', exact: true }).waitFor();
+        await page.getByRole('button', { name: 'Verificar fotos salvas', exact: true }).click();
+        await page.getByText('Fotos com dados acessíveis:', { exact: false }).waitFor();
+        const text = await page.locator('[role=status]').filter({ hasText: 'Fotos com dados acessíveis' }).textContent();
+        assert.match(text, /Fotos com dados acessíveis: 26/);
+        assert.match(text, /Imagens indisponíveis: 1/);
+        assert.match(text, /Imagens diferentes no registro: 27/);
+        assert.ok(await readQueue()); assert.equal(finalized, 0);
+        const remaining = await page.evaluate(() => new Promise(resolve => {
+          const r = indexedDB.open('criativa-lite-photos', 2); r.onsuccess = () => { const db = r.result; const tx = db.transaction('photos'); const q = tx.objectStore('photos').count(); tx.oncomplete = () => { db.close(); resolve(q.result); }; };
+        }));
+        assert.equal(remaining, 26);
+        await page.screenshot({ path: path.join(process.env.LOCALAPPDATA, 'CriativaRecovery/local-photo-audit.png') });
+        console.log(JSON.stringify({ scenario, readable: 26, missing: 1, total: 27, queuePreserved: true, remainingPhotosPreserved: true, noFinalization: true, errors }));
+        continue;
+      }
       if (scenario !== 'already-sent') {
         assert.ok(await readQueue(), 'Fila e fotos devem permanecer apos falha');
         if (scenario === 'automatic-reconnect') {
