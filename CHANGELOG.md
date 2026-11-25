@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## [2026-11-25] - Resgate de fotos e protecao independente no piloto da Lorena
+
+### Causa
+- Outra visita, `VISIT-0746E8AE`, da conta `lorena.costa` (ID 101), apresentou 15 imagens acessiveis e 17 indisponiveis, em 32 referencias diferentes, no endereco oficial. Usuario confirmou ser visita de hoje; ainda nao sabe se a captura ocorreu na versao publicada ontem ou se existem originais na galeria.
+- Consulta pontual nao encontrou visita/resumos nem fragmentos de upload do dono 101 no servidor. O hash integral exige ler todas as imagens antes da transmissao: uma referencia indisponivel bloqueia tambem o envio das fotos validas. Esse bloqueio foi reproduzido.
+- Nao foi comprovado por que os 17 arquivos deixaram de ser acessiveis. Nao atribuir a falta de internet, RAM, limpeza automatica ou atualizacao sem evidencia do aparelho. Protecao de ontem nao equivale a resolucao comprovada deste novo incidente.
+
+### Solucao aplicada
+- Piloto restrito ao ID 101/papel FIELD_OPS. Endpoint autenticado mantem copias privadas por referencia/hash em armazenamento separado do servidor. Outras contas conservam fluxo e trafego atuais.
+- Copia sequencial em segundo plano, ate quatro tentativas por rodada, depois da captura/reconexao e a cada 15 segundos com app visivel. Pausa ao iniciar captura; nao impede usar camera, rascunho, fila ou envio normal. Indices em memoria limitados a referencias, nunca imagens.
+- Acao `Proteger fotos disponiveis` salva o que ainda pode ser lido, sem exigir que todas as imagens estejam presentes. Confere conteudo gravado no servidor e informa protegidas, ausentes, falhas e referencias ainda nao conferidas. Copia privada nao significa visita enviada ao Drive.
+- Referencia ausente tenta recuperar somente copia verificada da mesma conta. Quando o banco permite, restaura o mesmo ID local sem substituir registros existentes; falha de regravacao local nao impede usar a copia valida online.
+- Acao `Recuperar originais da galeria` lista apenas referencias ausentes por etapa/industria. Confirmacao individual permite fornecer o original da mesma visita; copia acessivel nao e substituida. IDs, aliases, outras imagens e horarios da visita permanecem iguais. Sem inventar datas de captura.
+- Diagnostico registra versao, estado das referencias, persistencia concedida, uso/quota de armazenamento e informacoes de navegador/memoria quando disponibilizadas. Armazenamento nao e RAM e JS heap nao e a memoria total do Android. Campos sao filtrados, sem imagens ou credenciais no relatorio. Imagens ficam apenas no armazenamento privado de recuperacao. Novas fotos locais tambem registram hora/build de gravacao para rastrear a versao efetivamente usada.
+
+### Checklist
+- [x] 205 testes automatizados aprovados e TypeScript conferido.
+- [x] Reproducao isolada de 15 disponiveis/17 ausentes, protecao e restauracao das copias, isolamento e controles de interface em 390 px.
+- [x] Regressao de captura normal/Lite, restauracao, checkout/retomada e isolamento da excecao de descarte antigo aprovada. Build normal concluido.
+- [ ] Conferir previa/publicacao e verificacao do servidor.
+- [ ] Lorena abrir a versao de 25/11, proteger os arquivos reais e informar se possui os 17 originais na galeria. Nao afirmar que a visita real foi enviada ou que imagens ausentes foram recuperadas antes dessa verificacao.
+
+### Seguranca
+- Nenhuma limpeza de fila/fotos, descarte de visita, login operacional, alteracao de schema ou migracao de dados. A autorizacao de abandono do ID antigo nao se aplica a esta visita nova.
+- Endpoint exige sessao valida, conta/papel piloto, referencias do mesmo dono, JPEG ate 120 KB, limites de requisicao, hash e releitura. Respostas no-store. Copias divergentes nao substituem bytes existentes.
+- Recuperacao pela galeria exige referencia presente na fila do dono, ausencia confirmada e visita ainda nao recebida pelo servidor. Arquivo deve ser fornecido pela pessoa, nunca gerado. Se faltarem os originais e nao houver copia, bytes nao podem ser reconstruidos por reenvio.
+- Copias do piloto nao recebem exclusao automatica nesta entrega; retencao e expansao para outras contas requerem acompanhamento. Existem chamadas/armazenamento adicionais no Netlify, sem acionar Make ou Drive nesta etapa.
+
+### Testes realizados
+- APIs isoladas: autenticacao/conta/papel, acesso a outra referencia, idempotencia, hash/corrupcao/divergencia, limite de imagem e exclusao de campos arbitrarios/credenciais do diagnostico.
+- Navegador isolado sem trafego externo: proteger 15 e registrar 17 ausentes mantem todas as 32 referencias. Perda simulada das 15 copias primarias foi recuperada pelo servidor e regravada localmente. Nenhuma finalizacao ocorreu enquanto faltavam imagens.
+- Originais sinteticos fornecidos separadamente pela galeria preencheram as 17 referencias; imagem acessivel foi recusada para substituicao. Envio integral voltou a ter 32 imagens e fila permaneceu preservada para confirmacao do servidor.
+- Operacoes concorrentes de protecao mantiveram relatorios distintos e uma requisicao por vez. Troca de sessao bloqueou recuperacao remota.
+- UI: cancelar a selecao preserva a lacuna; confirmar o original atualiza a auditoria e remove somente a pendencia daquela imagem. Nenhuma excecao JavaScript observada.
+
 ## [2026-11-24] - Protecao da gravacao local de novas fotos e visitas
 
 ### Causa

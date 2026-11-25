@@ -42,7 +42,7 @@ export const storeLocalPhoto = async (ownerId: string, base64: string, context?:
     await withLocalVisitLock(async () => {
       await new Promise<void>((resolve, reject) => {
         const tx = evidenceTransaction(db, STORE);
-        tx.objectStore(STORE).add({ id, ownerId, base64, context });
+        tx.objectStore(STORE).add({ id, ownerId, base64, context, storedAt: new Date().toISOString(), writerBuild: typeof document === 'undefined' ? 'unknown' : document.querySelector('script[type="module"][src]')?.getAttribute('src') || 'unknown' });
         tx.oncomplete = () => resolve();
         tx.onabort = tx.onerror = () => reject(tx.error || new Error('Foto nao salva.'));
       });
@@ -53,6 +53,9 @@ export const storeLocalPhoto = async (ownerId: string, base64: string, context?:
       }
     });
   } finally { db.close(); }
+  if (ownerId === '101' && context?.visitId && typeof window !== 'undefined') {
+    window.dispatchEvent?.(new CustomEvent('criativa-photo-saved', { detail: { ownerId } }));
+  }
   return id;
 };
 
@@ -67,7 +70,32 @@ export const readLocalPhoto = async (ownerId: string, id: string): Promise<strin
     const request = tx.objectStore(STORE).get(id);
     tx.oncomplete = () => {
       db.close();
-      if (!request.result?.base64) reject(new LocalPhotoUnavailableError('missing', id));
+      if (!request.result?.base64) {
+        if (ownerId !== '101') { reject(new LocalPhotoUnavailableError('missing', id)); return; }
+        // Never omit an unavailable image. Use only the authenticated owner's
+        // verified server copy when this controlled recovery pilot is enabled.
+        void import('./photoRecoveryClient.ts').then(module => module.recoverPhotoCopy(ownerId, id))
+          .then(async copy => {
+            if (!copy) { reject(new LocalPhotoUnavailableError('missing', id)); return; }
+            // Restore the same reference when storage is writable. A full disk
+            // must not prevent online delivery of an already verified copy.
+            let recovered: IDBDatabase | undefined;
+            try {
+              recovered = await openPhotos();
+              await new Promise<void>((saved, failed) => {
+                const tx = evidenceTransaction(recovered, STORE), store = tx.objectStore(STORE), existing = store.get(id);
+                existing.onsuccess = () => {
+                  if (!existing.result) store.add({ id, ownerId, base64: copy.base64, context: { visitId: copy.visitId }, recoveredAt: new Date().toISOString() });
+                };
+                tx.oncomplete = () => saved();
+                tx.onabort = tx.onerror = () => failed(tx.error);
+              });
+            } catch { /* Server copy remains available; never delete/overwrite. */ }
+            finally { recovered?.close(); }
+            resolve(copy.base64);
+          })
+          .catch(reject);
+      }
       else if (request.result.ownerId !== ownerId) reject(new LocalPhotoUnavailableError('owner', id));
       else resolve(request.result.base64);
     };

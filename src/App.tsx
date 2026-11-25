@@ -31,6 +31,10 @@ import { auditLocalVisitPhotos, type LocalPhotoAudit } from './services/localPho
 import { getQueuedVisit } from './services/syncQueue';
 import { canDiscardAuthorizedVisit, wasVisitDiscarded } from './services/authorizedQueueDiscard';
 import { discardAuthorizedQueue } from './services/discardAuthorizedQueue';
+import { protectVisitPhotos, type PhotoProtection } from './services/photoSafety';
+import { photoRecoveryEnabled } from './services/photoRecoveryClient';
+import { localPhotoIds } from './services/litePhotos';
+import PhotoRecoveryGallery from './components/PhotoRecoveryGallery';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -101,6 +105,10 @@ const App: React.FC = () => {
   const [photoAudit, setPhotoAudit] = useState<{ ownerId: string; visitId: string; report?: LocalPhotoAudit; error?: string } | null>(null);
   const photoAuditBusy = useRef(false);
   const [discardBusy, setDiscardBusy] = useState(false);
+  const [protection, setProtection] = useState<{ visitId: string; report?: PhotoProtection; error?: string } | null>(null);
+  const protectionBusy = useRef(false);
+  const safetyDraft = useRef(visitState);
+  safetyDraft.current = visitState;
   const [discardMessage, setDiscardMessage] = useState<string | null>(null);
   const activeVisitIdentity = useRef({ ownerId: visitState.user?.id, visitId: visitState.visitId });
   activeVisitIdentity.current = { ownerId: visitState.user?.id, visitId: visitState.visitId };
@@ -130,7 +138,7 @@ const App: React.FC = () => {
     const ownerId = getSession()?.user.id;
     if (!ownerId || photoAuditBusy.current) return;
     photoAuditBusy.current = true;
-    setPhotoAudit({ ownerId, visitId });
+    setPhotoAudit(current => current?.ownerId === ownerId && current.visitId === visitId ? { ...current, error: undefined } : { ownerId, visitId });
     try {
       const queued = await getQueuedVisit(ownerId, visitId);
       if (!queued) throw new Error('O registro nao esta mais na fila local. Atualize o status.');
@@ -140,6 +148,53 @@ const App: React.FC = () => {
       if (getSession()?.user.id === ownerId) setPhotoAudit({ ownerId, visitId, error: error.message || 'Nao foi possivel conferir as fotos.' });
     } finally { photoAuditBusy.current = false; }
   };
+
+  const protectSavedPhotos = async (visitId: string) => {
+    const ownerId = getSession()?.user.id;
+    if (!ownerId || protectionBusy.current) return;
+    protectionBusy.current = true; setProtection({ visitId });
+    try {
+      const queued = await getQueuedVisit(ownerId, visitId);
+      if (!queued) throw new Error('Registro nao encontrado nesta fila.');
+      const report = await protectVisitPhotos(ownerId, visitId, queued.payload, true);
+      if (getSession()?.user.id === ownerId) setProtection({ visitId, report });
+    } catch (error: any) {
+      if (getSession()?.user.id === ownerId) setProtection({ visitId, error: error.message || 'Nao foi possivel proteger as fotos.' });
+    } finally { protectionBusy.current = false; }
+  };
+
+  useEffect(() => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || !photoRecoveryEnabled(ownerId) || !draftHydrated || loading) return;
+    let cancelled = false, busy = false;
+    const protect = async () => {
+      if (busy || cancelled || !navigator.onLine || document.visibilityState === 'hidden' || isPhotoCaptureBusy()) return;
+      busy = true;
+      try {
+        const draft = safetyDraft.current;
+        if (draft.visitId && localPhotoIds(draft).size) await protectVisitPhotos(ownerId, draft.visitId, draft);
+        const summaries = await listQueuedVisitSummaries(ownerId);
+        for (const summary of summaries.slice(0, 2)) {
+          if (cancelled || getSession()?.user.id !== ownerId || isPhotoCaptureBusy()) break;
+          const queued = await getQueuedVisit(ownerId, summary.visitId);
+          if (queued && localPhotoIds(queued.payload).size) await protectVisitPhotos(ownerId, summary.visitId, queued.payload);
+        }
+      } catch { /* Secondary protection must never block capture or delivery. */ }
+      finally { busy = false; }
+    };
+    const resume = () => { void protect(); };
+    let captureTimer: number | undefined;
+    const afterCapture = (event: Event) => {
+      if ((event as CustomEvent).detail?.ownerId !== ownerId) return;
+      window.clearTimeout(captureTimer);
+      captureTimer = window.setTimeout(resume, 800);
+    };
+    const timer = window.setInterval(resume, 15000);
+    window.addEventListener('online', resume); window.addEventListener('focus', resume);
+    window.addEventListener('criativa-photo-saved', afterCapture);
+    resume();
+    return () => { cancelled = true; window.clearInterval(timer); window.clearTimeout(captureTimer); window.removeEventListener('online', resume); window.removeEventListener('focus', resume); window.removeEventListener('criativa-photo-saved', afterCapture); };
+  }, [visitState.user?.id, draftHydrated, loading]);
 
   useEffect(() => {
     const ownerId = visitState.user?.id;
@@ -829,6 +884,13 @@ const App: React.FC = () => {
                                 {photoAudit.report.differentOwner > 0 && <p>{photoAudit.report.differentOwner} referencias nao correspondem a esta conta.</p>}
                                 {photoAudit.report.unverified > 0 && <p>{photoAudit.report.unverified} fotos nao puderam ser verificadas por falha de leitura.</p>}
                                 <p>A conferência não altera fotos nem a fila. Informe estes números ao suporte.</p>
+                                {photoRecoveryEnabled(visitState.user!.id) && <>
+                                  <button type="button" disabled={protectionBusy.current} onClick={() => void protectSavedPhotos(sync.visitId)} className="w-full border border-blue-300 text-blue-800 py-3 rounded-xl font-bold disabled:opacity-50">{protectionBusy.current && protection?.visitId === sync.visitId ? 'Protegendo fotos...' : 'Proteger fotos disponiveis'}</button>
+                                  {protection?.visitId === sync.visitId && protection.report && <p>Copias protegidas no servidor: <strong>{protection.report.protected}</strong>. Fotos nao encontradas: <strong>{protection.report.missing}</strong>. Falhas de conferencia/envio: <strong>{protection.report.failed}</strong>. Ainda nao conferidas: <strong>{protection.report.remaining}</strong>. A visita continua preservada e nao sera confirmada com fotos faltantes.</p>}
+                                  {protection?.visitId === sync.visitId && protection.error && <p>{protection.error}</p>}
+                                  <p className="text-slate-500">Protecao de fotos: 25/11/2026. Copia de seguranca nao equivale a visita enviada ao Drive.</p>
+                                  <PhotoRecoveryGallery ownerId={visitState.user!.id} visitId={sync.visitId} onRecovered={() => { setProtection(null); void inspectSavedPhotos(sync.visitId); }} />
+                                </>}
                               </>}
                               {photoAudit.error && <p>{photoAudit.error}</p>}
                               <p className="break-all text-slate-500">Endereço em uso: {window.location.hostname}</p>
