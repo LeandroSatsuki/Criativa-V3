@@ -23,6 +23,7 @@ try {
     if (url.pathname === '/api/stores') return route.fulfill({ json: [{ id: 'isolated', name: 'LOJA TESTE ISOLADA' }] });
     if (url.pathname === '/api/auth/session') return route.fulfill({ json: { user, token: 'local-only', expiresAt: '2099-01-01T00:00:00Z' } });
     assert.equal(url.pathname, '/api/photos/recovery'); active++; maxActive = Math.max(maxActive, active);
+    if (route.request().postDataJSON()?.visitId === 'VISIT-AUX-AUTH-REJECT') { active--; return route.fulfill({ status: 401, json: { error: 'Synthetic auxiliary rejection' } }); }
     try { const response = await handler(new Request(url, { method: 'POST', body: route.request().postData(), headers: route.request().headers() })); await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() }); }
     finally { active--; }
   });
@@ -76,11 +77,14 @@ try {
       if (body.action === 'chunk') { chunks[body.index] = body.chunk; return {}; }
       const reconstructed = JSON.parse(chunks.join('')); if (reconstructed.photos.ANTES.length !== 32) throw new Error('Photo count mismatch'); finalized = true; return { visitId: payload.visitId };
     });
+    const previousSession = localStorage.getItem('criativa_session'); let rejected = false;
+    try { await protectPhotoCopy('101', refs[0], 'VISIT-AUX-AUTH-REJECT', photo); } catch { rejected = true; }
+    if (!rejected || localStorage.getItem('criativa_session') !== previousSession) throw new Error('Auxiliary failure changed operational session');
     localStorage.setItem('criativa_session', JSON.stringify({ token: 'other-only', user: { id: 'other' } }));
     let ownerGuard = false; try { await recoverPhotoCopy('101', refs[0]); } catch { ownerGuard = true; }
     // A changed session returns no copy and makes no authenticated recovery call.
     ownerGuard = ownerGuard || await recoverPhotoCopy('101', refs[0]) === null;
-    return { protection, queuePhotoCount: preserved.payload.photos.ANTES.length, auditAfterPrimaryLoss: audit, localRestored, separateConcurrentReports: true, incompleteVisitBlocked: failed && sent === 0, all32RestoredFromSuppliedCopies: finalized, ownerGuard, queueStillPreserved: Boolean(await getQueuedVisit('101', payload.visitId)) };
+    return { protection, queuePhotoCount: preserved.payload.photos.ANTES.length, auditAfterPrimaryLoss: audit, localRestored, separateConcurrentReports: true, auxiliary401PreservesSession: true, incompleteVisitBlocked: failed && sent === 0, all32RestoredFromSuppliedCopies: finalized, ownerGuard, queueStillPreserved: Boolean(await getQueuedVisit('101', payload.visitId)) };
   });
   assert.deepEqual(result.protection, { protected: 15, missing: 17, failed: 0, remaining: 0 });
   assert.equal(result.queuePhotoCount, 32); assert.equal(result.auditAfterPrimaryLoss.readable, 15); assert.equal(result.auditAfterPrimaryLoss.missing, 17);

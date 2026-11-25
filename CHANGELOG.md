@@ -33,6 +33,7 @@
 - Navegador isolado sem trafego externo: proteger 15 e registrar 17 ausentes mantem todas as 32 referencias. Perda simulada das 15 copias primarias foi recuperada pelo servidor e regravada localmente. Nenhuma finalizacao ocorreu enquanto faltavam imagens.
 - Originais sinteticos fornecidos separadamente pela galeria preencheram as 17 referencias; imagem acessivel foi recusada para substituicao. Envio integral voltou a ter 32 imagens e fila permaneceu preservada para confirmacao do servidor.
 - Operacoes concorrentes de protecao mantiveram relatorios distintos e uma requisicao por vez. Troca de sessao bloqueou recuperacao remota.
+- Rejeicao 401 da copia auxiliar preserva a sessao operacional; autenticacao Bearer continua obrigatoria no servidor. Renovacao/encerramento da sessao permanecem a cargo do fluxo principal. Caso conferido no navegador com rejeicao simulada.
 - UI: cancelar a selecao preserva a lacuna; confirmar o original atualiza a auditoria e remove somente a pendencia daquela imagem. Nenhuma excecao JavaScript observada.
 
 ## [2026-11-24] - Protecao da gravacao local de novas fotos e visitas

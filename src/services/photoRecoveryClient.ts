@@ -6,7 +6,11 @@ const requireOwner = (ownerId: string) => {
 };
 const request = async (ownerId: string, body: unknown) => {
   requireOwner(ownerId);
-  const result = await requestJson<any>('/photos/recovery', { method: 'POST', retries: 0, timeoutMs: 12000, body: JSON.stringify(body) });
+  const session = getSession();
+  if (!session?.token || String(session.user.id) !== ownerId) throw new Error('A sessao mudou. As fotos foram preservadas.');
+  // Authenticate normally, but an auxiliary-copy failure must never sign the
+  // promoter out. Core session renewal remains responsible for ending sessions.
+  const result = await requestJson<any>('/photos/recovery', { auth: false, headers: { Authorization: `Bearer ${session.token}` }, method: 'POST', retries: 0, timeoutMs: 12000, body: JSON.stringify(body) });
   requireOwner(ownerId); return result;
 };
 export const recoverPhotoCopy = async (ownerId: string, photoId: string): Promise<{ base64: string; visitId: string } | null> => {
