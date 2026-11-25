@@ -19,7 +19,7 @@
 - [x] 205 testes automatizados aprovados e TypeScript conferido.
 - [x] Reproducao isolada de 15 disponiveis/17 ausentes, protecao e restauracao das copias, isolamento e controles de interface em 390 px.
 - [x] Regressao de captura normal/Lite, restauracao, checkout/retomada e isolamento da excecao de descarte antigo aprovada. Build normal concluido.
-- [ ] Conferir previa/publicacao e verificacao do servidor.
+- [x] Previa/publicacao final conferidas: login/health HTTP 200, provedor google-v1 e endpoint de recuperacao recusando acesso anonimo.
 - [ ] Lorena abrir a versao de 25/11, proteger os arquivos reais e informar se possui os 17 originais na galeria. Nao afirmar que a visita real foi enviada ou que imagens ausentes foram recuperadas antes dessa verificacao.
 
 ### Seguranca
@@ -35,6 +35,10 @@
 - Operacoes concorrentes de protecao mantiveram relatorios distintos e uma requisicao por vez. Troca de sessao bloqueou recuperacao remota.
 - Rejeicao 401 da copia auxiliar preserva a sessao operacional; autenticacao Bearer continua obrigatoria no servidor. Renovacao/encerramento da sessao permanecem a cargo do fluxo principal. Caso conferido no navegador com rejeicao simulada.
 - UI: cancelar a selecao preserva a lacuna; confirmar o original atualiza a auditoria e remove somente a pendencia daquela imagem. Nenhuma excecao JavaScript observada.
+- Previa final `6b074ad5784e87674a73ecaa` e publicacao `6b074af5351754f6d2503e74` conferidas, bundle `index-BhSjb9b8.js`. Publicado em 25/11/2026 as 17:54:26 de Brasilia. Fontes `773e733` e `f5b4e43` enviadas ao GitHub na branch `agent/google-sync-production`.
+- Conferencia publica sem login operacional: acesso/health HTTP 200, google-v1, nenhuma excecao JavaScript, POST anonimo recusado com 401/no-store e GET recusado com 405. Filtro Netlify warn/error/fatal dos ultimos dez minutos nao retornou ocorrencias; isso nao mede RAM de Android nem confirma o recebimento das fotos reais.
+- Consulta apos a publicacao ainda encontrou zero copias reais no armazenamento novo e zero diagnosticos da `VISIT-0746E8AE`. A interface/protecao estao publicadas, mas a visita real permanece dependente da abertura no aparelho, da protecao das imagens acessiveis e da localizacao dos 17 originais. Nao afirmar recuperacao ou envio real concluido.
+- Ensaio de recuperacao foi repetido com JPEGs do tamanho usado pelo app, nao apenas miniaturas. Camera/memoria nativas do Android da Lorena ainda precisam de observacao no aparelho.
 
 ## [2026-11-24] - Protecao da gravacao local de novas fotos e visitas
 
