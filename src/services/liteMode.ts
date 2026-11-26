@@ -9,4 +9,10 @@ export const liteTestCatalog = litePilot && env.VITE_LITE_TEST_CATALOG === 'true
 export const setLitePreference = (enabled: boolean) => localStorage.setItem(LITE_PREFERENCE_KEY, String(enabled));
 let capturing = false;
 export const setPhotoCaptureBusy = (busy: boolean) => { capturing = busy; };
-export const isPhotoCaptureBusy = () => capturing;
+let previewOwner: symbol | undefined;
+export const beginCameraPreview = () => {
+  const owner = Symbol();
+  previewOwner = owner;
+  return () => { if (previewOwner === owner) previewOwner = undefined; };
+};
+export const isPhotoCaptureBusy = () => capturing || previewOwner !== undefined;

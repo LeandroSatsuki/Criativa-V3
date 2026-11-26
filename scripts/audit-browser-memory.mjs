@@ -21,10 +21,10 @@ const server = createServer(async (req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-fake-device-for-media-stream'] });
 try {
   for (const mode of process.argv.includes('--recovery-only') ? [] : ['normal', 'lite']) {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', userAgent: 'Mozilla/5.0 (Linux; Android 12) Chrome/131.0.0.0 Mobile Safari/537.36' });
     try {
       const page = await context.newPage();
       const errors = [], dialogs = [];
@@ -184,6 +184,7 @@ try {
         await page.getByRole('button', { name: 'Recentes' }).click();
       }
       memory.push(await sample('after-reload-and-50-gallery-changes'));
+      if (mode === 'lite') await auditLiteCamera(page, context, count, beforeFailure, sources[0].buffer);
       assert.deepEqual(errors, []);
       console.log(JSON.stringify({ mode, fixture, memory, captures, invalidImagePreserved: true, storageFailurePreserved: mode === 'lite' ? true : 'not-injected', reloadPreserved: true, galleryChanges: 50, mountedPhotoPreviews: loaded, cleanup, errors, note: 'Desktop JS heap after GC; excludes native camera/GPU/decoded bitmap memory. Native Android camera not exercised.' }));
     } finally { await context.close(); }
@@ -259,3 +260,73 @@ try {
     } finally { await context.close(); }
   }
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }
+
+async function auditLiteCamera(page, context, count, initialCount, fallbackFile) {
+  const input = page.locator('input[type=file]').first();
+  const take = page.getByRole('button', { name: 'Tirar foto', exact: true });
+  const cancel = page.getByRole('button', { name: 'Cancelar', exact: true });
+  const noActiveTrack = () => page.waitForFunction(() => window.cameraAudit.tracks.every(t => t.readyState === 'ended'));
+  const awaitCount = async expected => {
+    await assert.doesNotReject(async () => {
+      for (let i = 0; i < 100; i++) {
+        if (await count() === expected) return;
+        await page.waitForTimeout(50);
+      }
+      assert.equal(await count(), expected);
+    });
+  };
+  await context.grantPermissions(['camera']);
+  await page.evaluate(() => {
+    const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    const audit = window.cameraAudit = { tracks: [], mode: 'ok', calls: 0 };
+    navigator.mediaDevices.getUserMedia = async constraints => {
+      audit.calls++;
+      audit.constraints = constraints;
+      if (audit.mode === 'denied') throw new DOMException('denied', 'NotAllowedError');
+      const stream = await real(constraints);
+      audit.tracks.push(...stream.getTracks());
+      if (audit.mode === 'delay') await new Promise(resolve => { audit.grant = resolve; });
+      return stream;
+    };
+  });
+  assert.equal(await page.evaluate(() => window.cameraAudit.calls), 0);
+  await input.click();
+  await take.waitFor();
+  await page.waitForFunction(() => document.querySelector('video')?.videoWidth > 0);
+  await cancel.click();
+  await noActiveTrack();
+  assert.equal(await count(), initialCount);
+  await page.evaluate(() => { window.cameraAudit.mode = 'delay'; });
+  await input.click();
+  await page.waitForFunction(() => !!window.cameraAudit.grant);
+  await cancel.click();
+  await page.evaluate(() => window.cameraAudit.grant());
+  await noActiveTrack();
+  await page.evaluate(() => { window.cameraAudit.mode = 'ok'; });
+  await input.click();
+  await page.waitForFunction(() => document.querySelector('video')?.videoWidth > 0);
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await noActiveTrack();
+  assert.equal(await count(), initialCount);
+  await context.setOffline(true);
+  await input.click();
+  await take.click();
+  await noActiveTrack();
+  await awaitCount(initialCount + 1);
+  await context.setOffline(false);
+  const constraints = await page.evaluate(() => window.cameraAudit.constraints);
+  assert.equal(constraints.audio, false);
+  assert.ok(constraints.video.width.max <= 1280 && constraints.video.frameRate.max <= 15);
+  await page.evaluate(() => { window.cameraAudit.mode = 'denied'; });
+  await input.click();
+  await page.getByRole('alert').filter({ hasText: 'câmera leve' }).waitFor();
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Usar câmera do aparelho' }).click();
+  await (await chooser).setFiles({ name: 'native.jpg', mimeType: 'image/jpeg', buffer: fallbackFile });
+  await awaitCount(initialCount + 2);
+  await page.reload();
+  await input.waitFor();
+  assert.equal(await count(), initialCount + 2);
+  console.log(JSON.stringify({ camera: 'android-lite-simulated', offlinePhotoSaved: true, fallbackPhotoSaved: true,
+    cancelPreservedCount: true, pageHideReleased: true, latePermissionReleased: true, reloadPreserved: true }));
+}

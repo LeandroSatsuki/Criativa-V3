@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [2026-11-26] — Câmera leve para Android
+
+- O Modo Lite abria a câmera externa nas cinco entradas de foto. A redução de resolução só começava depois da devolução do arquivo. O Naamã relatou a interrupção antes da primeira foto de uma indústria. A memória disponível no aparelho no momento do erro é desconhecida.
+- No Android compatível, o Modo Lite agora abre a câmera dentro da visita. Solicita somente vídeo, prefere a câmera traseira e limita a resolução e a taxa de quadros. A captura usa o mesmo carimbo, compressão e salvamento da visita. A câmera do aparelho continua disponível como alternativa.
+- A câmera é liberada ao fotografar, cancelar, ocultar a página ou sair da etapa, inclusive se a permissão chegar depois do cancelamento. O encerramento automático aguarda a captura. Não houve migração nem limpeza de visitas ou fotos.
+- Verificações locais: 205 testes passaram, TypeScript e build aprovados. O teste de navegador com câmera simulada verificou captura offline, cancelamento, saída de tela, permissão tardia ou negada, alternativa nativa e reabertura com as fotos salvas. Validação física com o Naamã pendente.
+
 ## [2026-11-25] - Resgate de fotos e protecao independente no piloto da Lorena
 
 ### Causa

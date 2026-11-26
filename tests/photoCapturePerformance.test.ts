@@ -18,12 +18,12 @@ test('captura impede compressoes simultaneas e libera o canvas', async () => {
 
 test('seletores podem recapturar e miniaturas usam decodificacao assincrona', async () => {
   const contentArea = await readSource('../src/components/ContentArea.tsx');
-  const fileInputs = contentArea.match(/type="file"/g) || [];
-  const clearedInputs = contentArea.match(/e\.currentTarget\.value = ''/g) || [];
+  const input = await readSource('../src/components/VisitPhotoInput.tsx');
+  assert.match(input, /event.currentTarget.value = ''/);
+  assert.equal(contentArea.match(/<VisitPhotoInput/g)?.length, 5);
   const allPhotoPreviews = contentArea.match(/<img /g) || [];
   const photoPreviews = contentArea.match(/<img loading="lazy" decoding="async"/g) || [];
 
-  assert.equal(clearedInputs.length, fileInputs.length);
   assert.equal(photoPreviews.length, allPhotoPreviews.length);
   assert.match(contentArea, /disabled=\{isProcessingPhoto/);
 });

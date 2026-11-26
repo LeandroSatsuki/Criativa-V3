@@ -7,9 +7,10 @@ import React, { useState, useEffect } from 'react';
 import { SectionId, VisitState, Industry, IndustryExecution } from '../types';
 import { apiService, getBrasiliaISO } from '../services/apiService';
 import { analyzeProductPhoto } from '../services/geminiService';
-import { liteMode, litePilot, setPhotoCaptureBusy } from '../services/liteMode';
+import { liteMode, litePilot, isPhotoCaptureBusy, setPhotoCaptureBusy } from '../services/liteMode';
 import { storeLocalPhoto, isLocalPhoto } from '../services/litePhotos';
 import { getSession } from '../services/session';
+import VisitPhotoInput, { type VisitPhotoSource } from './VisitPhotoInput';
 import PhotoPreview from './PhotoPreview';
 import {
   getQueuedVisit,
@@ -166,7 +167,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     let mounted = true;
     let lastAttempt = 0;
     const closeDueVisit = async () => {
-      if (document.visibilityState === 'hidden' || photoProcessingRef.current
+      if (document.visibilityState === 'hidden' || isPhotoCaptureBusy() || photoProcessingRef.current
         || syncOperationRef.current || automaticClosingRef.current || Date.now() - lastAttempt < 60_000) return;
       const manualCompleted = isConfirmedCheckout(latestVisitRef.current);
       const snapshot = manualCompleted ? latestVisitRef.current : buildAutomaticCheckout(latestVisitRef.current);
@@ -475,8 +476,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
     return lines.slice(0, 3).length * lineHeight;
   };
 
-  const processPhotoForReport = async (file: File): Promise<string> => {
-    const decoded = await decodeReportPhoto(file);
+  const processPhotoForReport = async (file: VisitPhotoSource): Promise<string> => {
+    const decoded = file instanceof HTMLCanvasElement
+      ? { source: file, width: file.width, height: file.height, release: () => { file.width = file.height = 1; } }
+      : await decodeReportPhoto(file);
     const releaseSourceImage = decoded.release;
       let canvas: HTMLCanvasElement | null = null;
       try {
@@ -523,7 +526,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       }
   };
 
-  const handlePhotoCapture = async (section: string, file: File, industryOverride?: string) => {
+  const handlePhotoCapture = async (section: string, file: VisitPhotoSource, industryOverride?: string) => {
     if (photoProcessingRef.current) return;
     photoProcessingRef.current = true;
     setPhotoCaptureBusy(true);
@@ -760,19 +763,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 ) : (
                   <Camera className="w-16 h-16 text-slate-300" />
                 )}
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  capture="environment"
+                <VisitPhotoInput
+                  key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, selectedIndustry])}
                   disabled={isProcessingPhoto}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.currentTarget.value = '';
-                    if (file) {
-                      void handlePhotoCapture(SectionId.Facade, file);
-                    }
-                  }}
+                  onPhoto={file => void handlePhotoCapture(SectionId.Facade, file)}
                 />
               </div>
 
@@ -1085,19 +1079,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     >
                       <Plus size={16} /> Adicionar Foto
                     </button>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      capture="environment"
+                    <VisitPhotoInput
+                      key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, selectedIndustry])}
                       disabled={isProcessingPhoto || currentPhotos.length >= MAX_PHOTOS_PER_SECTION}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.currentTarget.value = '';
-                        if (file && currentPhotos.length < MAX_PHOTOS_PER_SECTION) {
-                          void handlePhotoCapture(sectionId, file);
-                        }
-                      }}
+                      onPhoto={file => void handlePhotoCapture(sectionId, file)}
                     />
                   </div>
                 </div>
@@ -1310,19 +1295,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     >
                       <Plus size={16} /> Adicionar Foto
                     </button>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      capture="environment"
+                    <VisitPhotoInput
+                      key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, stockIndustry])}
                       disabled={isProcessingPhoto || estoquePhotos.length >= MAX_PHOTOS_PER_SECTION}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.currentTarget.value = '';
-                        if (file && estoquePhotos.length < MAX_PHOTOS_PER_SECTION) {
-                          void handlePhotoCapture(SectionId.Estoque, file, stockIndustry);
-                        }
-                      }}
+                      onPhoto={file => void handlePhotoCapture(SectionId.Estoque, file, stockIndustry)}
                     />
                   </div>
                 </div>
@@ -1495,19 +1471,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       >
                         <Camera size={14} /> Capturar
                       </button>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        capture="environment"
+                      <VisitPhotoInput
+                        key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, selectedIndustry])}
                         disabled={isProcessingPhoto || returnsPhotos.length >= MAX_PHOTOS_PER_SECTION}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          e.currentTarget.value = '';
-                          if (file && returnsPhotos.length < MAX_PHOTOS_PER_SECTION) {
-                            void handlePhotoCapture(SectionId.Trocas, file);
-                          }
-                        }}
+                        onPhoto={file => void handlePhotoCapture(SectionId.Trocas, file)}
                       />
                     </div>
                   </div>
@@ -1604,17 +1571,10 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   ) : (
                     <Camera className="w-12 h-12 text-slate-300" />
                   )}
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    capture="environment"
+                  <VisitPhotoInput
+                    key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, selectedIndustry])}
                     disabled={isProcessingPhoto}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.currentTarget.value = '';
-                      if (file) void handlePhotoCapture(SectionId.CheckOut, file);
-                    }}
+                    onPhoto={file => void handlePhotoCapture(SectionId.CheckOut, file)}
                   />
                 </div>
               </div>
