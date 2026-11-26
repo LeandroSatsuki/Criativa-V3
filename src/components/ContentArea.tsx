@@ -1,3 +1,5 @@
+import { appendCameraPhoto } from '../services/cameraDraftReceipt';
+import type { Attempt } from '../services/cameraJournal';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -526,16 +528,18 @@ const ContentArea: React.FC<ContentAreaProps> = ({
       }
   };
 
-  const handlePhotoCapture = async (section: string, file: VisitPhotoSource, industryOverride?: string) => {
-    if (photoProcessingRef.current) return;
+  const handlePhotoCapture = async (section: string, file: VisitPhotoSource, attempt?: Attempt, industryOverride?: string) => {
+    if (photoProcessingRef.current) { attempt?.end('cancel'); return; }
     photoProcessingRef.current = true;
     setPhotoCaptureBusy(true);
     setIsProcessingPhoto(true);
+    let writing = false;
     try {
       const activeIndustry = industryOverride || selectedIndustry;
       const base64 = await processPhotoForReport(file);
       if (String(getSession()?.user.id || '') !== queueOwnerId) throw new Error('A sessao mudou. Tente novamente com o usuario da visita.');
       const photoVisitId = visitState.visitId || generateVisitId();
+      writing = true;
       const compressedBase64 = liteMode ? await storeLocalPhoto(queueOwnerId, base64, {
         visitId: photoVisitId, storeId: visitState.currentStoreId, section,
         industry: activeIndustry || '', capturedAt: getBrasiliaISO(),
@@ -559,7 +563,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 ...existing,
                 photos: {
                   ...existing.photos,
-                  [section]: [...currentCategoryPhotos, compressedBase64],
+                  [section]: appendCameraPhoto(currentCategoryPhotos, compressedBase64, attempt),
                 },
               },
             };
@@ -568,7 +572,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             const currentCategoryPhotos = prevPhotos[section] || [];
             return {
               ...prevPhotos,
-              [section]: [...currentCategoryPhotos, compressedBase64],
+              [section]: appendCameraPhoto(currentCategoryPhotos, compressedBase64, attempt),
             };
           });
           return;
@@ -585,7 +589,7 @@ const ContentArea: React.FC<ContentAreaProps> = ({
             },
             photos: {
               ...current.photos,
-              [section]: [...currentCategoryPhotos, compressedBase64],
+              [section]: appendCameraPhoto(currentCategoryPhotos, compressedBase64, attempt),
             },
           });
           return {
@@ -609,10 +613,11 @@ const ContentArea: React.FC<ContentAreaProps> = ({
         const currentCategoryPhotos = prevPhotos[section] || [];
         return {
           ...prevPhotos,
-          [section]: [...currentCategoryPhotos, compressedBase64],
+          [section]: appendCameraPhoto(currentCategoryPhotos, compressedBase64, attempt),
         };
       });
     } catch (error: any) {
+      attempt?.end(writing ? 'write_error' : 'capture_error');
       alert(error.message || 'Não foi possível processar a foto.');
     } finally {
       photoProcessingRef.current = false;
@@ -766,7 +771,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                 <VisitPhotoInput
                   key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, selectedIndustry])}
                   disabled={isProcessingPhoto}
-                  onPhoto={file => void handlePhotoCapture(SectionId.Facade, file)}
+                  section={SectionId.Facade}
+                  onPhoto={(file, attempt) => void handlePhotoCapture(SectionId.Facade, file, attempt)}
                 />
               </div>
 
@@ -1082,7 +1088,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     <VisitPhotoInput
                       key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, selectedIndustry])}
                       disabled={isProcessingPhoto || currentPhotos.length >= MAX_PHOTOS_PER_SECTION}
-                      onPhoto={file => void handlePhotoCapture(sectionId, file)}
+                      section={sectionId}
+                      onPhoto={(file, attempt) => void handlePhotoCapture(sectionId, file, attempt)}
                     />
                   </div>
                 </div>
@@ -1298,7 +1305,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                     <VisitPhotoInput
                       key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, stockIndustry])}
                       disabled={isProcessingPhoto || estoquePhotos.length >= MAX_PHOTOS_PER_SECTION}
-                      onPhoto={file => void handlePhotoCapture(SectionId.Estoque, file, stockIndustry)}
+                      section={SectionId.Estoque}
+                      onPhoto={(file, attempt) => void handlePhotoCapture(SectionId.Estoque, file, attempt, stockIndustry)}
                     />
                   </div>
                 </div>
@@ -1474,7 +1482,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                       <VisitPhotoInput
                         key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, selectedIndustry])}
                         disabled={isProcessingPhoto || returnsPhotos.length >= MAX_PHOTOS_PER_SECTION}
-                        onPhoto={file => void handlePhotoCapture(SectionId.Trocas, file)}
+                        section={SectionId.Trocas}
+                        onPhoto={(file, attempt) => void handlePhotoCapture(SectionId.Trocas, file, attempt)}
                       />
                     </div>
                   </div>
@@ -1574,7 +1583,8 @@ const ContentArea: React.FC<ContentAreaProps> = ({
                   <VisitPhotoInput
                     key={JSON.stringify([queueOwnerId, visitState.visitId, visitState.currentStoreId, sectionId, selectedIndustry])}
                     disabled={isProcessingPhoto}
-                    onPhoto={file => void handlePhotoCapture(SectionId.CheckOut, file)}
+                    section={SectionId.CheckOut}
+                    onPhoto={(file, attempt) => void handlePhotoCapture(SectionId.CheckOut, file, attempt)}
                   />
                 </div>
               </div>

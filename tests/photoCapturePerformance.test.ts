@@ -8,7 +8,7 @@ test('captura impede compressoes simultaneas e libera o canvas', async () => {
   const contentArea = await readSource('../src/components/ContentArea.tsx');
   const imageCompression = await readSource('../src/services/imageCompression.ts');
 
-  assert.match(contentArea, /if \(photoProcessingRef\.current\) return/);
+  assert.match(contentArea, /if \(photoProcessingRef\.current\) \{ attempt\?\.end\('cancel'\); return/);
   assert.match(contentArea, /photoProcessingRef\.current = true/);
   assert.match(contentArea, /finally \{[\s\S]*?photoProcessingRef\.current = false/);
   assert.match(contentArea, /canvas\.width = 1;[\s\S]*?canvas\.height = 1/);

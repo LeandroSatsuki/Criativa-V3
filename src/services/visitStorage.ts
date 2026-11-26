@@ -1,3 +1,4 @@
+import { settleCameraDraft } from './cameraDraftReceipt.ts';
 import type { VisitState } from '../types';
 import { withLocalVisitLock } from './localVisitLock.ts';
 import { evidenceTransaction } from './durableStorage.ts';
@@ -176,7 +177,13 @@ const flushPendingSaves = async () => {
     const sameContent = committedDraft?.storageKey === current.storageKey
       && sameVisitContent(committedDraft.state, current.state);
     if (sameContent && committedDraft!.state.step === current.state.step) continue;
-    await withLocalVisitLock(() => writeIndexedDraft(current.state, sameContent));
+    try {
+      await withLocalVisitLock(() => writeIndexedDraft(current.state, sameContent));
+    } catch (error) {
+      settleCameraDraft(current.state,false);
+      throw error;
+    }
+    settleCameraDraft(current.state,true);
     localStorage.setItem(
       current.storageKey,
       JSON.stringify(stripPhotosForCompatibility(current.state)),

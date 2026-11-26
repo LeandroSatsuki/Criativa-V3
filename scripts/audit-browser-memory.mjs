@@ -27,7 +27,8 @@ try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', userAgent: 'Mozilla/5.0 (Linux; Android 12) Chrome/131.0.0.0 Mobile Safari/537.36' });
     try {
       const page = await context.newPage();
-      const errors = [], dialogs = [];
+      const errors = [], dialogs = [], cameraEvents = new Map();
+      let rejectDiagnostics = true;
       page.on('pageerror', error => errors.push(error.message));
       page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.accept(); });
       const user = { id: 'isolated-memory-audit', name: 'AUDITORIA ISOLADA', role: 'FIELD_OPS', user: 'audit-local' };
@@ -35,6 +36,14 @@ try {
         const url = new URL(route.request().url());
         assert.equal(url.origin, origin, 'Nenhuma conexao externa permitida');
         if (!url.pathname.startsWith('/api/')) return route.continue();
+        if (url.pathname === '/api/camera/monitor') {
+          if (rejectDiagnostics) { rejectDiagnostics=false; return route.fulfill({status:401,json:{error:'teste'}}); }
+          for (const event of route.request().postDataJSON().events) {
+            assert.deepEqual(Object.keys(event).sort(), ['id','at','section','mode','build','opened','result'].sort());
+            cameraEvents.set(event.id,event);
+          }
+          return route.fulfill({json:{received:true}});
+        }
         const data = url.pathname === '/api/config' ? { industries: ['TESTE'], timestamp: new Date().toISOString() }
           : url.pathname === '/api/stores' ? [{ id: 'audit-store', name: 'LOJA DE TESTE ISOLADO' }]
           : url.pathname === '/api/auth/session' ? { user, token: 'local-only', expiresAt: '2099-01-01T00:00:00Z' }
@@ -185,6 +194,16 @@ try {
       }
       memory.push(await sample('after-reload-and-50-gallery-changes'));
       if (mode === 'lite') await auditLiteCamera(page, context, count, beforeFailure, sources[0].buffer);
+      const cutoff = Date.now()+35000;
+      while (Date.now() < cutoff && ![...cameraEvents.values()].some(e=>e.result==='saved' && e.mode===(mode==='lite'?'lite':'native'))) {
+        await page.waitForTimeout(300);
+      }
+      assert.ok([...cameraEvents.values()].some(e=>e.result==='saved' && e.mode===(mode==='lite'?'lite':'native')));
+      assert.ok(await page.evaluate(()=>!!JSON.parse(localStorage.getItem('criativa_session'))?.token));
+      if (mode==='lite') {
+        assert.ok([...cameraEvents.values()].some(e=>e.result==='denied'));
+        assert.ok([...cameraEvents.values()].some(e=>e.result==='cancel'));
+      }
       assert.deepEqual(errors, []);
       console.log(JSON.stringify({ mode, fixture, memory, captures, invalidImagePreserved: true, storageFailurePreserved: mode === 'lite' ? true : 'not-injected', reloadPreserved: true, galleryChanges: 50, mountedPhotoPreviews: loaded, cleanup, errors, note: 'Desktop JS heap after GC; excludes native camera/GPU/decoded bitmap memory. Native Android camera not exercised.' }));
     } finally { await context.close(); }
@@ -283,28 +302,38 @@ async function auditLiteCamera(page, context, count, initialCount, fallbackFile)
       audit.calls++;
       audit.constraints = constraints;
       if (audit.mode === 'denied') throw new DOMException('denied', 'NotAllowedError');
-      const stream = await real(constraints);
+      let stream;
+      try { stream = await real(constraints); } catch (error) { audit.failure = error.name + ': '+error.message; throw error; }
       audit.tracks.push(...stream.getTracks());
       if (audit.mode === 'delay') await new Promise(resolve => { audit.grant = resolve; });
       return stream;
     };
   });
   assert.equal(await page.evaluate(() => window.cameraAudit.calls), 0);
+  const debugWait = async predicate => {
+    try { await page.waitForFunction(predicate,undefined,{timeout:10000}); }
+    catch (error) {
+      console.error(await page.evaluate(()=>({calls:window.cameraAudit.calls,failure:window.cameraAudit.failure,
+        visibility:document.visibilityState,media:document.querySelector('video')?.readyState,
+        dialog:document.querySelector('dialog')?.innerText,tracks:window.cameraAudit.tracks.map(t=>t.readyState)})));
+      throw error;
+    }
+  };
   await input.click();
   await take.waitFor();
-  await page.waitForFunction(() => document.querySelector('video')?.videoWidth > 0);
+  await debugWait(() => document.querySelector('video')?.videoWidth > 0);
   await cancel.click();
   await noActiveTrack();
   assert.equal(await count(), initialCount);
   await page.evaluate(() => { window.cameraAudit.mode = 'delay'; });
   await input.click();
-  await page.waitForFunction(() => !!window.cameraAudit.grant);
+  await debugWait(() => !!window.cameraAudit.grant);
   await cancel.click();
   await page.evaluate(() => window.cameraAudit.grant());
   await noActiveTrack();
   await page.evaluate(() => { window.cameraAudit.mode = 'ok'; });
   await input.click();
-  await page.waitForFunction(() => document.querySelector('video')?.videoWidth > 0);
+  await debugWait(() => document.querySelector('video')?.videoWidth > 0);
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   await noActiveTrack();
   assert.equal(await count(), initialCount);

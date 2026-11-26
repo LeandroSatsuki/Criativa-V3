@@ -21,6 +21,7 @@ import {
   listQueuedVisitSummaries,
   updateQueuedVisit,
 } from './services/syncQueue';
+import { startCameraMonitor } from './services/cameraJournal';
 import { loadVisitDraft, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
 import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
@@ -107,6 +108,9 @@ const App: React.FC = () => {
   const [discardBusy, setDiscardBusy] = useState(false);
   const [protection, setProtection] = useState<{ visitId: string; report?: PhotoProtection; error?: string } | null>(null);
   const protectionBusy = useRef(false);
+  useEffect(() => {
+    if (visitState.user?.role === 'FIELD_OPS') return startCameraMonitor(String(visitState.user.id));
+  }, [visitState.user?.id, visitState.user?.role]);
   const safetyDraft = useRef(visitState);
   safetyDraft.current = visitState;
   const [discardMessage, setDiscardMessage] = useState<string | null>(null);

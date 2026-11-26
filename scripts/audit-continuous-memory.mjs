@@ -31,6 +31,7 @@ try {
       await context.route('**/*', async route => {
         const request = route.request(), url = new URL(request.url()); assert.equal(url.origin, origin, 'Nenhuma conexao externa');
         if (!url.pathname.startsWith('/api/')) return route.continue();
+        if (url.pathname === '/api/camera/monitor') return route.fulfill({json:{received:true}});
         let data;
         if (url.pathname === '/api/config') data = { industries: ['TESTE'], timestamp: new Date().toISOString() };
         else if (url.pathname === '/api/stores') data = [{ id: 'store', name: 'LOJA STRESS' }];

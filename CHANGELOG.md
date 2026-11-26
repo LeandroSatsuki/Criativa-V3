@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-11-26] — Monitoramento da câmera em campo
+
+- Todas as contas de campo enviam apenas sinais de tentativa, etapa, versão, abertura e resultado. A confirmação de foto salva acompanha a gravação do rascunho no aparelho.
+- A fila de diagnóstico tem 64 posições por conta, usa lotes de até 12 e prioriza os registros recentes quando cheia. Fica separada das fotos e dos envios de visita. O envio de diagnóstico é oportunista; o painel apresenta os sinais recebidos nas últimas 24 horas.
+- Supervisores podem buscar o promotor, conferir fotos de Antes salvas pela câmera leve e ver alertas por duas falhas na mesma etapa ou pela mesma falha e versão em três contas em 30 minutos. O painel visível atualiza a cada minuto. Os registros operacionais de câmera têm limpeza periódica após sete dias.
+
 ## [2026-11-26] — Câmera leve para Android
 
 - O Modo Lite abria a câmera externa nas cinco entradas de foto. A redução de resolução só começava depois da devolução do arquivo. O Naamã relatou a interrupção antes da primeira foto de uma indústria. A memória disponível no aparelho no momento do erro é desconhecida.

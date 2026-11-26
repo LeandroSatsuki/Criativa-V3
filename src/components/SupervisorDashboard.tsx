@@ -1,3 +1,4 @@
+import CameraMonitor from './CameraMonitor';
 import React, { useEffect, useRef, useState } from 'react';
 import { apiService } from '../services/apiService';
 import { filterSupervisorPromoters, type SupervisorFilter } from '../services/supervisorFilters';
@@ -393,6 +394,7 @@ const SupervisorDashboard: React.FC = () => {
       </div>
       {historical && <p className="sv-notice">Registros de {dateLabel}. O roteiro previsto usa as atribuições atuais; a rota original pode ter sido diferente.</p>}
       {error && <div className="sv-notice sv-error" role="alert"><AlertCircle size={18} /><span>Exibindo a última consulta. {error}</span></div>}
+      <CameraMonitor promoters={dashboard.promoters} />
       <div className="sv-metrics">
         {metrics.map(({ key, label, value, subtitle, icon: Icon, tone }) => <button key={key} className={'sv-metric ' + (filter === key ? 'selected' : '')} aria-pressed={filter === key} onClick={() => selectFilter(key)}>
           <div className="sv-metric-label"><Icon size={18} className={'sv-text-' + tone} /><span>{label}</span><ArrowUpRight size={15} /></div><strong>{value}</strong><span className="sv-muted">{subtitle}</span>
