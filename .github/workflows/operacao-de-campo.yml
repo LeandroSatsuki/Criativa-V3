@@ -1,0 +1,44 @@
+name: Verificar operação de campo
+
+on:
+  pull_request:
+  push:
+    branches: [main, master, agent/google-sync-production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: campo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visitas:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Preparar navegador de teste
+        run: |
+          npm install --prefix "$RUNNER_TEMP/browser" --no-save --no-audit --no-fund playwright@1.63.0
+          mkdir -p "$RUNNER_TEMP/CriativaRecovery"
+      - name: Verificar câmera, memória, uso contínuo e retomada de visitas
+        env:
+          LOCALAPPDATA: ${{ runner.temp }}
+          AUDIT_CYCLES: '3'
+        run: |
+          browser="$RUNNER_TEMP/browser/node_modules/playwright/index.mjs"
+          node scripts/audit-browser-memory.mjs "$browser"
+          node scripts/audit-stuck-checkout.mjs "$browser"
+          node scripts/audit-continuous-memory.mjs "$browser"

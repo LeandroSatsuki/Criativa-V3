@@ -6,6 +6,7 @@
 - No Android compatível, o Modo Lite agora abre a câmera dentro da visita. Solicita somente vídeo, prefere a câmera traseira e limita a resolução e a taxa de quadros. A captura usa o mesmo carimbo, compressão e salvamento da visita. A câmera do aparelho continua disponível como alternativa.
 - A câmera é liberada ao fotografar, cancelar, ocultar a página ou sair da etapa, inclusive se a permissão chegar depois do cancelamento. O encerramento automático aguarda a captura. Não houve migração nem limpeza de visitas ou fotos.
 - Verificações locais: 205 testes passaram, TypeScript e build aprovados. O teste de navegador com câmera simulada verificou captura offline, cancelamento, saída de tela, permissão tardia ou negada, alternativa nativa e reabertura com as fotos salvas. Validação física com o Naamã pendente.
+- Prevenção: o GitHub verifica propostas de alteração e atualizações da base de produção com dados sintéticos. Exercita câmera, registros com 100 fotos, visitas consecutivas, perda de conexão e retomada da fila. O teste usa um navegador isolado e não acessa contas de campo.
 
 ## [2026-11-25] - Resgate de fotos e protecao independente no piloto da Lorena
 
