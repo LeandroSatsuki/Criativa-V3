@@ -350,12 +350,25 @@ async function auditLiteCamera(page, context, count, initialCount, fallbackFile)
   await input.click();
   await page.getByRole('alert').filter({ hasText: 'câmera leve' }).waitFor();
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: 'Usar câmera do aparelho' }).click();
-  await (await chooser).setFiles({ name: 'native.jpg', mimeType: 'image/jpeg', buffer: fallbackFile });
+  await page.getByLabel('Usar câmera do aparelho',{exact:true}).click();
+  const native = await chooser;
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await native.setFiles({ name: 'native.jpg', mimeType: 'image/jpeg', buffer: fallbackFile });
   await awaitCount(initialCount + 2);
   await page.reload();
   await input.waitFor();
   assert.equal(await count(), initialCount + 2);
+  const nextChooser = page.waitForEvent('filechooser');
+  await input.click();
+  await nextChooser;
+  assert.equal(await page.getByRole('dialog',{name:'Câmera leve'}).count(),0);
+  // Android can discard the browser before the native picker returns a file.
+  await page.reload();
+  await input.waitFor();
+  await input.click();
+  await take.waitFor();
+  await cancel.click();
+  assert.equal(await count(), initialCount+2);
   console.log(JSON.stringify({ camera: 'android-lite-simulated', offlinePhotoSaved: true, fallbackPhotoSaved: true,
     cancelPreservedCount: true, pageHideReleased: true, latePermissionReleased: true, reloadPreserved: true }));
 }

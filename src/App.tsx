@@ -22,6 +22,7 @@ import {
   updateQueuedVisit,
 } from './services/syncQueue';
 import { startCameraMonitor } from './services/cameraJournal';
+import { cameraChoice, setCameraChoice, supportsVisitCamera, type CameraChoice } from './services/visitCameraChoice';
 import { loadVisitDraft, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
 import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
@@ -1044,6 +1045,12 @@ const App: React.FC = () => {
             Modo Lite
             <input type="checkbox" checked={liteMode} disabled={deviceSettingBusy || litePilot} onChange={() => void changeDeviceMode()} className="h-5 w-5" />
           </label>
+          {supportsVisitCamera() && <label className="mt-4 block text-sm font-semibold">Câmera para fotos
+            <select className="mt-1 block w-full rounded-lg border p-2" defaultValue={cameraChoice(String(visitState.user?.id || ''))}
+              onChange={event => setCameraChoice(String(visitState.user?.id || ''),event.target.value as CameraChoice)}>
+              <option value="auto">Automática</option><option value="lite">Câmera leve</option><option value="native">Câmera do aparelho</option>
+            </select>
+          </label>}
           {deviceSettingError && <p role="alert" className="mt-4 text-sm text-orange-700">{deviceSettingError}</p>}
         </div>
       </div>}

@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PHOTO_INITIAL_MAX_LONG_EDGE } from '../services/imageCompression';
 import { beginCameraPreview, isPhotoCaptureBusy, liteMode } from '../services/liteMode';
+import { cameraChoice, setCameraChoice, supportsVisitCamera } from '../services/visitCameraChoice';
+import { getSession } from '../services/session';
 
 export type VisitPhotoSource = File | HTMLCanvasElement;
 
@@ -22,7 +24,8 @@ export default function VisitPhotoInput({ section, disabled, onPhoto }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  const nativePicker = useRef(false);
+  const nativeInput = useRef<HTMLInputElement>(null);
+  const handoff = useRef(false);
   const release = useRef<() => void>(() => {});
   const attempt = useRef<Attempt | undefined>(undefined);
   const finish = (result: Outcome) => { attempt.current?.end(result); attempt.current = undefined; };
@@ -38,9 +41,7 @@ export default function VisitPhotoInput({ section, disabled, onPhoto }: Props) {
     picker?.addEventListener('cancel',cancel);
     return () => { picker?.removeEventListener('cancel',cancel); finish('interrupted'); };
   }, []);
-  const useLiteCamera = liteMode && /Android/i.test(navigator.userAgent) &&
-    typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof HTMLDialogElement !== 'undefined' &&
-    typeof HTMLDialogElement.prototype.showModal === 'function';
+  const owner = String(getSession()?.user.id || '');
 
   useEffect(() => {
     if (!open) return;
@@ -62,15 +63,21 @@ export default function VisitPhotoInput({ section, disabled, onPhoto }: Props) {
       finish(result);
       stop();
       setReady(false);
-      setError('A câmera leve não conseguiu abrir. Você pode usar a câmera do aparelho.');
+      setError(result === 'denied'
+        ? 'O acesso à câmera leve está bloqueado. Toque em Usar câmera do aparelho para continuar.'
+        : 'A câmera leve não conseguiu abrir. Você pode usar a câmera do aparelho.');
     };
     const close = () => { finish('interrupted'); stop(); setOpen(false); };
-    const onHide = () => { if (document.hidden) close(); };
+    const onHide = () => { if (document.hidden && !handoff.current) close(); };
+    const onPageHide = () => { if (!handoff.current) close(); };
+    const fallbackPicker = nativeInput.current;
+    const onNativeCancel = () => { handoff.current=false; finish('cancel'); stop(); setOpen(false); };
     const timeout = window.setTimeout(() => fail('timeout'), 20000);
     release.current = stop;
     dialog.current!.showModal();
+    fallbackPicker?.addEventListener('cancel',onNativeCancel);
     document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', close);
+    window.addEventListener('pagehide', onPageHide);
     preview.onplaying = () => {
       if (!active || !preview.videoWidth || !preview.videoHeight) return;
       window.clearTimeout(timeout);
@@ -91,12 +98,23 @@ export default function VisitPhotoInput({ section, disabled, onPhoto }: Props) {
       result.getVideoTracks().forEach(track => { track.onended = () => fail('open_error'); });
       preview.srcObject = result;
       await preview.play();
+      // Keep the device default when the browser or lens lacks continuous autofocus.
+      if (active) {
+        const track = result.getVideoTracks()[0];
+        try {
+          const caps = track?.getCapabilities?.() as MediaTrackCapabilities & {focusMode?: string[]};
+          if (caps?.focusMode?.includes('continuous')) {
+            void track.applyConstraints({advanced:[{focusMode:'continuous'} as MediaTrackConstraintSet]}).catch(()=>{});
+          }
+        } catch { /* Focus is optional; preview already works. */ }
+      }
     }).catch(error => fail(error?.name === 'NotAllowedError' ? 'denied' : 'open_error'));
     return () => {
       stop();
       preview.onplaying = preview.onerror = null;
+      fallbackPicker?.removeEventListener('cancel',onNativeCancel);
       document.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pagehide', close);
+      window.removeEventListener('pagehide', onPageHide);
     };
   }, [open]);
 
@@ -128,14 +146,15 @@ export default function VisitPhotoInput({ section, disabled, onPhoto }: Props) {
     <input ref={input} type="file" accept="image/*" capture="environment" aria-label="Adicionar foto"
       disabled={disabled} className="absolute inset-0 opacity-0 cursor-pointer"
       onClick={event => {
-        if (!useLiteCamera || nativePicker.current) {
-          finish('interrupted');
+        finish('interrupted');
+        const choice = cameraChoice(owner);
+        if (!supportsVisitCamera() || !(choice === 'lite' || (choice === 'auto' && liteMode))) {
           attempt.current = beginCameraAttempt(section,'native');
           return;
         }
         event.preventDefault();
         if (open || isPhotoCaptureBusy()) return;
-        finish('interrupted');
+        handoff.current = false;
         attempt.current = beginCameraAttempt(section,'lite');
         setError(''); setReady(false); setOpen(true);
       }}
@@ -154,14 +173,28 @@ export default function VisitPhotoInput({ section, disabled, onPhoto }: Props) {
         <button type="button" onClick={takePhoto} disabled={!ready || !!error || disabled}
           className="rounded-xl bg-blue-600 px-4 py-3 font-semibold disabled:opacity-40">Tirar foto</button>
         <button type="button" onClick={() => { finish('cancel'); close(); }} className="rounded-xl px-3 py-3">Cancelar</button>
-        <button type="button" className="rounded-xl px-3 py-3 underline" onClick={() => {
-          finish('switched');
-          close();
-          // Keep the user gesture when handing control to the Android picker.
-          dialog.current?.close();
-          nativePicker.current = true;
-          try { input.current?.click(); } finally { nativePicker.current = false; }
-        }}>Usar câmera do aparelho</button>
+        <label className="relative rounded-xl px-3 py-3 underline">
+          Usar câmera do aparelho
+          <input ref={nativeInput} type="file" accept="image/*" capture="environment" aria-label="Usar câmera do aparelho"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0" disabled={disabled}
+            onClick={() => {
+              finish(handoff.current ? 'interrupted' : 'switched');
+              handoff.current = true;
+              release.current();
+              setReady(false);
+              setError('Aguardando a foto da câmera do aparelho.');
+              attempt.current = beginCameraAttempt(section,'native');
+            }}
+            onChange={event => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = '';
+              handoff.current=false;
+              if (file && !disabled) { setCameraChoice(owner,'native'); deliver(file); }
+              else finish('cancel');
+              close();
+            }}
+          />
+        </label>
       </div>
     </dialog>, document.body)}
   </>;

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [2026-11-27] — Entrada na loja e troca de câmera no Android
+
+- Se o Android interromper a câmera do aparelho antes de devolver a imagem, a próxima tentativa usa a câmera leve em aparelhos compatíveis. A pessoa pode escolher a câmera nas preferências durante a visita.
+- A troca para a câmera do aparelho usa um seletor acionado pelo próprio toque e mantém a tela de captura disponível durante a passagem para o Android. Ao receber o arquivo, o aplicativo lembra a escolha nessa sessão e conta.
+- A câmera leve solicita foco contínuo quando a lente oferece esse recurso e mantém os limites de resolução e de quadros. A permissão bloqueada tem mensagem própria.
+
 ## [2026-11-26] — Monitoramento da câmera em campo
 
 - Todas as contas de campo enviam apenas sinais de tentativa, etapa, versão, abertura e resultado. A confirmação de foto salva acompanha a gravação do rascunho no aparelho.

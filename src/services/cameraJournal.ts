@@ -1,6 +1,7 @@
 import { getSession } from './session';
 import { requestJson } from './httpClient';
 import { isPhotoCaptureBusy } from './liteMode';
+import { setCameraChoice } from './visitCameraChoice';
 import type { CameraEvent, Outcome } from './cameraSignals';
 
 const slots = 64, day = 86400000, marker = 'criativa_camera_active_v1';
@@ -39,6 +40,7 @@ async function flush() {
         liveLocks ||= new Set((await navigator.locks.query()).held?.map(lock=>lock.name));
         if (!liveLocks.has('criativa-camera-'+event.id) && read(k)?.result === null) {
           event.result='interrupted'; localStorage.setItem(k,JSON.stringify(event));
+          if (event.mode === 'native' && !event.opened && Date.now()-event.at < 600000) setCameraChoice(id,'lite');
         }
       }
       if (!event.result) schedule(125000);
@@ -61,7 +63,10 @@ export function startCameraMonitor(id: string) {
     const k = sessionStorage.getItem(marker);
     if (k?.startsWith('criativa_camera_v1:'+encodeURIComponent(id)+':')) {
       const pending = read(k);
-      if (pending && !pending.result) localStorage.setItem(k,JSON.stringify({...pending,result:'interrupted'}));
+      if (pending && !pending.result) {
+        localStorage.setItem(k,JSON.stringify({...pending,result:'interrupted'}));
+        if (pending.mode === 'native' && !pending.opened && Date.now()-pending.at < 600000) setCameraChoice(id,'lite');
+      }
       sessionStorage.removeItem(marker);
     }
   } catch { /* Monitoring is optional when device storage is unavailable. */ }
@@ -75,6 +80,7 @@ export function startCameraMonitor(id: string) {
 export function beginCameraAttempt(section: string, mode: CameraEvent['mode']): Attempt {
   try {
     if (!owner) return noSignal;
+    const attemptOwner = owner;
     const id = crypto.randomUUID(), at = Date.now();
     let k = '', oldestKey = '', oldestTime = Infinity;
     for (let n=0;n<slots;n++) {
@@ -103,6 +109,7 @@ export function beginCameraAttempt(section: string, mode: CameraEvent['mode']): 
       end(result) { try {
         if (event.result || read(k)?.id !== id) return;
         event.result=result; unlock?.(); localStorage.setItem(k,JSON.stringify(event));
+        if (result === 'interrupted' && mode === 'native' && !event.opened) setCameraChoice(attemptOwner,'lite');
         if (sessionStorage.getItem(marker)===k) sessionStorage.removeItem(marker);
         schedule(8000);
       } catch {} },
