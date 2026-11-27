@@ -2,6 +2,7 @@ import type { Config, Context } from '@netlify/functions';
 import { json } from './_shared/json';
 import { authenticate } from './_shared/auth';
 import { canAccessVisit } from './_shared/visit-access';
+import { startBackgroundSync } from './_shared/background-sync-trigger';
 import { generateVisitId, getVisit, listVisits, saveVisit, upsertVisit } from './_shared/visits';
 
 export default async (request: Request, _context: Context) => {
@@ -36,11 +37,13 @@ export default async (request: Request, _context: Context) => {
         user: auth.user,
       },
     });
+    const syncStarted = await startBackgroundSync(request, record.visitId);
 
     return json({
       visitId: record.visitId,
       syncStatus: record.syncStatus,
       updatedAt: record.updatedAt,
+      syncStarted,
     }, 201);
   }
 

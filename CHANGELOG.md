@@ -1,5 +1,1649 @@
 # CHANGELOG
 
+## [2026-11-27] — Entrada na loja e troca de câmera no Android
+
+- Se o Android interromper a câmera do aparelho antes de devolver a imagem, a próxima tentativa usa a câmera leve em aparelhos compatíveis. A pessoa pode escolher a câmera nas preferências durante a visita.
+- A troca para a câmera do aparelho usa um seletor acionado pelo próprio toque e mantém a tela de captura disponível durante a passagem para o Android. Ao receber o arquivo, o aplicativo lembra a escolha nessa sessão e conta.
+- A câmera leve solicita foco contínuo quando a lente oferece esse recurso e mantém os limites de resolução e de quadros. A permissão bloqueada tem mensagem própria.
+
+## [2026-11-26] — Monitoramento da câmera em campo
+
+- Todas as contas de campo enviam apenas sinais de tentativa, etapa, versão, abertura e resultado. A confirmação de foto salva acompanha a gravação do rascunho no aparelho.
+- A fila de diagnóstico tem 64 posições por conta, usa lotes de até 12 e prioriza os registros recentes quando cheia. Fica separada das fotos e dos envios de visita. O envio de diagnóstico é oportunista; o painel apresenta os sinais recebidos nas últimas 24 horas.
+- Supervisores podem buscar o promotor, conferir fotos de Antes salvas pela câmera leve e ver alertas por duas falhas na mesma etapa ou pela mesma falha e versão em três contas em 30 minutos. O painel visível atualiza a cada minuto. Os registros operacionais de câmera têm limpeza periódica após sete dias.
+
+## [2026-11-26] — Câmera leve para Android
+
+- O Modo Lite abria a câmera externa nas cinco entradas de foto. A redução de resolução só começava depois da devolução do arquivo. O Naamã relatou a interrupção antes da primeira foto de uma indústria. A memória disponível no aparelho no momento do erro é desconhecida.
+- No Android compatível, o Modo Lite agora abre a câmera dentro da visita. Solicita somente vídeo, prefere a câmera traseira e limita a resolução e a taxa de quadros. A captura usa o mesmo carimbo, compressão e salvamento da visita. A câmera do aparelho continua disponível como alternativa.
+- A câmera é liberada ao fotografar, cancelar, ocultar a página ou sair da etapa, inclusive se a permissão chegar depois do cancelamento. O encerramento automático aguarda a captura. Não houve migração nem limpeza de visitas ou fotos.
+- Verificações locais: 205 testes passaram, TypeScript e build aprovados. O teste de navegador com câmera simulada verificou captura offline, cancelamento, saída de tela, permissão tardia ou negada, alternativa nativa e reabertura com as fotos salvas. Validação física com o Naamã pendente.
+- Prevenção: o GitHub verifica propostas de alteração e atualizações da base de produção com dados sintéticos. Exercita câmera, registros com 100 fotos, visitas consecutivas, perda de conexão e retomada da fila. O teste usa um navegador isolado e não acessa contas de campo.
+
+## [2026-11-25] - Resgate de fotos e protecao independente no piloto da Lorena
+
+### Causa
+- Outra visita, `VISIT-0746E8AE`, da conta `lorena.costa` (ID 101), apresentou 15 imagens acessiveis e 17 indisponiveis, em 32 referencias diferentes, no endereco oficial. Usuario confirmou ser visita de hoje; ainda nao sabe se a captura ocorreu na versao publicada ontem ou se existem originais na galeria.
+- Consulta pontual nao encontrou visita/resumos nem fragmentos de upload do dono 101 no servidor. O hash integral exige ler todas as imagens antes da transmissao: uma referencia indisponivel bloqueia tambem o envio das fotos validas. Esse bloqueio foi reproduzido.
+- Nao foi comprovado por que os 17 arquivos deixaram de ser acessiveis. Nao atribuir a falta de internet, RAM, limpeza automatica ou atualizacao sem evidencia do aparelho. Protecao de ontem nao equivale a resolucao comprovada deste novo incidente.
+
+### Solucao aplicada
+- Piloto restrito ao ID 101/papel FIELD_OPS. Endpoint autenticado mantem copias privadas por referencia/hash em armazenamento separado do servidor. Outras contas conservam fluxo e trafego atuais.
+- Copia sequencial em segundo plano, ate quatro tentativas por rodada, depois da captura/reconexao e a cada 15 segundos com app visivel. Pausa ao iniciar captura; nao impede usar camera, rascunho, fila ou envio normal. Indices em memoria limitados a referencias, nunca imagens.
+- Acao `Proteger fotos disponiveis` salva o que ainda pode ser lido, sem exigir que todas as imagens estejam presentes. Confere conteudo gravado no servidor e informa protegidas, ausentes, falhas e referencias ainda nao conferidas. Copia privada nao significa visita enviada ao Drive.
+- Referencia ausente tenta recuperar somente copia verificada da mesma conta. Quando o banco permite, restaura o mesmo ID local sem substituir registros existentes; falha de regravacao local nao impede usar a copia valida online.
+- Acao `Recuperar originais da galeria` lista apenas referencias ausentes por etapa/industria. Confirmacao individual permite fornecer o original da mesma visita; copia acessivel nao e substituida. IDs, aliases, outras imagens e horarios da visita permanecem iguais. Sem inventar datas de captura.
+- Diagnostico registra versao, estado das referencias, persistencia concedida, uso/quota de armazenamento e informacoes de navegador/memoria quando disponibilizadas. Armazenamento nao e RAM e JS heap nao e a memoria total do Android. Campos sao filtrados, sem imagens ou credenciais no relatorio. Imagens ficam apenas no armazenamento privado de recuperacao. Novas fotos locais tambem registram hora/build de gravacao para rastrear a versao efetivamente usada.
+
+### Checklist
+- [x] 205 testes automatizados aprovados e TypeScript conferido.
+- [x] Reproducao isolada de 15 disponiveis/17 ausentes, protecao e restauracao das copias, isolamento e controles de interface em 390 px.
+- [x] Regressao de captura normal/Lite, restauracao, checkout/retomada e isolamento da excecao de descarte antigo aprovada. Build normal concluido.
+- [x] Previa/publicacao final conferidas: login/health HTTP 200, provedor google-v1 e endpoint de recuperacao recusando acesso anonimo.
+- [ ] Lorena abrir a versao de 25/11, proteger os arquivos reais e informar se possui os 17 originais na galeria. Nao afirmar que a visita real foi enviada ou que imagens ausentes foram recuperadas antes dessa verificacao.
+
+### Seguranca
+- Nenhuma limpeza de fila/fotos, descarte de visita, login operacional, alteracao de schema ou migracao de dados. A autorizacao de abandono do ID antigo nao se aplica a esta visita nova.
+- Endpoint exige sessao valida, conta/papel piloto, referencias do mesmo dono, JPEG ate 120 KB, limites de requisicao, hash e releitura. Respostas no-store. Copias divergentes nao substituem bytes existentes.
+- Recuperacao pela galeria exige referencia presente na fila do dono, ausencia confirmada e visita ainda nao recebida pelo servidor. Arquivo deve ser fornecido pela pessoa, nunca gerado. Se faltarem os originais e nao houver copia, bytes nao podem ser reconstruidos por reenvio.
+- Copias do piloto nao recebem exclusao automatica nesta entrega; retencao e expansao para outras contas requerem acompanhamento. Existem chamadas/armazenamento adicionais no Netlify, sem acionar Make ou Drive nesta etapa.
+
+### Testes realizados
+- APIs isoladas: autenticacao/conta/papel, acesso a outra referencia, idempotencia, hash/corrupcao/divergencia, limite de imagem e exclusao de campos arbitrarios/credenciais do diagnostico.
+- Navegador isolado sem trafego externo: proteger 15 e registrar 17 ausentes mantem todas as 32 referencias. Perda simulada das 15 copias primarias foi recuperada pelo servidor e regravada localmente. Nenhuma finalizacao ocorreu enquanto faltavam imagens.
+- Originais sinteticos fornecidos separadamente pela galeria preencheram as 17 referencias; imagem acessivel foi recusada para substituicao. Envio integral voltou a ter 32 imagens e fila permaneceu preservada para confirmacao do servidor.
+- Operacoes concorrentes de protecao mantiveram relatorios distintos e uma requisicao por vez. Troca de sessao bloqueou recuperacao remota.
+- Rejeicao 401 da copia auxiliar preserva a sessao operacional; autenticacao Bearer continua obrigatoria no servidor. Renovacao/encerramento da sessao permanecem a cargo do fluxo principal. Caso conferido no navegador com rejeicao simulada.
+- UI: cancelar a selecao preserva a lacuna; confirmar o original atualiza a auditoria e remove somente a pendencia daquela imagem. Nenhuma excecao JavaScript observada.
+- Previa final `6b074ad5784e87674a73ecaa` e publicacao `6b074af5351754f6d2503e74` conferidas, bundle `index-BhSjb9b8.js`. Publicado em 25/11/2026 as 17:54:26 de Brasilia. Fontes `773e733` e `f5b4e43` enviadas ao GitHub na branch `agent/google-sync-production`.
+- Conferencia publica sem login operacional: acesso/health HTTP 200, google-v1, nenhuma excecao JavaScript, POST anonimo recusado com 401/no-store e GET recusado com 405. Filtro Netlify warn/error/fatal dos ultimos dez minutos nao retornou ocorrencias; isso nao mede RAM de Android nem confirma o recebimento das fotos reais.
+- Consulta apos a publicacao ainda encontrou zero copias reais no armazenamento novo e zero diagnosticos da `VISIT-0746E8AE`. A interface/protecao estao publicadas, mas a visita real permanece dependente da abertura no aparelho, da protecao das imagens acessiveis e da localizacao dos 17 originais. Nao afirmar recuperacao ou envio real concluido.
+- Ensaio de recuperacao foi repetido com JPEGs do tamanho usado pelo app, nao apenas miniaturas. Camera/memoria nativas do Android da Lorena ainda precisam de observacao no aparelho.
+
+## [2026-11-24] - Protecao da gravacao local de novas fotos e visitas
+
+### Causa
+- Foto indisponivel na visita antiga da Lorena nao revela quando/por que seus bytes deixaram de ser acessiveis. Sem o diagnostico do banco do aparelho, nao atribuir o incidente a falta de internet, limpeza automatica ou falta de RAM.
+- Ensaio reproduziu uma lacuna: primeiro login nao solicitava persistencia do armazenamento; apenas reabertura autenticada fazia isso. Gravacoes criticas usavam durabilidade padrao, sem solicitar flush estrito. Referencia Lite era aceita depois do commit, mas sem releitura independente.
+- Fila, rascunho e fotos continuam em bancos separados. Essa alteracao reduz janelas de risco, sem prometer atomicidade entre bancos ou protecao contra limpeza de dados, perda do aparelho ou falha fisica.
+
+### Solucao aplicada
+- Solicitar persistencia tambem no primeiro login, uma vez por carregamento da pagina, sem bloquear entrada/restauracao se o navegador negar ou demorar.
+- Solicitar durabilidade estrita para novas fotos Lite, conteudo do rascunho e gravacao individual de visitas na fila. Navegadores que recusam a opcao seguem pela assinatura antiga; erros reais de quota, banco e interrupcao continuam sendo reportados.
+- Foto Lite somente entrega referencia para a interface depois do commit e de releitura do mesmo dono com conteudo identico. Falha de verificacao rejeita a captura, preservando os dados existentes. Verificacao de uma foto por vez, sem carregar a visita inteira na RAM.
+- Sem alteracao de schema, contratos, tamanho/qualidade das imagens, pastas do Drive, transporte, limpeza ou IDs ja existentes. Modo normal recebe a protecao do rascunho/fila; releitura individual refere-se ao cofre Lite.
+
+### Checklist
+- [x] 200 testes automatizados, TypeScript e build normal aprovados.
+- [x] Primeiro login e reabertura solicitam persistencia; permissao negada nao bloqueia o trabalho.
+- [x] 27 fotos de aproximadamente 100 KB cada preservadas em fila, rascunho e sem confirmacao, simulando 30 dias. Nenhuma excluida.
+- [x] Captura normal/Lite, quota simulada, restauracao, checkout, reconexao e concorrencia revalidados em navegador isolado.
+- [x] Previa e publicacao oficial conferidas, login/health HTTP 200 e filtro de logs apos atualizacao sem ocorrencias retornadas.
+
+### Seguranca
+- Nenhum login na conta operacional, upload de teste real, exclusao de imagem, limpeza de dados ou reinstalacao. Fila antiga nao e reescrita nem migrada.
+- Confirmacao de recebimento do servidor continua obrigatoria antes de retirar uma visita da fila. Foto ausente nao e omitida para simular sucesso.
+- Persistencia e durabilidade sao protecoes adicionais, nao garantia de backup. Chrome documenta durabilidade: https://developer.chrome.com/blog/indexeddb-durability-mode-now-defaults-to-relaxed . Eviccao normal atua na origem inteira, portanto nao explica isoladamente uma foto ausente com fila preservada: https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria .
+
+### Testes realizados
+- Compatibilidade com navegadores que recusam opcoes de transacao; erros reais nao sao repetidos como fallback. Commit abortado e releitura ausente/divergente recusam referencia, sem excluir arquivo gravado.
+- Ensaio de 100 fotos existentes por modo, oito capturas de 12/48 MP e 50 navegacoes de galeria; reabertura preserva evidencia, fontes/bitmaps liberados. Simulacao de armazenamento cheio preserva visita Lite.
+- Sete cenarios de checkout/retomada, incluindo offline, reconexao automatica, visita ja recebida e uma foto ausente: fila removida somente apos confirmacao; 26 fotos restantes e pendencia preservadas no caso incompleto.
+- Quinze eventos simultaneos continuam resultando em uma consulta de status e tres leituras completas da fila sintetica de 12 MB. Sem regressao observada na deduplicacao ou aumento de paralelismo.
+- Ensaio em Chrome de computador nao reproduz energia/RAM/camera nativa de Android; nenhum teste de perda fisica de disco foi realizado.
+- Auditoria adicional demonstrou que IDs novos truncados em oito caracteres podem colidir com UUIDs diferentes. Nao foi constatada colisao na visita de Lorena; mudanca de identidade foi separada deste reforco de armazenamento para manter escopo reduzido.
+- Previa `6b057eab00b007744825c471` e publicacao oficial `6b057ef3f4f7dc14edcf5488` conferidas. Publicado em 24/11/2026 as 09:11:41 de Brasilia, bundle `index-CBOIgtNS.js`, fonte `ebf6295` enviada ao GitHub na branch `agent/google-sync-production`.
+- Conferencia publica sem login operacional: pagina de acesso/health HTTP 200, provedor `google-v1` e nenhuma excecao JavaScript. Filtro Netlify warn/error/fatal dos ultimos dez minutos nao retornou ocorrencias; nao equivale a telemetria de RAM nem a garantia sobre todos os celulares.
+- Ensaio do descarte autorizado antigo reconferido: cancelar preserva, confirmar afeta somente o ID permitido, e fila/rascunho novos continuam intactos. Confirmacao fisica da Lorena no aparelho continua pendente.
+
+## [2026-11-24] - Abandono autorizado de uma unica pendencia antiga
+
+### Causa
+- Operador autorizou abrir mao da visita antiga `VISIT-9ADC2CA2`, da conta `lorena.costa` (ID 101), em BH PRAIA DA COSTA 539. Fotos locais indisponiveis impedem concluir o upload; Lorena ja consegue trabalhar em novas visitas.
+
+### Solucao aplicada
+- Acao `Remover envio antigo autorizado` aparece somente para esse ID, dono e login. Confirmacao explicita identifica visita/loja e informa que ela nao sera enviada. Nenhum botao de limpeza geral foi introduzido.
+- Antes da remocao, o registro da fila e arquivado em chave separada do banco de rascunhos. Essa copia preserva o payload/referencias existentes, sem reconstruir imagens que ja estejam ausentes.
+- Marcador local impede a versao atual de recriar ou reenviar o ID abandonado. Restauracao de tela antiga ignora somente esse rascunho; rascunho novo e demais filas permanecem intactos.
+- Upload ativo impede a acao. Falha no arquivamento ou no marcador preserva a fila; falha na remocao permite repetir.
+
+### Checklist
+- [x] 196 testes automatizados aprovados; TypeScript e build normal concluidos.
+- [x] Ensaio de interface: cancelar mantem a pendencia; confirmar remove apenas o ID autorizado, preservando uma fila nova e um rascunho novo em andamento.
+- [x] Cópia local preservada e reabertura de rascunho antigo nao recria o envio. Regressao de checkout/retomada, fotos ausentes, sessao e concorrencia conferida.
+- [ ] Lorena deve abrir a atualizacao e confirmar a acao no proprio aparelho. Nao afirmar que a fila fisica dela foi removida antes dessa confirmacao.
+
+### Seguranca
+- Nenhuma exclusao em Drive/planilha/servidor ou limpeza de fotos, cache ou dados do aplicativo. O arquivamento usa chave propria, sem alterar o schema do banco.
+- Autorizacao restrita a uma visita especifica; outra conta, login ou ID sao recusados. Novas visitas nao recebem essa acao de descarte.
+- Copia arquivada fica no armazenamento local, sem carregamento periodico na RAM. A remocao desta pendencia nao garante ausencia de falhas futuras de aparelho/rede; as protecoes de retomada e liberacao operacional continuam ativas.
+
+### Testes realizados
+- Isolamento de dono/ID, preservacao da visita ativa e de filas novas/outras contas, falha de backup, falha de marcador, tentativa durante upload e bloqueio de recriacao.
+- Navegador em 390 px, dados sinteticos e APIs simuladas: confirmacao/cancelamento e reabertura aprovados sem excecao JavaScript. Nenhum login na conta operacional.
+- Previa `6b057b4f481092791af05bcc` e publicacao oficial `6b057b7e2dbfe61d70014923` conferidas. Publicado em 24/11/2026 as 08:56:57 de Brasilia, bundle `index-CYpSLHoB.js`, fonte `80aba9c` enviada ao GitHub na branch `agent/google-sync-production`.
+- Origem/login e health HTTP 200 com `google-v1`, sem excecao JavaScript no Chrome e sem warn/error/fatal retornados no filtro de dez minutos. Nenhum login na conta da promotora ou exclusao remota realizada.
+- Remocao fisica da pendencia no celular continua dependente do clique e confirmacao de Lorena; o servidor nao tem acesso direto a essa fila local.
+
+## [2026-11-24] - Conferencia local para foto indisponivel na fila da Lorena
+
+### Causa
+- Retorno do aparelho mostra `Foto local indisponivel` na `VISIT-9ADC2CA2`. A atualizacao de retomada passou a executar o transporte e identificou que pelo menos uma referencia Lite nao pode ser resolvida em imagem.
+- Nova consulta nao encontrou a visita nos registros/resumos nem fragmentos de upload do dono 101. Nao existe copia remota recebida nesses armazenamentos para recuperar por esta via.
+- A mensagem anterior de preparacao nao mostrava essa causa. O erro nao comprova que todas as 27 fotos estejam ausentes e nao determina por si so quando/por que a imagem deixou de ser acessivel.
+- Revisao da limpeza atual: exige recibo de visita enviada, retencao minima de 24 horas, dono/visita correspondentes e ausencia de fila ou rascunho protegido. Testes confirmam que fila antiga nao e excluida por estar velha. Nao foi constatado acesso ao banco do aparelho para atribuir a origem da ausencia.
+
+### Solucao aplicada
+- Botao `Verificar fotos salvas` para a fila com erro local. Faz leitura sequencial das referencias, informa quantas possuem dados, quantas estao ausentes, quantas pertencem a outra conta e quantas nao puderam ser verificadas por erro do banco.
+- A conferencia mostra o hostname em uso para verificar o endereco do aplicativo e nao guarda imagens em memoria nem faz upload. Conta imagens diferentes por referencia/conteudo, sem duplicar aliases no payload. Presenca de dados nao equivale a validacao visual do JPEG.
+- Erros de foto tipados distinguem ausencia, proprietario e falha de leitura. O envio continua interrompido se faltar imagem: nao descarta fotos nem confirma visita incompleta como enviada.
+
+### Checklist
+- [x] 192 testes automatizados aprovados, TypeScript e build normal concluidos.
+- [x] Ensaio sintetico com 27 referencias e uma foto ausente: 26 com dados e uma indisponivel; fila e 26 fotos mantidas, nenhuma finalizacao.
+- [x] Regressao de seis cenarios de checkout/retomada, preservacao sem sessao e controle de consultas concorrentes revalidada.
+- [ ] Obter os numeros reais da conferencia no aparelho da Lorena e confirmar se ela tem os originais na galeria. Ainda nao foi recuperada a imagem ausente.
+
+### Seguranca
+- Conferencia somente de leitura, uma imagem por vez, com verificacao de dono e interrupcao se a sessao mudar. Sem varrer filas de outras pessoas, alterar referencias ou substituir imagens por suposicao.
+- Nenhuma mudanca na limpeza local, no schema do banco ou nos contratos de upload. Sem login em conta operacional, exclusao de dados ou testes com fotos reais.
+- Promotora deve preservar o aplicativo/fila e a galeria. Nao reinstalar ou limpar dados. Repetir envio nao reconstroi bytes que estejam ausentes.
+
+### Testes realizados
+- Ausencia de uma referencia nao remove as demais; aliases sao contados uma vez; falha de banco e reportada como nao verificada, nao como arquivo apagado; outra conta nao e lida.
+- Fila com mais de uma semana continua bloqueando limpeza; todos os 26 arquivos restantes permaneceram iguais apos conferencia.
+- UI no Chrome isolado, 390 px, com report da falta de uma foto e hostname visivel. Os numeros do teste nao sao os numeros reais do aparelho da Lorena.
+- Previa final `6b05795f2afe78722fb9d2e3` e publicacao oficial `6b057989294192faefc6ddd4` conferidas. Publicado em 24/11/2026 as 08:48:36 de Brasilia, bundle `index-BtkQuPgw.js`, fonte `23a4086` enviada ao GitHub na branch `agent/google-sync-production`.
+- Origem/login e health HTTP 200, provedor `google-v1`, sem excecao JavaScript no Chrome de conferencia. Nenhum login na conta operacional realizado.
+- Usuario confirmou que Lorena ja consegue trabalhar; nao sabe se os originais estao na galeria. Falta conferir as contagens reais usando o novo botao. O desbloqueio operacional esta confirmado, a recuperacao das fotos antigas ainda nao.
+
+## [2026-11-24] - Controle de consultas concorrentes para reduzir picos de memoria
+
+### Causa
+- Relatos de funcionamento normal no inicio e insuficiencia de memoria apos uso continuado. O teste anterior de uma captura/visita nao cobria consultas lentas sobrepostas.
+- `refreshSyncStatus` podia ser iniciado novamente por foco, retorno de conexao, atualizacao da fila e timer enquanto a consulta anterior ainda aguardava resposta.
+- Quando varias consultas recebiam `enviado`, cada uma chamava a confirmacao e lia novamente o payload completo do IndexedDB. A confirmacao tambem podia concorrer com o envio automatico.
+- Reproducao isolada com fila sintetica de 12 MB e 15 eventos: 16 consultas simultaneas, 33 leituras completas e pico amostrado de heap JavaScript de 212.059.180 bytes. Trata-se de pressao temporaria por concorrencia, nao prova de fotos permanentemente acumuladas nem medicao da RAM do Android.
+
+### Solucao aplicada
+- Consultas de status em andamento sao compartilhadas por conta; eventos adicionais aguardam a mesma operacao.
+- Confirmacoes concorrentes compartilham a operacao por dono/visita. Continua obrigatorio `enviado`, recibo local Lite antes da remocao e verificacao de propriedade.
+- A coordenacao nao guarda payloads/resultados apos concluir. Sucesso e erro liberam a chave para novas consultas; falha de transacao permite repetir sem perder registros.
+- Respostas de uma conta anterior nao atualizam o painel nem confirmam a fila depois de trocar a sessao.
+
+### Checklist
+- [x] 189 testes da aplicacao aprovados, TypeScript e build normal concluidos.
+- [x] Mesmo ensaio de rede lenta: uma consulta simultanea, tres leituras completas e pico amostrado de 29.065.296 bytes (86,3% menor nesse ensaio).
+- [x] Uso continuo: oito visitas no normal e oito no Lite, 18 capturas por visita, 288 fotos no total, com transporte e confirmacao simulados.
+- [x] Seis cenarios de finalizacao/recuperacao e restauracao sem sessao/login revalidados.
+- [ ] Confirmar melhora nos Androids afetados apos receberem a atualizacao; ausencia total de avisos nao foi comprovada nos aparelhos.
+
+### Seguranca
+- Sem alteracao de qualidade, fluxo de pastas, autenticacao, formato da fila, armazenamento de fotos ou exclusao de dados reais. Limites de retencao Lite e regras de reenvio preservados.
+- Sem login de promotora ou envio real de fotos nos testes. Nenhuma chamada de teste a Make/Drive/planilha. Publicacao nao forca recarga de telas abertas.
+
+### Testes realizados
+- `audit-sync-overlap.mjs`: eventos repetidos com resposta atrasada e payload local de 12 MB. Remove a fila somente apos confirmacao simulada. Pico varia conforme amostragem/coleta de lixo; nao representa memoria total do navegador ou aparelho.
+- `audit-continuous-memory.mjs`: capturas, validacoes, saida, upload e confirmacao consecutivos sem recarga. Apos coleta de lixo, normal passou de 5.516.756 para 6.207.276 bytes entre primeira e oitava visita; Lite de 4.909.808 para 5.364.428. Buffers externos ficaram proximos de 467 KB; nos pontos de medicao, zero bitmaps, URLs temporarias de captura e conexoes IndexedDB abertas. Contagem de nos/listeners permaneceu estavel entre as visitas.
+- Medicoes que usavam `setInputFiles` foram descartadas para analise de vazamento: retentores do DevTools mantinham inputs antigos. O ensaio valido injeta arquivo via DataTransfer e inspeciona recursos depois de terminar cada visita. As imagens sao sinteticas; camera nativa e RAM total do Android nao foram medidas.
+- Testes de coordenacao cobrem chamadas simultaneas, isolamento de contas, liberacao apos erro e confirmacao interrompida sem perda de fotos. Regressao de visita antiga, offline, Lite, transacao abortada, visita nova e retomada automatica aprovadas.
+- Achado adicional para acompanhamento separado: o indicador compartilhado de analise opcional pode manter o botao de validacao desabilitado enquanto uma analise anterior aguarda resposta. Esse caminho nao foi alterado nesta correcao focada em concorrencia de status/confirmacao.
+- Previa `6b0571b76c4722e1d53e0b73` e publicacao oficial `6b057203c09c072e578f9f9f` conferidas. Publicado em 24/11/2026 as 08:16:29 de Brasilia, bundle `index-BqorOwwJ.js`, fonte `36d80ba` enviada ao GitHub na branch `agent/google-sync-production`.
+- Apos publicar: origem/login e health HTTP 200, `google-v1`, sem erro JavaScript no Chrome isolado e filtro de logs dos dez minutos anteriores sem warn/error/fatal retornados. Isso nao fornece telemetria da RAM dos celulares.
+- Consulta pontual da recuperacao anterior: `VISIT-9ADC2CA2` ainda ausente as 08:16:49 de Brasilia; continua pendente da retomada no aparelho da Lorena, sem novo login ou alteracao dessa conta.
+
+## [2026-11-24] - Retomada da fila manual e desbloqueio seguro da saida
+
+### Causa
+- Relato da conta `lorena.costa`, visita `VISIT-9ADC2CA2`, loja BH PRAIA DA COSTA 539: telas mostram 27 fotos e uma fila local antiga. Na consulta, nao havia registro dessa visita nem fragmentos de upload do dono 101 no servidor; o conteudo permanecia no aparelho.
+- Retomada automatica era restrita a filas `automaticCheckout` com status `pending`. Visitas manuais e uploads interrompidos em `syncing` dependiam de outro envio manual.
+- Consulta HTTP 404 era exibida como preparacao indefinida, sem acao especifica para enviar o conteudo local. Atualizar status nao retomava o transporte.
+- Uma saida ja registrada bloqueava o encerramento automatico das 18h; falhas de envio podiam deixar o rascunho concluido ocupando a visita ativa.
+- O erro que interrompeu a primeira tentativa dessa promotora nao pode ser determinado pelos dados disponiveis no servidor. A causa da permanencia sem retomada foi confirmada no fluxo e reproduzida com dados sinteticos.
+
+### Solucao aplicada
+- Retomada automatica de filas manuais e automaticas `pending`/`syncing`, com intervalo minimo de um minuto por visita, duas por rodada e ordenacao pela ultima tentativa para evitar monopolio das primeiras entradas.
+- Transporte consulta o status remoto primeiro: cria apenas em 404, nao sobrescreve visita existente e remove fila somente depois de `enviado`. Cliques manuais e retomada automatica da mesma visita compartilham a mesma operacao.
+- HTTP 404 no painel identifica registro salvo no aparelho e oferece `Enviar visita salva`. Erros de rede/transitorios preservam a fila para retomada; erro remoto continua usando o retry controlado do servidor.
+- Saidas manuais antigas com horario, tarefa de checkout e foto confirmados sao preservadas na fila antes de liberar a lista de lojas. Mantidos ID, fotos e horario original. Copia mais rica nao e reduzida; divergencias de fotos preservam ambas as copias e impedem a liberacao automatica.
+- `Registro da Saida` agora confirma o salvamento local e libera a proxima loja; o envio corre separadamente. A tela Sync antiga continua atendida. Reenviar outra visita nao redefine o rascunho atual.
+
+### Checklist
+- [x] 185 testes automatizados aprovados, TypeScript e build normal concluidos.
+- [x] Ensaio de navegador em seis cenarios: fila manual offline, Lite com `syncing` interrompido, registro ja enviado, falha de gravacao, nova finalizacao e retomada automatica online.
+- [x] Mesmo ID, 27 fotos preservadas, nenhuma recriacao de visita ja enviada e remocao somente apos confirmacao simulada.
+- [x] Regressao sem sessao/login, inicializacao com 100 fotos/fila antiga/offline, upload legado parcial e preferencias Lite verificadas.
+- [ ] Confirmar recebimento real da `VISIT-9ADC2CA2` apos o aparelho abrir a atualizacao e retomar o envio. Nao afirmar resgate antes dessa confirmacao.
+
+### Seguranca
+- Sem login na conta operacional, exclusao de fotos/filas ou alteracao de Drive, planilha, credenciais, camera ou armazenamento do aparelho da promotora.
+- Nenhum upload de teste real; testes usam APIs simuladas e bloqueiam conexoes externas. Atualizacao preserva os dados locais e nao forca recarga das telas em uso.
+- O servidor nao consegue buscar fotos que continuam somente no celular: a promotora precisa abrir a versao atualizada com conexao. Nao reinstalar nem limpar dados.
+
+### Testes realizados
+- Fila manual em syncing e 404 remoto retoma com mesmo ID; concorrencia compartilha uma criacao; rede/502 preservam payload; troca de dono impede envio; erro remoto nao sobrescreve registro.
+- Fila mais rica preservada, saida/horario original mantidos, divergencia recusada e transacao abortada nao libera nem apaga o rascunho.
+- Chrome isolado em 390 px: seis cenarios aprovados sem erro JavaScript. Falha de gravacao mantem a visita ativa e a foto de saida intactas.
+- Previa `6b056bf0aaa837020fc6353a` e publicacao oficial `6b056c1e2307e4fb89e75d24` conferidas. Publicado em 24/11/2026 as 07:51:20 de Brasilia, bundle `index-BLXEQdDT.js`, fonte `ca97322` enviada ao GitHub na branch `agent/google-sync-production`.
+- Apos publicar: origem/login e health HTTP 200, provedor `google-v1`, nenhuma excecao JavaScript no Chrome isolado e filtro de logs de dez minutos sem warn/error/fatal retornados.
+- As 07:51:45 de Brasilia, a visita `VISIT-9ADC2CA2` ainda nao havia chegado ao servidor. Usuario orientado a solicitar que Lorena reabra a atualizacao com internet e use `Enviar visita salva` caso necessario, sem sair da conta, reinstalar ou limpar dados. Recuperacao real permanece pendente dessa acao no aparelho.
+
+## [2026-11-23] - Correcao urgente de preservacao, conciliacao e picos de memoria
+
+### Causa
+- A tela sem sessao podia substituir o rascunho persistido. A troca de conta usava um unico slot sem guardar a visita do dono anterior.
+- Indices antigos de visitas ja enviadas ocupavam a selecao unica da conciliacao automatica.
+- Fotos originais grandes chegavam ao canvas; envios legados grandes criavam o JSON inteiro, a lista de fragmentos e outro buffer para o hash.
+
+### Solucao aplicada
+- Tela sem sessao nao carrega as fotos nem grava estado vazio. Login restaura apenas o rascunho do mesmo dono.
+- Troca de dono arquiva o rascunho anterior na mesma transacao IndexedDB e promove o rascunho do usuario atual. Conclusao/reset nao ressuscita arquivo antigo. Sem alteracao de versao do banco nem migracao em massa.
+- Falha ao ler o banco bloqueia a substituicao por copia sem fotos e oferece nova tentativa. Arquivos locais por dono tambem bloqueiam a limpeza de suas fotos.
+- Conciliacao confere o registro completo, atualiza somente os indices de visitas concluidas e procura a proxima elegivel, com ate oito verificacoes e um processamento por execucao. Mantido o agendamento a cada cinco minutos.
+- JPEG/PNG com cabecalho reconhecido solicita bitmap reduzido no navegador, preservando aspecto e orientacao EXIF. Bitmap, URL temporaria e canvas sao liberados. Formatos/aparelhos incompativeis usam o caminho anterior.
+- Envios grandes, inclusive antigos em base64, usam o transporte incremental ja utilizado no Lite. Para o legado, mantidas exatamente as fronteiras UTF-8 dos fragmentos da versao anterior; para o Lite, mantidas as fronteiras que ja utilizava. Mesmos IDs, hash, confirmacao e retomada; sem montar o JSON integral desses registros. Envio direto pequeno preservado.
+
+### Checklist
+- [x] 177 testes automatizados da aplicacao aprovados; TypeScript e build aprovados.
+- [x] Navegador: rascunho sem sessao preservado em normal/Lite e retomado apos login do mesmo dono; falha de leitura e nova abertura preservam a visita.
+- [x] Troca de conta, arquivamento interrompido, retorno do dono e nao ressuscitar visita encerrada testados.
+- [x] Capturas de 12/48 MP, orientacao EXIF, arquivo invalido, falha de gravacao, recarga e galeria verificadas em perfis isolados.
+- [x] Upload legado de 100 fotos, iniciado com fragmento da versao anterior, interrompido e retomado com mesmo hash: oito fragmentos, zero duplicacoes, zero serializacoes integrais e buffer codificado maximo de 1.572.864 bytes.
+- [x] Inicializacao de 100 fotos, fila antiga, offline, captura/envio Lite e preferencias de aparelho aprovados.
+- [x] Previa `6b046e70002ab57ede7de2ba`: login sem erros JavaScript, health HTTP 200 e `google-v1`.
+
+### Seguranca
+- Nenhuma limpeza de filas de promotores, exclusao de fotos, alteracao de credenciais ou login em conta operacional nos testes.
+- Organizacao do Drive, qualidade/tamanho final de foto, manifestos e finalizacao da visita preservados.
+- Modo normal/Lite escolhido no aparelho permanece. Atualizacao nao forca recarga de telas abertas.
+- A reducao comprovada e do bitmap entregue ao canvas e das copias de envio. Memoria total e camera nativa do Android ainda dependem de confirmacao nos aparelhos afetados; nao ha garantia de eliminar todo aviso de memoria.
+
+### Testes realizados
+- Os dois cenarios que falhavam na auditoria agora preservam a visita. Falhas de gravacao/arquivamento revertem a transacao.
+- No Chrome isolado, uma imagem 8000x6000 chegou ao canvas como bitmap 832x624; a foto com EXIF rotacionado chegou como 832x1110 e terminou em 624x832. Nenhum bitmap ou URL de captura ficou aberto no ensaio.
+- Ensaios locais usam dados sinteticos e APIs simuladas; nao geraram fotos ou visitas de teste em producao nem trafego no Make.
+- Primeira publicacao de protecao em `6b046f234dcbb8733c6c49ea`, as 13:52 de Brasilia. A execucao agendada seguinte normalizou automaticamente as duas entradas antigas; indice de pendencias com zero entradas na leitura de 13:55:56, sem alterar os registros completos enviados.
+- Publicacao final em 23/11/2026 as 13:56:32 de Brasilia: deploy `6b047037992fe12250e6b2a7`, bundle `index-Ctv3zdaR.js`, fonte `dd86d16` enviada ao GitHub na branch `agent/google-sync-production`.
+- Apos publicar: endereco oficial/login HTTP 200, sem erro JavaScript, health HTTP 200 com `google-v1`, 20 funcoes presentes e nenhum warn/error/fatal retornado na consulta de logs dos dez minutos anteriores. Sem login em conta de promotora. Pendencias ainda somente nos aparelhos nao fazem parte dessa consulta.
+
+## [2026-11-23] - Auditoria de memoria e recuperacao, sem publicacao
+
+### Causa
+- Novos relatos de insuficiencia de memoria antes de abrir a camera e apos as fotos. Nao foi confirmado se os aparelhos afetados ativaram o Modo Lite.
+- O modo normal continua padrao, mantem fotos em base64 no estado e serializa a visita inteira para enviar. Lite reduz esses caminhos para novas capturas; rascunhos antigos nao sao migrados automaticamente.
+- Os dois modos abrem a imagem original com `Image` antes de desenhar o canvas de 832 px. Essa etapa pode pressionar a memoria nativa ao retornar da camera; o heap JavaScript do computador nao mede essa pressao nem a RAM do Android.
+
+### Solucao aplicada
+- Auditoria e roteiro reproduzivel `scripts/audit-browser-memory.mjs`, com APIs inteiramente simuladas e bloqueio de conexoes externas. Nenhuma correcao funcional publicada nesta etapa.
+- Identificada falha critica de recuperacao: reabrir sem sessao local, com visita ainda nao enviada, sobrescreve `active-visit` com estado vazio. Reproduzido em normal e Lite. No Lite a foto individual permaneceu no cofre, mas o rascunho perdeu a referencia; no normal a evidencia estava no proprio rascunho substituido.
+- Detectadas duas entradas antigas no indice remoto de pendencias cujos registros completos ja estao `enviado`. A rotina agendada seleciona uma entrada por vez e retorna se ela ja foi enviada, sem reparar o indice nem selecionar a seguinte. Isso pode impedir a recuperacao automatica de outra visita; nao significa que as duas visitas verificadas estejam sem envio.
+
+### Checklist
+- [x] 167 testes existentes da aplicacao e 22 do servico Google aprovados; TypeScript e build aprovados.
+- [x] Build local reproduziu o bundle oficial `index-B6WUAAZV.js`; producao continua no deploy `6ae4ca435a610694913e6e34`.
+- [x] Inicializacao com rascunho de 100 fotos, fila legada, login vazio e modo offline; captura Lite, recarga, falha de rede, retomada e confirmacao testados no Chrome isolado.
+- [x] Preferencias em 320 px: troca de modo permitida sem pendencias e recusada com visita/fila.
+- [x] Ensaio adicional em cada modo: 100 fotos iniciais, sete capturas de 12 MP e uma de 48 MP, imagem invalida, recarga e 50 mudancas da galeria. Falha de gravacao tambem injetada no Lite. Fotos anteriores preservadas nesses casos e nenhuma URL temporaria de captura permaneceu aberta.
+- [x] Regressao sem sessao reproduzida duas vezes; roteiro encerra com falha intencional enquanto a preservacao nao for corrigida. A suite existente aprovada nao cobria esse cenario.
+- [ ] Proteger a restauracao e a persistencia do rascunho quando faltar sessao; validar retorno do mesmo dono e isolamento entre contas antes de publicar.
+- [ ] Reparar a selecao da conciliacao diante de indices desatualizados, com verificacao do registro completo.
+- [ ] Validar camera nativa em Android afetado e confirmar versao/modo em uso; nao houve acesso a RAM desses aparelhos.
+
+### Seguranca
+- Sem deploy, login de promotora, alteracao de configuracao ou exclusao de dados reais. Nenhum upload de teste enviado a Make, Drive ou planilha.
+- Consultas remotas limitadas a saude, metadados de deploy, logs e verificacao pontual das pendencias. Nenhuma fila de aparelho foi limpa.
+- Nao orientar reinstalacao ou limpeza dos dados de aparelhos com registros pendentes. A falha sem sessao exige prioridade antes de orientar sair da conta com visita aberta.
+
+### Testes realizados
+- Com 100 fotos sinteticas validas: heap apos coleta de lixo de aproximadamente 20,4 MB no normal e 3,5 MB no Lite antes da captura. Apos oito capturas: 20,2 MB e 4,4 MB. Nao foi observado crescimento continuo no ensaio curto; esses numeros nao incluem camera nativa, imagens decodificadas, GPU ou memoria total do navegador.
+- Ensaio independente de reinicio offline: 100 fotos preservadas em ambos os modos; heap JavaScript de 15.380.076 para 3.247.648 bytes (78,9% menor no Lite) com a mesma massa sintetica desse ensaio.
+- Origem oficial e health responderam HTTP 200 com provedor `google-v1`. Consulta de logs de uma hora retornou 50 entradas `info`; filtro de 24 horas nao retornou `warn/error/fatal`. Isso nao fornece telemetria de encerramentos por memoria nos celulares nem prova ausencia de todos os erros HTTP.
+- Uma visita real vista em processamento durante a consulta concluiu como `enviado`, sem erro, em leitura posterior. Dados ainda apenas no celular nao aparecem no indice do servidor.
+
+## [2026-10-30] - Modo Lite por aparelho no endereco oficial
+
+### Causa
+- Disponibilizar o modo validado no Moto G84 sem trocar o link operacional nem migrar filas reais. O cofre de fotos do piloto ainda nao tinha coleta segura dos arquivos confirmados.
+
+### Solucao aplicada
+- Preferencias do aparelho com ativacao/desativacao local do Modo Lite; padrao normal preservado.
+- Troca recusada durante visita, processamento de foto, envio automatico ou fila pendente. Estado salvo antes da recarga.
+- Confirmacao remota registra recibo local antes de remover a fila. Limpeza somente apos 24 horas, sem fila ou evidencia de visita aberta, para fotos do mesmo dono/visita confirmada.
+- Web Locks coordenam gravacoes locais e limpeza. Sem suporte, a limpeza e adiada. Transacao interrompida reverte exclusoes.
+- Build normal usa `/api` e catalogos reais; flag de catalogo sintetico exige build de piloto explicito.
+
+### Checklist
+- [x] 167 testes e TypeScript aprovados; build normal concluido.
+- [x] Modo normal com rascunho antigo, 100 fotos, fila antiga e falha de conexao verificado no Chrome.
+- [x] Lite com captura, recarga, fila offline, retomada e confirmacao verificado com APIs simuladas.
+- [x] Engrenagem testada em 320 px: ativar/desativar sem pendencia; bloquear com visita ou fila; sem erro JavaScript ou rolagem horizontal.
+- [x] Preview `6ae4c9e798a4de4e3a20596f` e publicacao oficial `6ae4ca435a610694913e6e34` conferidos. Publicado em 30/10/2026 as 13:48 de Brasilia, bundle `index-B6WUAAZV.js`.
+
+### Seguranca
+- Sem exclusao de fotos do Drive, migracao de rascunhos antigos ou atualizacao forcada das telas abertas.
+- Nenhuma limpeza remota da fila dos promotores; coleta local condicionada aos recibos e guardas de preservacao.
+- Guia operacional em `LITE_USO_REAL.md`. Nao retornar a build anterior ao suporte de referencias enquanto houver dados Lite pendentes.
+
+### Testes realizados
+- Confirmacao obrigatoria, retencao, isolamento de dono, fila e rascunho bloqueando limpeza, orfaos preservados, falta de Web Locks e transacao de limpeza abortada.
+- Os ensaios reais anteriores confirmaram quatro fotos automatizadas e cinco fotos do piloto Moto G84 ate Drive/planilha; nesta etapa, interface e guardas locais foram testadas em ambiente isolado.
+- Apos publicar: login no endereco oficial e PWA sem erro JavaScript; health Google saudavel, 20 funcoes e agendamento de conciliacao preservados.
+
+## [2026-10-30] - Piloto Lite confirmado no Moto G84
+
+### Causa
+- Validar em aparelho Android real a camera, a reabertura e o envio do modo Lite antes da liberacao operacional.
+
+### Solucao aplicada
+- Usuario executou o roteiro no Moto G84 e confirmou funcionamento sem aviso de memoria, demora ou travamento.
+- Registro `VISIT-5F8E6908` conferido no backend: cinco fotos, cinco comprovantes e finalizacao concluida, sem erro.
+
+### Checklist
+- [x] Camera e reabertura confirmadas pelo usuario no aparelho.
+- [x] FACHADA, ANTES, ESTOQUE, DEPOIS e CHECKOUT confirmados no manifesto.
+- [x] Linha criada `RELATORIO_VISITAS!A2415:AD2415`, status enviado, sem lotes pendentes nem referencias locais no servidor.
+- [ ] Limpeza segura de fotos locais, ativacao por aparelho no link oficial e tratamento de visitas antigas antes da liberacao ampla.
+
+### Seguranca
+- Nenhuma alteracao de producao ou exclusao de registros realizada nesta conferencia. Homologacao continua separada.
+- Resultado valida um aparelho/fluxo; nao mede a RAM do Moto G84 nem garante comportamento identico em todos os dispositivos.
+
+### Testes realizados
+- Teste fisico executado pelo usuario, com confirmacao no chat.
+- Conferencia somente de leitura do registro, manifesto, finalizacao, linha e indice de pendencias do servidor. Nao houve inspecao visual autenticada de cada foto no Drive.
+
+## [2026-10-30] - Ensaio real Lite autorizado e acesso para Moto G84
+
+### Causa
+- O worker do preview inicial retornou HTTP 401 no Google; preview e producao possuem URLs Google diferentes. O envio pelo cliente Lite foi recebido, mas faltava confirmar Drive e planilha.
+
+### Solucao aplicada
+- Com autorizacao explicita, conta Lorena ID 101 usada para visita sintetica `VISIT-7C86A59C`, rotulada `HOMOLOGACAO LITE - NAO OPERACIONAL`.
+- Mesmo registro retomado pelo worker oficial: quatro fotos com comprovantes e finalizacao, linha `RELATORIO_VISITAS!A2406:AD2406`, status enviado e indice de pendencias sem esse ID.
+- Build separado `build:lite-preview`, em `dist-lite`, com catalogo somente de homologacao e proxy `/lite-api` para o backend oficial. Preview `6ae4ac537bda385b9deb0003`, sem publicacao na origem oficial.
+
+### Checklist
+- [x] 164 testes, TypeScript e build aprovados; APIs do proxy fora do cache da PWA.
+- [x] Envio real do cliente Lite ate o servidor e quatro fotos/finalizacao Google confirmados apos retomada no worker oficial.
+- [x] Login real via novo proxy e fluxo local simulado da compilacao nova aprovados.
+- [ ] Camera real e fluxo completo pelo novo proxy no Moto G84; roteiro em `LITE_HOMOLOGACAO.md`.
+- [ ] Limpeza automatica segura das fotos individuais continua pendente.
+
+### Seguranca
+- Nenhuma credencial ou configuracao de producao foi alterada. Producao mantida no deploy anterior e saudavel.
+- Durante a segunda passagem de interface, a conta entrou em outro aparelho e a sessao foi encerrada. Logins automaticos interrompidos para nao disputar acesso.
+- Fotos de teste permanecem identificadas no Drive/planilha. Nenhuma foto de promotora foi movida ou excluida.
+
+### Testes realizados
+- Manifesto e recibos da visita real conferidos: 4/4 e linha criada. Nao houve inspecao visual autenticada de cada imagem no Drive.
+- Novo build em Chrome com APIs simuladas: captura, recarga, fila offline, retomada, hash e confirmacao; sem erros JavaScript.
+
+## [2026-10-30] - Validacoes adicionais do piloto Lite
+
+### Causa
+- Necessidade de verificar persistencia apos reinicio real do navegador, funcionamento offline e consumo de memoria do rascunho Lite antes de qualquer piloto operacional.
+
+### Solucao aplicada
+- Validacoes executadas em perfis isolados e APIs simuladas, com novo teste para bloquear finalizacao se o conteudo mudar entre as duas leituras do envio.
+
+### Checklist
+- [x] 164 testes e TypeScript aprovados.
+- [x] Fechamento e reabertura do Chrome com rede desativada: 100 fotos recuperadas.
+- [x] Falha de rede pela interface preserva fila; nova abertura retoma envio; resposta simulada `enviado` retira somente a fila.
+- [ ] Camera real Android e envio real Drive/planilha: dependem de aparelho e conta/PDV dedicados de homologacao, nao encontrados nesta maquina/cadastro.
+- [ ] Limpeza automatica segura das fotos individuais ainda pendente.
+
+### Seguranca
+- Nenhum login de promotora ativa nem imagem enviada ao Drive real. Producao permaneceu no deploy `6ae1f58c3c646eebc5f8d7a6`, saudavel em `google-v1`.
+- A remocao da fila foi testada com confirmacao simulada; fotos individuais permanecem preservadas nesta etapa.
+
+### Testes realizados
+- No ensaio sintetico de 100 fotos, rascunho passou de 12.121.420 para 5.247 bytes em referencias. Heap JavaScript do Chrome desktop apos GC: 15.139.208 para 3.011.100 bytes. Nao representa memoria total, pico nem medicao do Android.
+- Procedimentos, limitacoes e resultados completos em `LITE_HOMOLOGACAO.md`.
+
+## [2026-10-30] - Piloto Lite isolado da producao
+
+### Causa
+- A visita e a fila mantinham o conteudo de todas as fotos em strings grandes; reduzir gravacoes repetidas nao elimina essa carga durante a abertura.
+
+### Solucao aplicada
+- Piloto com flag de build, em branch e preview separados: novas fotos salvas individualmente no IndexedDB e referencias pequenas no rascunho/fila.
+- Galeria com uma foto por pagina, sem IA e sem transicao animada entre secoes.
+- Envio sequencial em fragmentos, com SHA-256 incremental e verificacao de integridade compativel com o servidor existente.
+
+### Checklist
+- [x] 163 testes, TypeScript, builds normal/Lite e fluxos simulados no Chrome aprovados.
+- [x] Contrato de fotos e finalizacao Google comparado com o original.
+- [x] Preview `6ae4a1fbdabad6722181e5c3` pronto, login/PWA sem erro JavaScript; deploy oficial `6ae1f58c3c646eebc5f8d7a6` mantido e health Google saudavel.
+- [ ] Ensaio real no Android e no Drive com conta de teste dedicada.
+- [ ] Coleta segura de fotos locais sem uso, migracao de rascunhos antigos e ativacao por aparelho antes de liberar amplamente.
+
+### Seguranca
+- Producao nao publicada nem filas reais migradas ou apagadas. Nenhum envio real ao Drive foi executado pelo piloto.
+- Preview compartilha backend e sessoes; nao usar conta ativa da operacao. Orientacoes e limites em `LITE_HOMOLOGACAO.md`.
+- O piloto ainda usa a camera nativa e nao permite garantir o fim do aviso no celular.
+
+### Testes realizados
+- Persistencia individual e restauracao por referencia, isolamento de dono, falha de gravacao, foto ausente e JSON misto antigo/novo.
+- 100 fotos, hash reconstruido compativel, envio sequencial, interrupcao e retomada apenas dos fragmentos ausentes.
+- Captura pela interface, recarga e finalizacao no backend simulado; modo normal preservado nos cenarios de abertura e offline.
+
+## [2026-10-28] - Reducao de copias do rascunho durante abertura e navegacao
+
+### Causa
+- O salvamento observava o estado inteiro e a tela ativa: navegacao, renovacao da sessao e atualizacao de catalogos podiam serializar novamente todas as fotos sem alterar a visita.
+- Esse trabalho acrescentava alocacoes temporarias; nao foi comprovado vazamento permanente nem medida a RAM do aparelho da Keutily.
+
+### Solucao aplicada
+- Restauracao IndexedDB passa a reconhecer o rascunho ja persistido, evitando regravacao quando o conteudo nao mudou.
+- Troca de tela salva apenas uma posicao pequena no mesmo armazenamento. A restauracao confere dono e ID da visita antes de aplicar a posicao.
+- Usuario com os mesmos dados e mudancas apenas nos catalogos nao provocam nova gravacao das fotos.
+- Fotos, tarefas, quantidades, encerramento, mudanca de dono e demais alteracoes reais continuam gravando o rascunho integral; as gravacoes concorrentes continuam coalescidas.
+
+### Checklist
+- [x] Formato integral das fotos e rascunhos preservado, sem migracao ou mudanca de versao do IndexedDB.
+- [x] Falha de transacao preserva a versao anterior e permite repetir a gravacao.
+- [x] Leitura de rascunhos antigos, fila pendente e abertura sem conexao verificadas.
+- [x] Publicado em 28/10/2026 as 10:16 de Brasilia, deploy `6ae1f58c3c646eebc5f8d7a6`, bundle `index-BxRpz8GC.js`; preview `6ae1f52f4b4e5a56e2a8556f` validado antes da publicacao.
+- [ ] Confirmar no aparelho da Keutily apos receber a nova versao.
+
+### Seguranca
+- Nenhuma limpeza de dados, fila ou cache; sem atualizacao forcada de telas abertas.
+- Backend, organizacao do Drive, autenticacao e envio de fotos permanecem nos contratos existentes.
+- Este ajuste reduz copias de persistencia; nao elimina o carregamento integral do rascunho nem altera a camera nativa ou o formato da fila.
+
+### Testes realizados
+- 155 testes aprovados, TypeScript e build aprovados.
+- Teste de rascunho de 4 MB: nenhuma regravacao integral em renovacao equivalente ou atualizacao de catalogo; navegacao grava somente a posicao; novas fotos e tarefas gravam integralmente.
+- Transacao abortada e falha de compatibilidade simuladas: dados anteriores preservados e nova tentativa concluida.
+- Chrome isolado em viewport movel: abertura com 100 fotos e tres filas antigas, renovacao e navegacao sem `put` integral do rascunho; fotos e devolucoes preservadas. Restauracao legada, login vazio e abertura com falha de conexao tambem aprovados.
+- Producao apos publicacao: versao nova e login conferidos no Chrome sem erro JavaScript, health `google-v1`, 20 funcoes e conciliacao a cada cinco minutos. Sem erros nos logs consultados de config, health e conciliacao na janela de cinco minutos.
+
+## [2026-09-30] - Menos alocacoes na abertura e preparacao dos envios
+
+### Causa
+- Relatos de aviso de memoria e bloqueio na logo em varios aparelhos; a causa especifica nesses dispositivos ainda depende do aviso exato e da versao instalada.
+- Confirmado no codigo: o particionamento de um payload sintetico de 12 MB alocava cumulativamente 301.983.778 bytes em 182 buffers UTF-8 temporarios. Isso nao representa o pico de RAM do aparelho.
+- O rascunho legado era lido antes da restauracao IndexedDB; consultas operacionais e retomadas podiam se sobrepor a abertura. Fotos de devolucao ainda eram serializadas na copia de compatibilidade.
+
+### Solucao aplicada
+- Contagem e divisao UTF-8 em leitura linear, sem buffers temporarios, mantendo limites, conteudo, hash de upload e compatibilidade dos fragmentos existentes.
+- Restauracao unica pelo IndexedDB, com fallback legado preservado; carga operacional depois da restauracao, seguida de consultas e retomadas.
+- Evitada a segunda consulta de lojas na renovacao inicial da sessao.
+- Copia de compatibilidade sem fotos de devolucao; originais continuam integralmente no IndexedDB, gravados antes dessa copia.
+
+### Checklist
+- [x] Sem alteracao de esquema IndexedDB, IDs, qualidade das fotos ou contrato de upload.
+- [x] Filas antigas e fotos preservadas nos testes de navegador.
+- [x] Publicado no link oficial em `2026-09-30T20:37:26Z`, deploy `6abd72eed1b3b209bff98ad8`, bundle `index-CuofTeGC.js`.
+- [ ] Confirmar abertura no aparelho do Alex e nos demais afetados apos receberem a versao atualizada.
+
+### Seguranca
+- Nenhuma limpeza de dados, desinstalacao, migracao de fila ou atualizacao forcada durante visitas.
+- Backend Google, pastas e regras de confirmacao dos envios permanecem iguais.
+
+### Testes realizados
+- 152 testes aprovados; TypeScript e build aprovados.
+- 19 comparacoes com o particionador anterior: mesmos bytes e fragmentos, incluindo Unicode e payload grande.
+- Ensaio local de 12 MB: 1.077 ms antes e 122 ms depois; zero buffers UTF-8 no novo particionamento. Nao e uma medicao de RAM total nem garantia de desempenho em celulares.
+- Chrome isolado, viewport movel: abertura sem sessao, restauracao legada e rascunho de 100 fotos com tres visitas pendentes. Fotos e devolucoes preservadas, uma consulta de lojas e nenhum erro JavaScript.
+- Abertura com APIs sem conexao validada usando o cache operacional e preservando o rascunho local.
+- Preview e producao: HTTP 200, health `google-v1`, login visivel sem erro JavaScript e registro da PWA com o bundle novo. Producao manteve 20 funcoes e o agendamento de conciliacao a cada cinco minutos.
+- A tentativa inicial de deploy falhou no build do CLI sem substituir producao. Publicacao concluida com os arquivos ja compilados e validados (`--no-build`); logs consultados de health/config/conciliacao sem erro na janela verificada.
+
+## [2026-09-30] - Recuperacao controlada de visita da Sirlene
+
+### Causa
+- O aparelho ainda exibiu uma versao antiga da PWA e manteve uma visita na fila local.
+- A visita `VISIT-62A55D5A` estava no servidor com `Make retornou HTTP 400: Queue is full.`; o contexto antigo continuava encaminhando o envio ao Make.
+
+### Solucao aplicada
+- Registro integral preservado fora do repositorio antes do reprocessamento.
+- Conferidos 46 eventos fotograficos com IDs unicos e dados da promotora e loja correspondentes ao registro original.
+- Uma tarefa temporaria, restrita ao ID da visita, ao proprietario, a loja e ao hash do conjunto de fotos, retomou o registro pelo provedor Google de producao.
+- A visita terminou com 46/46 comprovantes, `syncStatus=enviado`, linha criada e indice de pendencias do servidor vazio para esse ID.
+- A tarefa temporaria foi retirada do codigo apos a conclusao. A fila local do aparelho nao foi alterada remotamente.
+
+### Checklist
+- [x] Copia integral criada antes de qualquer reenvio.
+- [x] Comprovantes, finalizacao e resumo da visita verificados no servidor.
+- [x] Nenhuma foto ou visita foi apagada; o Make nao foi chamado pela recuperacao.
+- [ ] Confirmar no aparelho que `Atualizar status` retira a pendencia local antes de trocar o link.
+- [ ] Corrigir a permanencia da versao antiga da PWA e restringir links antigos em etapa separada, sem eliminar filas locais.
+
+### Seguranca
+- A recuperacao usou o mesmo ID e os IDs idempotentes de foto do contrato existente.
+- A tarefa validava o conjunto exato de 46 fotos a cada execucao e parava automaticamente apos `enviado`.
+- O backup de 4,8 MB foi mantido fora do repositorio, sem expor fotos ou credenciais no GitHub.
+
+### Testes realizados
+- 149 testes, TypeScript e build aprovados antes da publicacao da tarefa.
+- Preview com 21 funcoes e health `google-v1`; producao permaneceu disponivel durante o reenvio.
+- Comparacao final entre o backup e o registro: mesmo ID, promotora e loja; 46 comprovantes sem lacunas nem links vazios; finalizacao e linha confirmadas.
+- Resumo com `enviado` e ausencia da visita no indice de pendencias do servidor.
+
+## [2026-09-29] - Provedor de sincronizacao explicito
+
+### Causa
+- O backend assumia Make quando `BACKEND_SYNC_PROVIDER` estava ausente ou invalido.
+- No contexto Netlify `branch-deploy`, o provedor e as credenciais Google nao estao configurados, mas o webhook Make esta. Uma URL de branch existente ainda informou `provider=make`.
+- Variaveis e funcoes dos deploys de branch antigos sao imutaveis; publicar o codigo atual em producao nao altera esses enderecos.
+
+### Solucao aplicada
+- O Make so e selecionado quando `BACKEND_SYNC_PROVIDER=make` e definido explicitamente.
+- Provedor ausente ou invalido agora preserva a visita com erro de configuracao, sem chamar o webhook; o healthcheck informa `unconfigured` nesse caso.
+- Correcao publicada no preview `6abb2a0edfa74a422f9c2bfa` e em producao `6abb2a9d8ea714b1ba24ed6b`.
+
+### Checklist
+- [x] Producao mantida em `google-v1` e rota de reenvio sem sessao em HTTP 401.
+- [x] Nenhuma foto, visita, fila local, credencial ou webhook alterado pelo deploy.
+- [ ] Confirmar a URL usada no aparelho afetado e retirar de circulacao o deploy antigo somente depois de verificar eventuais dados locais nessa origem.
+- [ ] Revisar os demais deploys de branch publicados antes de declara-los corrigidos.
+
+### Seguranca
+- O fallback silencioso para Make foi removido de novos deploys; o rollback para Make continua possivel apenas por configuracao explicita.
+- Links de branch ja publicados continuam com o comportamento antigo ate serem substituidos ou desativados de forma controlada.
+
+### Testes realizados
+- 148 testes, TypeScript e build de producao aprovados.
+- Preview e producao responderam `google-v1`; rota de reenvio sem autenticacao retornou HTTP 401.
+- Logs de erro das funcoes sem novas falhas na janela consultada apos a publicacao.
+
+## [2026-09-28] - Recuperacao controlada de visitas pendentes
+
+### Causa
+- Onze visitas antigas permaneciam no servidor sem finalizacao: oito com erro de confirmacao de fotos e tres com `Make retornou HTTP 400: Queue is full.`
+- Os registros nao estavam no indice consultado pela reconciliacao automatica; um resumo tambem divergia do registro completo.
+- O contexto Netlify `branch-deploy` possui webhook Make, mas nao possui `BACKEND_SYNC_PROVIDER` nem credenciais Google. Nesse contexto, o codigo assume Make; uma URL de branch consultada confirmou `provider=make`. O endereco efetivamente usado no aparelho ainda precisa ser confirmado.
+
+### Solucao aplicada
+- Copias integrais dos onze registros foram gravadas e verificadas no armazenamento do projeto antes de qualquer reenvio.
+- As visitas foram retomadas individualmente pela API autenticada do dominio produtivo, com verificacao de fotos, finalizacao e saida do indice de pendencias antes de avancar para a proxima.
+- Onze visitas terminaram com 415 de 415 comprovantes; o painel passou a mostrar 32 de 32 visitas concluidas e zero pendencias para a promotora auditada.
+
+### Checklist
+- [x] Todos os registros antigos preservados e conciliados.
+- [x] Nenhuma fila local, foto ou visita foi excluida manualmente.
+- [x] Nenhum ambiente, webhook ou codigo produtivo foi alterado durante os reenvios.
+- [ ] Confirmar o endereco usado no aparelho antes de orientar qualquer troca de atalho.
+- [ ] Corrigir de forma planejada o fallback para Make nos deploys de branch.
+
+### Seguranca
+- Reenvio sequencial com IDs existentes e comprovacao do estado final; falhas interromperiam a sequencia.
+- Backups foram mantidos em armazenamento separado, sem expor credenciais ou fotos no repositorio.
+- Uma eventual duplicidade de arquivos legados no Drive nao deve ser removida sem auditoria individual.
+
+### Testes realizados
+- Onze registros completos relidos apos o processamento: `enviado`, manifesto completo, finalizacao confirmada, resumo atualizado e ausencia no indice de pendencias.
+- Painel autenticado de producao respondeu HTTP 200 com zero pendencias da promotora.
+- Health do dominio principal informou `google-v1`; uma URL de branch informou `make`.
+
+## [2026-09-28] - Encerramento automatico e painel interativo
+
+### Causa
+- Visitas abertas podiam permanecer no aparelho depois do fim da jornada sem envio.
+- O painel do supervisor exigia muita rolagem e nao oferecia filtro regional ou ordenacao por pendencias.
+
+### Solucao aplicada
+- Visitas iniciadas ate as 18h de Brasilia sao encerradas automaticamente, com o mesmo ID, sem exigir foto de saida e preservando fotos, estoque e etapas incompletas.
+- O rascunho so e liberado depois da gravacao confirmada na fila local. Uma foto em processamento e aguardada antes do encerramento.
+- Com o app fechado, o encerramento ocorre na reabertura e conserva as 18h do dia previsto. Entradas excepcionais apos as 18h pertencem ao proximo ciclo de encerramento, evitando saida anterior a entrada.
+- O envio automatico consulta o status antes de criar a visita, retoma ao recuperar conexao e respeita intervalo minimo de um minuto entre tentativas. Erros transitorios do servidor permanecem pendentes para retomada.
+- O supervisor identifica a saida automatica no detalhe da visita. A confirmacao das fotos e a finalizacao no Google continuam no fluxo existente.
+- Painel com indicadores compactos, abas Equipe/Evolucao, busca, filtro de regiao e ordenacao por pendencias, nome ou cumprimento do roteiro.
+- Falha em uma atualizacao do painel preserva a ultima consulta e mostra o erro. Dados de datas diferentes nao sao misturados.
+
+### Checklist
+- [x] Fila existente, IDs e contratos do Google preservados; metadados novos sao opcionais.
+- [x] Nenhum registro antigo no servidor foi regravado ou removido.
+- [x] Alerta de 24h mantido sem bloqueio do trabalho offline.
+- [x] Encerramento manual existente e foto de saida mantidos no fluxo normal.
+
+### Seguranca
+- Falha de armazenamento mantem o rascunho aberto; a fila so e removida depois de o servidor confirmar envio completo.
+- Encerramento nao marca tarefas incompletas nem inventa foto de saida. Horario previsto e horario efetivo do salvamento ficam registrados separadamente.
+- Envio automatico valida o dono da sessao a cada chamada e nao substitui payload que ja existe no servidor.
+- O app precisa estar aberto ou ser reaberto para acessar fotos locais; nenhuma tarefa em nuvem pode recuperar um aparelho fechado e offline.
+
+### Testes realizados
+- Testes unitarios de horario, retomada no dia seguinte, preservacao de dados e idempotencia.
+- Chrome com dados ficticios em 320, 390 e 1366 px: filtros, busca, calendario, grafico, detalhe, Escape e ausencia de rolagem horizontal.
+- Falha HTTP 502 no painel preservou a consulta anterior.
+- Fluxos completos simulados: encerramento offline, reabertura no dia seguinte, falha de armazenamento e captura de foto em processamento no limite das 18h.
+- Preview `6abb0c5098d4e4a2822b5b23`: fluxos simulados aprovados no Chrome, sem envio de dados ficticios ao Google.
+- App, health, manifesto e service worker do preview HTTP 200; painel sem autenticacao HTTP 401.
+- Contrato de finalizacao validado para visita parcial sem foto de saida: data original, saida 18:00, duracao correta e contagem exata de fotos.
+- Suite completa: 147 testes aprovados; TypeScript e build de producao aprovados.
+- Producao publicada no deploy `6abb0d115a501946919a2ac5`, codigo `4d341bf`, com o mesmo pacote validado no preview.
+- Verificacao pos-deploy: app, health, manifesto e service worker HTTP 200; supervisor sem sessao HTTP 401; asset principal corresponde ao pacote publicado.
+- Consulta de logs das funcoes sem erros na janela de cinco minutos verificada apos a publicacao. O primeiro encerramento real depende de uso do app atualizado pela equipe.
+
+## [2026-09-28] - Consulta historica e acompanhamento do supervisor
+
+### Causa
+- O painel era fixo no dia atual e listava, por padrao, cadastros ativos, inativos e historicos misturados.
+- O detalhe do promotor mostrava apenas registros recentes e nao separava lojas previstas, faltantes e tempo de permanencia na data consultada.
+- Envios locais com mais de 24 horas nao tinham destaque especifico no aparelho.
+
+### Solucao aplicada
+- O supervisor pode selecionar um dia no calendario. O backend valida a data e mantem cache separado por dia.
+- A lista inicial mostra promotores ativos. O atalho de consulta permite pesquisar tambem inativos e historicos.
+- O detalhe apresenta a rota prevista, lojas sem registro, visitas daquele dia, fotos, tempo em loja e pendencias de sincronizacao.
+- O painel apresenta o percentual de cumprimento de rota e identifica que rotas historicas usam o cadastro atual, pois nao existem retratos antigos da planilha.
+- Envios locais com mais de 24 horas sao destacados na tela de sincronizacao, sem remover ou modificar a fila.
+- A rota compartilhada por multiplos promotores ja era suportada e foi preservada.
+
+### Checklist
+- [x] Leitura por data e acesso de supervisor mantidos separados dos endpoints de gravacao.
+- [x] Visitas, fotos, pastas do Drive e fila offline sem alteracao de formato.
+- [x] Datas invalidas e futuras rejeitadas.
+- [x] Uso offline preservado quando ha pendencia antiga.
+
+### Seguranca
+- As mudancas de painel sao somente de leitura; nenhuma visita antiga e regravada.
+- O alerta de 24 horas nao bloqueia o aparelho sem conectividade.
+- Check-out automatico sem o app aberto nao foi ativado: o servidor nao recebe rascunhos ainda salvos apenas no celular.
+
+### Testes realizados
+- Testes de data em Brasilia, rota prevista, lista inicial de ativos e idade da fila local.
+- Suite completa com 137 testes aprovados, TypeScript e build de producao aprovados.
+- Preview `6abafd51da675908e88dc4c0`: app, health, manifesto e service worker HTTP 200; API do supervisor sem sessao HTTP 401.
+- Consultas autenticadas no preview responderam sem 502 em 6,6 s (hoje), 5,8 s (dia anterior) e 5,4 s (detalhe), com cache frio.
+- Capturas com dados ficticios em 390 px e 1366 px confirmaram ausencia de rolagem horizontal, troca de data e abertura do detalhe.
+- Correcao publicada no deploy produtivo `6abaffe3cd07cf7a7d3fd286`; app, health, manifesto e service worker HTTP 200, supervisor sem sessao HTTP 401.
+- Logs de erro das funcoes sem novas falhas na janela consultada apos a publicacao. A primeira consulta real de supervisor no novo deploy ainda depende do uso da equipe.
+
+## [2026-09-25] - Recuperacao de confirmacoes antigas de fotos
+
+### Causa
+- Duas visitas criadas antes da estabilizacao do provedor Google ficaram com um erro legado de confirmacao do Make e sem identificador de lote Google.
+- O erro antigo nao era elegivel para nova tentativa nem para a reconciliacao agendada, embora as fotos permanecessem preservadas no registro local e no backend.
+
+### Solucao aplicada
+- As visitas `VISIT-BF2A106C` e `VISIT-9ECD3FE8` foram reprocessadas de forma controlada pelo provedor Google e concluidas com `44/44` e `38/38` fotos confirmadas.
+- Erros historicos de confirmacao de foto agora podem ser reenviados mesmo sem identificador de lote Google anterior.
+- A reconciliacao agendada passou a recuperar somente esses erros historicos conhecidos.
+- Quando o provedor ativo e Google, a API substitui a referencia antiga ao Make na mensagem exibida ao usuario.
+
+### Checklist
+- [x] 82 fotos confirmadas e duas visitas finalizadas pelo Google.
+- [x] Copia de seguranca dos dois registros criada antes do reprocessamento.
+- [x] Nenhum contrato de foto, pasta, fila local ou autenticacao alterado.
+- [x] Erros genericos continuam fora da recuperacao automatica.
+
+### Seguranca
+- A recuperacao usa os IDs idempotentes existentes e nao exclui fotos ou visitas.
+- A politica automatica reconhece apenas as mensagens legadas de confirmacao de foto.
+- O provedor produtivo permaneceu `google-v1` durante toda a operacao.
+
+### Testes realizados
+- Testes unitarios adicionados para erro legado sem lote, mensagem por provedor e selecao restrita da reconciliacao.
+- Validacao produtiva confirmou `enviado`, sem erro, em ambas as visitas.
+
+## [2026-09-14] - Liberacao imediata de memoria da camera
+
+### Causa
+- A imagem original selecionada da camera permanecia decodificada durante todas as tentativas de compactacao.
+- Canvases temporarios de redimensionamento dependiam da coleta automatica de memoria do navegador.
+- Em aparelhos com menos RAM, esses recursos podiam permanecer simultaneamente na memoria entre capturas.
+
+### Solucao aplicada
+- A imagem original agora e desconectada imediatamente depois de ser desenhada no canvas de trabalho.
+- Canvases intermediarios agora sao liberados de forma deterministica ao trocar de resolucao e ao finalizar a compactacao.
+- O caminho de erro tambem libera a imagem e os canvases temporarios.
+- Correcao publicada no deploy produtivo `6aa82ff755d8dd780cb60766`.
+
+### Checklist
+- [x] Resolucao, qualidade, carimbo, formato JPEG e limite de 120 KB preservados.
+- [x] Fachada, antes, estoque, depois, trocas e checkout usam o mesmo fluxo protegido.
+- [x] Rascunho, fila offline, APIs, Google Drive e finalizacao sem alteracao.
+- [x] Navegadores continuam com o mesmo caminho de captura, sem requisito novo de compatibilidade.
+
+### Seguranca
+- Nenhuma foto existente e modificada, migrada ou excluida.
+- A liberacao ocorre somente depois que os pixels ja foram copiados para o canvas usado na compactacao.
+- O canvas principal permanece sob responsabilidade da captura e tambem e liberado no bloco final existente.
+
+### Testes realizados
+- Suite completa com 128 testes aprovados.
+- TypeScript, lint e build de producao aprovados.
+- Teste de regressao confirma a liberacao antecipada da imagem e a limpeza final dos canvases temporarios.
+- Preview `6aa82f75e40d4a28170fcc07` validado antes da publicacao.
+- Aplicativo, health, manifesto, service worker e pacotes responderam HTTP 200 em producao.
+- Artefato produtivo validado ate a tela de acesso e sem erros no console.
+
+## [2026-09-14] - Reducao de memoria durante visitas
+
+### Causa
+- Galerias de antes, estoque e depois podiam manter ate 30 miniaturas decodificadas simultaneamente na tela.
+- O painel supervisor e seus graficos eram incluidos no pacote inicial mesmo para promotores, aumentando a memoria usada ao abrir o aplicativo.
+- As fotos continuavam protegidas no rascunho e na fila, mas a quantidade de elementos visuais montados elevava o pico de RAM em aparelhos com menos memoria.
+
+### Solucao aplicada
+- As galerias agora exibem paginas de ate seis miniaturas e iniciam pela pagina mais recente.
+- Os controles permitem consultar todas as paginas e a exclusao preserva o indice original da foto.
+- O painel supervisor passou a ser carregado sob demanda somente quando essa area e acessada.
+- O pacote inicial do promotor foi reduzido de aproximadamente 798 KB para 420 KB sem alterar o formato das fotos.
+- Correcao publicada no deploy produtivo `6aa82af62f76feff6bd2a644`.
+
+### Checklist
+- [x] Todas as fotos do rascunho continuam disponiveis e enviadas normalmente.
+- [x] Limite, compressao, qualidade e ordem das fotos preservados.
+- [x] Fila offline, APIs, Google Drive e finalizacao de visita sem alteracao.
+- [x] Fachada e checkout permanecem visiveis como imagens individuais.
+- [x] Painel supervisor preservado em um pacote carregado sob demanda.
+
+### Seguranca
+- A mudanca limita somente as miniaturas montadas no navegador; nao remove, migra nem regrava fotos existentes.
+- Nenhum contrato de dados, endpoint ou mecanismo de sincronizacao foi alterado.
+- A versao produtiva anterior permanece disponivel para reversao atomica no Netlify.
+
+### Testes realizados
+- Suite completa com 128 testes aprovados.
+- TypeScript, lint e build de producao aprovados.
+- Testes de regressao validam paginacao, indices originais e carregamento sob demanda.
+- Em uma secao cheia, o limite visual caiu de 30 para seis miniaturas montadas por vez.
+- Preview `6aa829f29ab5f56d7f348c4d` validado antes da publicacao.
+- Aplicativo, health, manifesto, service worker e pacotes responderam HTTP 200 em producao.
+- Dominio produtivo validado ate a tela de acesso e sem erros no console.
+
+## [2026-09-12] - Reducao da espera entre capturas
+
+### Causa
+- Cada foto podia executar ate cinco buscas adicionais de qualidade JPEG mesmo depois de atingir a faixa segura de tamanho.
+- O aplicativo permitia iniciar outra captura enquanto a foto anterior ainda estava sendo processada, elevando o pico de memoria em celulares.
+- Canvas temporarios permaneciam alocados ate a coleta automatica de memoria e miniaturas eram decodificadas de forma imediata.
+- A lentidao ocorre no processamento local; nenhuma API e chamada entre uma captura e outra e o cache do PWA nao armazena fotos.
+
+### Solucao aplicada
+- A busca de qualidade foi reduzida de cinco para duas etapas, preservando o alvo de 100 KB e o teto obrigatorio de 120 KB.
+- Todas as telas de captura agora impedem compressoes simultaneas e exibem o estado `Processando foto`.
+- O canvas e liberado imediatamente apos gerar a foto comprimida.
+- Miniaturas usam carregamento tardio e decodificacao assincrona.
+- O seletor da camera e limpo depois da escolha para permitir nova captura do mesmo nome de arquivo.
+- Correcao publicada no deploy produtivo `6aa5efc12ef6300fe5973b25`.
+
+### Checklist
+- [x] Resolucao, limite de tamanho, carimbo e formato JPEG preservados.
+- [x] Fachada, antes, estoque, depois, trocas e checkout protegidos contra processamento simultaneo.
+- [x] Estrutura da fila offline e do rascunho IndexedDB mantida sem alteracao.
+- [x] Upload, Google Drive, pastas e painel supervisor mantidos sem alteracao.
+
+### Seguranca
+- Nenhuma foto ou visita existente e migrada, removida ou regravada pelo deploy.
+- A protecao atua somente enquanto uma nova foto esta sendo processada.
+- O teto de 120 KB e a falha segura para imagens acima do limite permanecem ativos.
+
+### Testes realizados
+- Suite completa com 125 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Testes de regressao verificam bloqueio concorrente, liberacao do canvas, recaptura e decodificacao assincrona.
+- Preview `6aa5ef60fa364161ab84ecbd` validado antes da publicacao e sem erros no console.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao com o bundle `index-wQpzsITU.js`.
+- Dominio produtivo validado ate a tela de acesso e sem erros no console.
+
+## [2026-09-12] - Retomada de upload fragmentado
+
+### Causa
+- Em conexoes interrompidas, o envio de uma visita grande podia parar depois de gravar apenas os primeiros fragmentos.
+- Uma nova tentativa recomecava no primeiro fragmento, aumentando o tempo e a chance de outra interrupcao antes da finalizacao.
+
+### Solucao aplicada
+- O servidor agora oferece uma consulta autenticada dos indices de fragmentos ja recebidos.
+- O aplicativo retoma somente os fragmentos ausentes e repete cada gravacao idempotente em falhas transitorias.
+- A visita continua sendo criada apenas depois da remontagem e verificacao criptografica do payload completo.
+- Correcao publicada no deploy produtivo `6aa589429e2cb9e300a0a9fa`.
+
+### Checklist
+- [x] Fragmentos existentes sao preservados e reutilizados.
+- [x] Fragmentos ausentes continuam obrigatorios antes da finalizacao.
+- [x] Aplicativos anteriores permanecem compativeis com a rota.
+- [x] Nenhuma estrutura de fotos, pastas ou filas foi alterada.
+
+### Seguranca
+- A consulta exige a sessao do promotor e usa o ID autenticado na chave do armazenamento.
+- Um usuario nao consegue consultar nem reutilizar fragmentos pertencentes a outro usuario.
+- A validacao SHA-256 integral permanece ativa antes de aceitar a visita.
+
+### Testes realizados
+- Suite completa com 123 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Preview `6aa588e3875c3a3074f75ef0` validado antes da publicacao.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao com o bundle `index-qF5FnZ4C.js`.
+- A rota de consulta recusou requisicao sem sessao com HTTP 401.
+
+## [2026-09-04] - Data operacional preservada em reenvios offline
+
+### Causa
+- Visitas iniciadas em um dia e sincronizadas no dia seguinte priorizavam o horario do reenvio ao montar a data da planilha e das pastas no Drive.
+- A visita permanecia idempotente, mas podia ser arquivada na data de sincronizacao em vez da data real do check-in.
+
+### Solucao aplicada
+- A data operacional agora prioriza `checkInTime` nos eventos de fotos, na finalizacao e no transformador legado.
+- `timestamp` permanece como fallback somente quando a visita nao possui horario de entrada.
+- Correcao publicada no deploy produtivo `6a9abbae2706936c8b103fd4`.
+
+### Checklist
+- [x] Visita offline reenviada no dia seguinte permanece na data do check-in.
+- [x] Nome da pasta da visita e data da linha usam a mesma referencia.
+- [x] Chave idempotente, fotos, fila local e processamento em segundo plano nao foram alterados.
+
+### Seguranca
+- Nenhum registro produtivo foi editado ou removido durante a auditoria.
+- A alteracao e restrita a escolha de uma data ja presente no payload autenticado.
+- O fallback anterior foi mantido para compatibilidade com registros legados sem check-in.
+
+### Testes realizados
+- Suite completa com 122 testes aprovados, incluindo regressao de envio no dia seguinte.
+- TypeScript e build de producao aprovados.
+- Preview `6a9abb52672d40f47b330a26` validado antes da publicacao.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao.
+
+## [2026-09-04] - Visita iniciada somente pela foto de entrada
+
+### Causa
+- A selecao de um PDV criava imediatamente o ID e o horario da visita, antes de qualquer foto de entrada.
+- Esse rascunho incompleto era restaurado como `Visita em andamento`, inclusive no dia seguinte.
+- Como o cancelamento aparecia somente depois da entrada, um clique acidental podia bloquear outro PDV e levar o usuario a reinstalar o aplicativo.
+
+### Solucao aplicada
+- Selecionar um PDV agora apenas abre provisoriamente a tela da fachada, sem criar visita ou horario de entrada.
+- O ID e o horario passam a ser criados somente depois que a foto de entrada e processada com sucesso.
+- O retorno antes da foto volta diretamente para a lista de PDVs e permite escolher outra loja.
+- Se a foto ja foi registrada, o retorno oferece preservar ou cancelar o registro tambem na tela da fachada.
+- Rascunhos antigos que possuem apenas ID, loja ou horario, mas nenhuma foto de entrada nem check-in confirmado, sao liberados automaticamente.
+- Correcao publicada no deploy produtivo `6a9ab5ac637396b153070a2b`.
+
+### Checklist
+- [x] Clique isolado no PDV nao cria uma visita em andamento.
+- [x] Visitas reais com foto de entrada permanecem preservadas.
+- [x] Rascunhos antigos sem foto sao recuperados sem reinstalacao.
+- [x] Fila offline, uploads, Google Sync e painel supervisor nao foram alterados.
+
+### Seguranca
+- A recuperacao exige ausencia simultanea de foto de entrada, tarefa de check-in e confirmacao de entrada.
+- Nenhuma visita enviada, foto registrada ou item da fila offline e removido.
+- A atualizacao do PWA continua aguardando o fechamento das telas abertas, evitando interromper visitas em execucao.
+
+### Testes realizados
+- Suite completa com 121 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Preview `6a9ab5159792795fa4c614dd` validado antes da publicacao e sem erros no console.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 em producao com o bundle `index-B7eYqlu6.js`.
+
+## [2026-09-01] - Retorno seguro durante visita ativa
+
+### Causa
+- Depois de confirmar a foto de entrada, o painel da visita nao oferecia uma forma segura de voltar para a lista de PDVs.
+- Uma navegacao direta para outro PDV poderia substituir os dados identificadores da visita que ainda estava em andamento.
+
+### Solucao aplicada
+- O painel geral recebeu um botao `Voltar` no topo quando existe uma visita ativa.
+- O botao abre uma escolha entre voltar mantendo todo o registro, cancelar o registro atual ou permanecer na visita.
+- Ao voltar sem cancelar, o PDV atual aparece como `Registro em andamento` e pode ser retomado no ponto salvo.
+- Outros PDVs nao podem substituir uma visita ativa; o usuario precisa retomar ou cancelar o registro primeiro.
+- Correcao publicada no deploy produtivo `6a972a16ae93f44688b628d6`.
+
+### Checklist
+- [x] Fotos e progresso preservados na opcao de apenas voltar.
+- [x] Cancelamento limitado ao rascunho atual.
+- [x] Fila de visitas pendentes nao e removida nem alterada.
+- [x] Fluxos de upload, Google Sync e painel supervisor mantidos sem alteracao.
+
+### Seguranca
+- O cancelamento reutiliza apenas a limpeza controlada do estado da visita atual.
+- Nenhuma API de exclusao do servidor ou da fila offline e chamada pelo novo dialogo.
+- A troca para outro PDV fica bloqueada enquanto existir um registro ativo.
+
+### Testes realizados
+- Suite completa com 117 testes aprovados.
+- TypeScript e build de producao aprovados.
+- Preview `6a9729c393021d4d6aa15520` validado antes da publicacao.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 no dominio produtivo com o bundle `index-BLSBXHs5.js`.
+
+## [2026-08-31] - Reducao de memoria da fila offline
+
+### Causa
+- A consulta executada a cada 15 segundos carregava todas as visitas pendentes com suas fotos em base64 apenas para montar contadores e status.
+- Cada atualizacao de uma visita limpava e regravava a fila inteira no IndexedDB.
+- Alteracoes rapidas no rascunho podiam manter varias copias completas da visita aguardando gravacao.
+
+### Solucao aplicada
+- O IndexedDB recebeu um indice leve por usuario, sem payload ou fotos, usado em contagens e consultas recorrentes.
+- Filas existentes migram automaticamente para a versao nova, preservando os registros e todas as fotos.
+- O indice de filas antigas e criado uma visita por vez, cedendo processamento entre registros para evitar bloquear celulares com muitos arquivos locais.
+- Reenvios carregam apenas uma visita completa por vez.
+- Inclusao, atualizacao e remocao alteram somente o registro selecionado, sem regravar a fila inteira.
+- Salvamentos rapidos do rascunho sao consolidados e sempre preservam o estado mais recente.
+- O deploy inicial `6a95c8bf81e5a1051d211cec` foi revertido preventivamente apos um relato de travamento, posteriormente confirmado como referente ao chat e nao ao aplicativo.
+- A versao final, com migracao gradual adicional, foi publicada no deploy produtivo `6a95d327702381cb61133f58`.
+
+### Checklist
+- [x] Estrutura do payload e fotos offline preservadas.
+- [x] Compatibilidade com filas antigas sem `ownerId` mantida.
+- [x] Nenhum botao de exclusao ou limpeza de fila adicionado.
+- [x] Fluxos de envio Google e painel supervisor mantidos sem alteracao.
+
+### Seguranca
+- O indice armazena somente ID, usuario, loja, status, erro e datas.
+- A leitura completa valida o dono da visita antes de devolver o payload.
+- Atualizacoes nao podem trocar o ID nem sobrescrever fila pertencente a outro usuario.
+
+### Testes realizados
+- Migracao real de IndexedDB v1 para v2 com quatro filas antigas e aproximadamente 1 MB de fotos preservadas.
+- Contagem por usuario, atualizacao isolada, remocao isolada e reenvio unitario.
+- Consolidacao de tres salvamentos rapidos com restauracao do ultimo rascunho.
+- Suite completa com 116 testes, TypeScript e build de producao aprovados.
+- Aplicativo, health, manifesto e service worker responderam HTTP 200 no preview `6a95d2540869cdd269103706` e no dominio produtivo.
+- Tela de login carregada no navegador sem erros ou avisos no console.
+
+## [2026-08-31] - Recuperacao automatica da sincronizacao Google
+
+### Causa
+- A credencial de producao do Netlify nao correspondia ao segredo ativo do servico Google Cloud, fazendo chamadas autenticadas retornarem HTTP 401.
+- Uma visita podia ser gravada no Netlify Blobs sem iniciar a funcao de sincronizacao quando o celular perdia a resposta entre essas duas requisicoes.
+- Jobs antigos que falharam no Google podiam continuar aparentando `processing`, impedindo a recuperacao de tarefas expiradas.
+
+### Solucao aplicada
+- A credencial permanente do Google Cloud foi alinhada no contexto de producao do Netlify e mantida como segredo restrito a Functions.
+- O Cloud Run recebeu a revisao `criativa-sync-ingress-prod-00002-5jg`, com troca atomica e 100% do trafego somente depois de ficar pronta.
+- Clientes compativeis solicitam o inicio da sincronizacao na mesma gravacao da visita; clientes antigos continuam usando o fluxo anterior.
+- Foi adicionada reconciliacao programada a cada cinco minutos, limitada a uma visita antiga por execucao e somente para o provedor `google-v1`.
+- Jobs Google pendentes ha mais de 30 minutos podem receber uma nova geracao idempotente durante a recuperacao autenticada.
+- Foi criado um indice leve de visitas pendentes para evitar carregar fotos em base64 durante a reconciliacao.
+- Correcao publicada no deploy produtivo `6a95b9bf404d46cc591294d2`.
+- Treze visitas Google preservadas no servidor foram conciliadas e finalizadas; a auditoria terminou com 573 de 579 visitas enviadas.
+
+### Checklist
+- [x] Nenhuma fila local do celular e removida ou alterada automaticamente.
+- [x] Visitas novas e sem fotos nao entram na reconciliacao.
+- [x] Erros legados do Make ficam fora da recuperacao automatica.
+- [x] Fluxo anterior permanece como fallback para versoes antigas do aplicativo.
+
+### Seguranca
+- A credencial permanece secreta, restrita a Functions e nao foi gravada no repositorio.
+- A recuperacao reutiliza IDs e comprovantes para preservar a idempotencia no Google Drive.
+- O reconciliador executa apenas uma etapa de uma visita por ciclo para limitar carga e impacto em producao.
+
+### Testes realizados
+- 111 testes automatizados, lint, TypeScript e build de producao aprovados.
+- 22 testes do worker Google e respectivo build aprovados.
+- Autenticacao entre Netlify e Google validada pela rota protegida sem expor o valor da credencial.
+- Aplicativo e `/api/health` responderam HTTP 200 depois do deploy.
+- As seis pendencias restantes foram confirmadas como falhas legadas do Make, entre julho e 17 de agosto, e nao foram alteradas.
+
+## [2026-08-31] - Estabilidade do painel supervisor e leituras operacionais
+
+### Causa
+- O painel carregava centenas de resumos do Netlify Blobs em paralelo; com 559 visitas, execucoes chegaram a 20 segundos e ao limite de 1.024 MB de memoria.
+- Eventos de foco, retorno da internet e `pageshow` podiam iniciar mais de uma atualizacao do painel ao mesmo tempo.
+- A fila de sincronizacao consultava visitas completas, incluindo fotos em base64, embora precisasse apenas de status, loja e promotor.
+
+### Solucao aplicada
+- Leituras de resumos e visitas passaram a usar concorrencia limitada e preservar a ordem dos resultados.
+- O painel ganhou cache autenticado de 60 segundos e reaproveitamento da mesma construcao em chamadas simultaneas no mesmo processo.
+- O aplicativo impede uma segunda atualizacao enquanto a primeira ainda estiver em andamento.
+- A fila de sincronizacao passou a usar somente o indice leve de resumos, sem carregar fotos.
+- Correcao publicada de forma atomica no deploy produtivo `6a959a7dcf34d7c42fde4cac`.
+
+### Checklist
+- [x] Fluxos de fotos, visitas e Google Sync mantidos sem alteracao.
+- [x] Painel, detalhe do promotor, saude operacional e fila validados com 559 registros.
+- [x] Nenhum registro produtivo foi removido ou regravado durante os testes.
+- [x] Rota legada `GET /api/visits` mantida compativel e com concorrencia limitada.
+
+### Seguranca
+- O cache continua protegido pela autenticacao e nao e enviado com cabecalhos publicos de cache.
+- O cache expira em 60 segundos e rejeita datas invalidas ou futuras.
+- A limitacao de concorrencia reduz picos de memoria sem alterar os dados retornados.
+
+### Testes realizados
+- 107 testes automatizados, TypeScript e build de producao aprovados.
+- Preview `6a95995dccc035aee349a15a`: painel frio em 4,1 segundos e chamadas em cache entre 0,37 e 1,76 segundos.
+- Detalhe do promotor, saude operacional e fila retornaram HTTP 200 no preview.
+
+## [2026-08-27] - Recuperacao retrocompativel de lotes Google antigos
+
+### Causa
+- Lotes criados antes da reducao do tamanho de 20 para 5 fotos guardavam apenas o ID da tarefa, sem a lista exata de fotos.
+- Ao consultar uma tarefa antiga concluida, o backend reconstruia a expectativa com o limite novo e rejeitava comprovantes validos ja gravados no Drive.
+- A mensagem de erro ainda mencionava Make, embora o provedor ativo fosse o Google Cloud.
+
+### Solucao aplicada
+- Novos trabalhos agora persistem os IDs exatos das fotos enquanto estiverem pendentes.
+- Trabalhos antigos sao conciliados pelos comprovantes retornados pelo Google, limitados a fotos ainda pendentes da mesma visita.
+- Erros legados de confirmacao passam a permitir uma nova tentativa segura no aplicativo.
+- A validacao continua exigindo IDs unicos, arquivo, URL e correspondencia integral do lote antes da finalizacao da visita.
+- O hotfix foi publicado de forma atomica no deploy de producao `6a90984e140dd4a714264711`.
+- Sete visitas antigas foram recuperadas e finalizadas, totalizando 172 fotos reconhecidas nos manifestos.
+
+### Checklist
+- [x] Fluxo novo de cinco fotos preservado.
+- [x] Compatibilidade adicionada somente para trabalhos antigos sem composicao persistida.
+- [x] Nenhuma fila ou foto e removida automaticamente.
+- [x] Finalizacao continua condicionada a conciliacao integral das fotos.
+
+### Seguranca
+- Comprovantes de outra visita, desconhecidos, duplicados, parciais ou sem arquivo/URL sao rejeitados.
+- O ID da tarefa deve pertencer a visita em processamento.
+- A operacao permanece idempotente e nao recria fotos que ja existem no Google Drive.
+
+### Testes realizados
+- Testes automatizados de reconciliacao legada e composicao persistida.
+- Testes negativos para duplicidade, foto desconhecida, resposta parcial e tarefa de outra visita.
+- Suite completa com 103 testes, tipagem, build e deploy de preview `6a9097e448fd9a78fc22da98` executados antes da producao.
+- Health check produtivo, protecao `401` sem sessao e auditoria de 482 visitas validados apos a publicacao.
+
+## [2026-08-25] - Recuperacao manual de lotes Google
+
+### Causa
+- Lotes que atingiam cinco falhas no Cloud Tasks ficavam em `dead_letter` e o
+  retry existente apenas consultava novamente o mesmo job terminal.
+- O botao `Atualizar status` nao oferecia uma acao de recuperacao ao promotor,
+  embora a visita permanecesse preservada na fila local e no backend.
+
+### Solucao aplicada
+- Foi implementado localmente o modo autenticado de recuperacao de
+  `dead_letter`, criando uma nova geracao da tarefa e preservando os IDs das
+  fotos para reutilizar a deduplicacao do Drive.
+- A tela de envios passa a oferecer `Tentar novamente` apenas para esse erro,
+  com limite de duas tentativas manuais por lote e intervalo de 60 segundos.
+- Depois do limite, o aplicativo sinaliza `Necessita suporte` e nao cria loops
+  automaticos. A recuperacao foi publicada em producao.
+- Os logs mostraram `504` no limite de aproximadamente 300 segundos. O tamanho
+  padrao foi reduzido de 20 para 10 fotos por lote na homologacao, preservando
+  margem para variacoes de latencia do Google Drive.
+- A homologacao confirmou lote de cinco fotos em 32 segundos. A producao foi
+  configurada com lote 5 para manter margem do limite de 300 segundos.
+- O aviso de fila pendente passou a permitir `Continuar trabalhando` sem
+  remover os registros, e as duas opcoes de limpar a fila foram eliminadas.
+
+### Checklist
+- [x] Preservar o fluxo normal e o polling automatico existentes.
+- [x] Exigir sessao e permissao de acesso a visita no endpoint de retry.
+- [x] Limitar e espaçar as recuperacoes manuais por lote.
+- [x] Manter IDs de foto estaveis para impedir duplicidade no Drive.
+- [x] Adicionar testes unitarios, TypeScript e build.
+- [x] Identificar o timeout real de 300 segundos nos logs do worker produtivo.
+- [x] Publicar preview isolado com lote 10 e ingresso de homologacao.
+- [x] Alinhar o token do ingresso no contexto `deploy-preview`.
+- [x] Validar lote 10 e recuperacao idempotente em homologacao.
+- [x] Validar lote 5 abaixo do limite operacional.
+- [x] Remover da interface e do servico a exclusao integral da fila local.
+- [x] Permitir abrir outro PDV mantendo os envios pendentes salvos.
+- [x] Publicar a mitigacao produtiva de forma atomica no Netlify.
+
+### Seguranca
+- Nenhum job terminal e reaberto e nenhuma tarefa e apagada. Cada recuperacao
+  recebe uma identidade nova e mantem o job original para auditoria.
+- O retry nao e automatico e nao pode ser acionado por outro promotor.
+- A mudanca produtiva ficou limitada ao lote 5 e ao deploy atomico; nenhum
+  registro operacional foi apagado ou reaberto.
+- O contexto `deploy-preview` foi configurado com lote 10 durante a validacao;
+  a producao foi promovida somente depois do teste com lote 5.
+- O segredo foi transferido sem ser gravado no repositorio ou em arquivo local,
+  e somente o contexto `deploy-preview` foi atualizado no Netlify.
+- Os lotes sinteticos foram enviados exclusivamente aos servicos e destinos de
+  homologacao; a producao recebeu somente codigo e configuracao validados.
+- A publicacao produtiva nao reiniciou nem removeu visitas. O Netlify manteve a
+  versao anterior ativa ate a troca atomica pelo novo deploy.
+
+### Testes realizados
+- Aplicativo: `99/99` testes aprovados, incluindo a politica que impede excluir
+  a fila e permite continuar trabalhando em outro PDV.
+- TypeScript: `tsc --noEmit` aprovado.
+- Build Vite de producao concluido; permanece apenas o aviso preexistente de
+  bundle principal acima de 500 kB.
+- Preview `6a8dfd567016c9f48fdba9a7` confirmou o provedor `google-v1`, manteve a
+  sonda interna protegida com `401` sem credencial e usou lote 10.
+- O token de `deploy-preview` foi alinhado ao segredo
+  `criativa-sync-ingress-secret`; a leitura autenticada do ingresso retornou o
+  job de controle `completed` com dois recibos.
+- Um lote sintetico com 10 fotos concluiu com 10 recibos. A conclusao foi
+  observada entre 243 e 308 segundos, faixa ainda muito proxima do timeout.
+- O reenvio com identidade `:RETRY:1` concluiu em ate 222 segundos, retornou 10
+  recibos e reutilizou os mesmos 10 IDs de arquivo e a mesma pasta do PDV.
+- A deduplicacao foi aprovada; como o lote 10 ficou proximo do timeout, a
+  promocao produtiva utilizou o lote 5 validado com margem operacional.
+- Um lote adicional de cinco fotos concluiu na homologacao em 32 segundos.
+- A base produtiva confirmou que `VISIT-BEAE0D3A` concluiu 8/8, enquanto
+  `VISIT-9F78346B` (15 fotos) e `VISIT-62DAA44B` (19 fotos) chegaram a
+  `dead_letter` sem recibos. As tres visitas foram criadas entre 15:57:58 e
+  15:58:02, confirmando concorrencia de jobs grandes e nao interferencia dos
+  testes isolados de homologacao.
+- Deploy produtivo `6a8e02c2124360d7e7dc7a86` publicado com lote 5 e
+  recuperacao manual idempotente. Health respondeu `200`, o provedor permaneceu
+  `google-v1` e rotas de sincronizacao sem sessao continuaram retornando `401`.
+- Deploy produtivo final `6a8e0613124360ebc1dc7947` publicou a fila nao
+  bloqueante e removeu a exclusao. O bundle publico e o deploy imutavel possuem
+  o mesmo SHA-256; `Continuar trabalhando` esta presente e `Limpar minha fila`
+  nao existe no JavaScript entregue aos usuarios.
+
+## [2026-08-19] - Migracao produtiva do Make para Google Sync
+
+### Causa
+- O saldo do Make chegou a `75 / 16.000` creditos, com risco imediato de
+  interromper os envios de campo.
+- O fluxo por foto e as confirmacoes do Make continuavam consumindo operacoes,
+  mesmo depois da reducao de qualidade e do agrupamento em lotes.
+
+### Solucao aplicada
+- Foi implementada a ingestao autenticada em lotes de ate 20 fotos, com corpo
+  temporario no Cloud Storage e somente referencias pequenas no Cloud Tasks.
+- O worker privado passou a criar e reutilizar
+  `INDUSTRIA/DATA/PDV[/DEVOLUCOES]` e a finalizar a visita por upsert de
+  `ID_VISITA` na aba `RELATORIO_VISITAS`.
+- Foram criados servicos produtivos separados, fila propria e segredos
+  distintos para a pasta `FOTOS SISTEMA CRIATIVA` e a planilha
+  `Sistema Criativa`.
+- A Netlify recebeu `BACKEND_SYNC_PROVIDER`, URL e token do Google somente no
+  backend. O corte foi publicado no deploy `6a85cd9390a9e46dc390e106`.
+- A funcao em segundo plano passou a aguardar dois segundos entre consultas ao
+  Google, evitando esgotar tentativas enquanto um lote ainda esta processando.
+- A sonda de homologacao foi mantida desabilitada em producao e corrigida para
+  responder `404` quando sua variavel nao existe.
+- Foi criado o orcamento mensal `Criativa - Controle mensal R$ 30`, limitado ao
+  projeto `make-criativa`, com alertas de gasto real em 25%, 50%, 75%, 90% e
+  100%, alem de alerta de previsao em 100%.
+
+### Checklist
+- [x] Homologacao completa sem Make: ingresso, staging, Cloud Tasks, worker,
+  Drive, devolucoes, Sheets e limpeza do staging.
+- [x] Destinos produtivos validados em modo somente leitura.
+- [x] Servicos produtivos criados sem receber trafego durante a preparacao.
+- [x] Camada compativel publicada primeiro com `provider=make`.
+- [x] Frontend produtivo preservado byte a byte durante os deploys do backend.
+- [x] Feature flag alterada para `google-v1` somente depois dos gates anteriores.
+- [x] Conferir as primeiras visitas reais completas pelos recibos persistidos.
+- [x] Configurar orcamento e alertas progressivos de custo no Google Cloud.
+- [ ] Manter observacao reforcada de erros e fila durante o primeiro dia.
+
+### Seguranca
+- O worker produtivo continua privado e aceita somente a identidade da fila.
+- O ingresso publico exige token constante em Secret Manager; chamadas sem
+  token e com token invalido retornaram `401`.
+- Credenciais OAuth e tokens nao foram gravados no repositorio ou nos logs.
+- Nenhuma visita sintetica foi escrita na pasta ou planilha produtiva.
+- O Make nao foi desligado nem alterado e permanece como rollback imediato. O
+  deploy validado anterior ao corte e `6a85cc51880b7360cf530f8e`.
+- O orcamento usa somente notificacoes; nenhum limite automatico de gastos ou
+  desligamento de servico foi habilitado.
+
+### Testes realizados
+- Aplicativo: `96/96` testes, TypeScript e build aprovados.
+- Google Sync: `22/22` testes, build aprovado e `npm audit` sem vulnerabilidades.
+- Homologacao ponta a ponta criou foto normal e devolucao, retornou dois
+  recibos, finalizou a visita e removeu o staging sem duplicidade no retry.
+- Preview Netlify confirmou `google-v1`; a sonda protegida retornou `401` sem
+  token, `401` com token invalido e `200` com token valido.
+- OAuth produtivo listou seis pastas na raiz e leu
+  `RELATORIO_VISITAS!A1:A2` com HTTP `200`, sem escrita.
+- Depois do corte, `/api/health` retornou `provider=google-v1`, rotas sem sessao
+  continuaram em `401`, a sonda interna retornou `404` e os hashes do HTML,
+  service worker, manifesto, JavaScript e CSS permaneceram iguais.
+- Cloud Run registrou zero erros nos servicos produtivos. Depois do corte, oito
+  lotes com 96 fotos e tres finalizacoes reais foram processados; os 11 jobs
+  ficaram `completed`, sem `processing`, `pending` ou `dead_letter`, e a fila
+  voltou a zero.
+- O Google Cloud confirmou a criacao do orcamento em `make-criativa`, no valor
+  de R$ 30,00, exibindo os seis gatilhos configurados e gasto atual de R$ 0,00.
+- O Google Auth Platform do projeto `make-criativa` foi conferido com a conta
+  proprietaria: OAuth externo com status `Em producao`, usando 1 de 100
+  usuarios. O refresh token nao esta sujeito a expiracao semanal de teste.
+
+## [2026-08-19] - Preparacao da migracao Make para Google Cloud
+
+### Causa
+- O processamento produtivo ainda depende de operacoes do Make por foto e pode
+  repetir lotes quando uma resposta ultrapassa o timeout do backend.
+- A migracao precisava comecar sem chamar webhooks, consumir creditos do Make
+  ou interferir nas visitas em andamento.
+
+### Solucao aplicada
+- Projeto `make-criativa`, conta, faturamento, APIs e credenciais existentes
+  foram inventariados em modo somente leitura.
+- Cloud Run, Cloud Tasks, Secret Manager, Artifact Registry, Sheets, Firestore
+  e Cloud Build foram habilitados para a homologacao.
+- Foi criada uma base local isolada com lease, idempotencia, recibo persistido,
+  limite de tentativas, `dead_letter` e nomes deterministas de tarefas.
+- O desenho usa Cloud Storage para o corpo das fotos e envia ao Cloud Tasks
+  somente referencias pequenas, evitando limite de payload e reenvio de base64.
+- Foi criada a conta de runtime sem chave JSON e com acesso minimo a Firestore,
+  Secret Manager, logs e enfileiramento.
+- Firestore, bucket privado, fila limitada, repositorio Docker e recipientes
+  vazios de segredos foram criados em `southamerica-east1`.
+- O primeiro container permanece local, oferece somente `/health` e responde
+  `404` para ingestao, impedindo trafego antes da autenticacao.
+- A imagem `health:20260819-1` foi publicada pelo Cloud Build e implantada no
+  Cloud Run privado `criativa-sync-homolog`, com escala de zero a uma instancia.
+- O bucket temporario recebeu lifecycle de sete dias, mantendo acesso publico
+  bloqueado e controle uniforme de acesso.
+- O cenario produtivo `Criativa Field Ops - Upload V2` foi exportado e
+  conferido em modo somente leitura, sem `Run once`, salvamento ou chamada de
+  webhook. A pasta raiz, a aba `RELATORIO_VISITAS` e as rotas individuais e de
+  lote foram confirmadas contra a implementacao Google.
+- Um cliente OAuth dedicado foi autorizado com somente `drive.file` e
+  `spreadsheets`; o refresh token foi gravado diretamente no Secret Manager.
+- O worker passou a criar a arvore `INDUSTRIA/DATA/PDV[/DEVOLUCOES]`, enviar
+  lotes de ate 20 fotos e fazer upsert por `ID_VISITA`.
+- A limpeza do staging foi movida para depois da persistencia do recibo final.
+  Uma falha parcial agora preserva todos os objetos necessarios para o retry, e
+  falha de limpeza nao transforma um lote ja concluido em erro.
+- Foi implantado o servico privado `criativa-sync-worker-homolog`, apontado
+  somente para pasta e planilha exclusivas de homologacao.
+
+### Testes realizados
+- Projeto Google Cloud e Drive API confirmados pela conta administrativa.
+- Operacao de habilitacao das sete APIs concluiu com sucesso.
+- Testes locais anti-loop adicionados ao servico isolado.
+- Dezessete testes do servico Google aprovados, build TypeScript concluido e
+  `npm audit --omit=dev` sem vulnerabilidades.
+- A conta de runtime foi confirmada sem chaves gerenciadas pelo usuario.
+- Cloud Build `a1184509-8fdc-4c15-88b7-6649d91433c5` terminou com `SUCCESS` em
+  52 segundos.
+- Acesso anonimo ao Cloud Run retornou `403`; health autenticado retornou `200`
+  com `acceptsTraffic=false` e `makeCalled=false`.
+- POST autenticado em `/v1/events` retornou `404`, confirmando que a ingestao
+  ainda nao foi exposta.
+- Lifecycle foi relido no bucket com acao `Delete`, idade sete dias, protecao
+  publica `enforced` e uniform bucket-level access ativo.
+- Cloud Build `3b28062e-31c2-42fc-9825-4d26c3d9f06e` terminou com `SUCCESS` e
+  publicou a imagem do worker pelo digest
+  `sha256:6a35beeaae8e3af1828a1f6292a8327be1d0472f0b7ff2e2083702ddf561cccc`.
+- O worker retornou `403` anonimo e `/health` autenticado retornou `200`, com
+  `role=worker` e `makeCalled=false`.
+- Um lote isolado com foto normal e devolucao criou dois arquivos unicos em
+  `HOMOLOG INDUSTRIA/19-08-2026/PDV TESTE GOOGLE[/DEVOLUCOES]`.
+- A repeticao do mesmo lote retornou o mesmo recibo com HTTP `200`, sem reler o
+  staging e sem duplicar os arquivos; os objetos temporarios foram removidos.
+- A finalizacao isolada retornou `created`, o retry devolveu o mesmo recibo e
+  um novo evento da mesma visita retornou `updated`; a planilha permaneceu com
+  uma unica linha de dados.
+- O dominio produtivo e `/api/health` continuaram respondendo HTTP `200`, com
+  Make V2 ativo no modo `visit-v2`.
+
+### Seguranca
+- Make, Netlify, webhooks e aplicativo produtivo nao foram alterados.
+- A leitura do Make foi limitada ao blueprint e ao painel; nenhum cenario foi
+  executado ou salvo e nenhum credito foi consumido por essa conferencia.
+- Client secret e refresh token ficam apenas no Secret Manager e nao foram
+  gravados no repositorio, no blueprint ou nos logs da aplicacao.
+- A conta de servico nao possui chave JSON gerenciada pelo usuario.
+- Nenhuma rota do Netlify aponta para os recursos novos.
+- O servico de bootstrap OAuth e sua conta temporaria foram removidos depois
+  da autorizacao; o worker permanece privado e com escala maxima de uma
+  instancia.
+- O teste escreveu somente em pasta e planilha de homologacao. A pasta e a
+  planilha produtivas nao receberam dados sinteticos.
+- A ingestao e a feature flag do Netlify continuam desligadas; nao houve corte
+  de trafego e o rollback operacional permanece sendo o Make.
+
+## [2026-08-18] - Lote otimizado e repeticao por timeout interrompida
+
+### Causa
+- Lotes produtivos de 20 fotos consumiam `90` creditos e levavam cerca de um
+  minuto, acima do timeout de `45s` do backend.
+- Dois processamentos consecutivos foram comparados por assinatura e tinham o
+  mesmo `BATCH_ID` e a mesma visita. O Make concluia com `Success`, mas o
+  backend encerrava a espera e reenfileirava todo o lote.
+- O consumo do cenario produtivo nas ultimas 24 horas subiu de `5.449` para
+  `7.488` creditos durante a investigacao.
+
+### Solucao aplicada
+- O lote foi temporariamente desligado pelo rollback documentado e publicado
+  no deploy `6a84a710d8a336a4e181c5e3`; o envio individual permaneceu funcionando
+  sem indisponibilidade.
+- Na homologacao, os arquivos passaram a nascer diretamente dentro do PDV e de
+  `PDV/DEVOLUCOES`. Os modulos 90 e 91, que moviam cada arquivo depois do
+  upload, foram removidos sem retirar a busca idempotente ou a confirmacao HTTP.
+- O blueprint produtivo foi gerado preservando integralmente o webhook original,
+  reexportado e auditado com 74 modulos, pais diretos e sem os modulos 90 e 91.
+- O cenario produtivo permaneceu `Active` e com agendamento
+  `Immediately as data arrives` durante a promocao.
+- O lote foi reativado com tamanho `10` e timeout de `60s` no deploy final
+  `6a84ab1cb1f442e553fc2be6`.
+
+### Testes realizados
+- Foto normal em arvore nova: `Success`, 13 creditos; o ID pai informado na
+  criacao do arquivo foi exatamente o ID retornado pela pasta do PDV.
+- Reenvio da foto normal: `Success` em quatro segundos e 13 creditos; o modulo
+  de arquivo usou `GET`, confirmando reutilizacao sem duplicidade.
+- Devolucao em arvore nova: 15 creditos; o ID pai do arquivo foi exatamente o
+  ID da pasta `DEVOLUCOES`.
+- Reenvio da devolucao: `Success` em cinco segundos e 15 creditos, usando `GET`
+  para o arquivo existente.
+- Lote de 10 imagens, com payload de aproximadamente 1,4 MB: HTTP `200` em
+  38,7 segundos, 10 recibos, 10 IDs unicos e um unico PDV. O custo calculado e
+  confirmado pelo desenho do cenario e de 40 creditos.
+- `npm.cmd test`: 94 testes aprovados; `npm.cmd run lint`: aprovado.
+- Pagina, configuracao e health checks do dominio principal e do deploy unico
+  retornaram `200`; a sonda interna continuou protegida com `404`.
+
+### Seguranca
+- Nenhum login, roteiro, captura ou persistencia de visita foi desligado.
+- O modo individual permaneceu ativo durante toda a troca do blueprint.
+- Nenhuma credencial, URL de webhook, foto de usuario ou identificador de lote
+  foi registrado no codigo ou neste changelog.
+- Pendente observar o primeiro lote real de ate 10 fotos depois do deploy final;
+  nenhum teste sintetico adicional foi feito no Drive produtivo para evitar
+  criar pastas artificiais.
+
+## [2026-08-18] - Lote ativado em producao sem interromper o aplicativo
+
+### Causa
+- O cenario produtivo registrou `5.449` creditos nas ultimas 24 horas. A
+  auditoria mostrou sequencias de fotos individuais com aproximadamente seis
+  creditos por arquivo e intervalos de poucos segundos.
+- A fila restante da homologacao continha somente um evento sintetico com
+  `ROW_WRITE=false`; ela nao bloqueava a producao e foi ignorada para evitar
+  consumo sem beneficio operacional.
+
+### Solucao aplicada
+- O blueprint produtivo atual foi exportado antes da alteracao para
+  `Criativa Field Ops - Upload V2.blueprint.json`.
+- A promocao foi gerada sobre esse backup, preservando integralmente o webhook
+  produtivo e a conexao do Google Drive, enquanto incorporou os modulos 92 a 99
+  e as rotas individuais com `INDUSTRIA/DATA/PDV/DEVOLUCOES`.
+- O cenario `5846231` permaneceu `Active` e com agendamento
+  `Immediately as data arrives`; as rotas individuais nao foram removidas.
+- O Netlify recebeu `BACKEND_MAKE_PHOTO_BATCH_ENABLED=true`, tamanho 20 e
+  timeout de 45 segundos no contexto de producao.
+- O deploy atomico `6a849cf9bdb850e15438466e` publicou a nova versao sem
+  indisponibilidade observada.
+
+### Testes realizados
+- `npm.cmd test`: 94 testes aprovados.
+- `npm.cmd run lint`: TypeScript aprovado sem erros.
+- `npm.cmd run build`: build de producao aprovado.
+- Um lote sintetico com uma foto e `ROW_WRITE=false` respondeu HTTP `200`,
+  `PHOTO_BATCH_UPLOADED` e recibo completo; a execucao terminou com `Success`
+  em sete segundos e 14 creditos.
+- Execucoes individuais de usuarios continuaram terminando com `Success`
+  antes, durante e depois do salvamento do blueprint.
+- Health checks do dominio principal e do deploy unico retornaram `ok=true`,
+  Make V2 ativo e modo `visit-v2`; a sonda interna permaneceu protegida com
+  HTTP `404`.
+- Os logs das funcoes de sincronizacao nao apresentaram erros apos o deploy.
+- A primeira visita real depois da ativacao agrupou sete fotos, percorreu os
+  modulos 92 a 97 e terminou com `Success` em 34 segundos e 38 creditos; o
+  `VISIT_FINALIZE` seguinte terminou com `Success` e quatro creditos.
+- Sete envios individuais custariam aproximadamente 42 creditos somente nas
+  fotos. A economia observada no lote real foi de quatro creditos, cerca de
+  9,5% nessa etapa; com 20 fotos, o desenho idempotente atual tende a economizar
+  aproximadamente 25%, abaixo do prototipo inicial sem idempotencia.
+
+### Seguranca
+- O rollback operacional e manter o cenario ativo e alterar somente
+  `BACKEND_MAKE_PHOTO_BATCH_ENABLED=false`, seguido de redeploy.
+- Nenhuma credencial ou URL de webhook foi registrada no codigo, no changelog
+  ou na saida dos testes.
+- A proxima otimizacao deve reduzir as quatro operacoes por foto da rota
+  idempotente sem retirar o rollback nem interromper a operacao atual.
+
+## [2026-08-18] - Arvore nova do lote validada e testes pausados por limite do Make
+
+### Causa
+- A rota de lote pesquisava industria, data e PDV com os modulos 71, 72 e 73,
+  mas nao criava os niveis ausentes. A primeira visita de uma arvore nova seguia
+  com ID de pasta vazio e falhava no Google Drive.
+
+### Solucao aplicada
+- A copia inativa de homologacao recebeu os modulos 92 a 97 para pesquisar ou
+  criar, em sequencia, industria, data e PDV com uma unica saida por nivel.
+- Os modulos 98 e 99 aplicam o mesmo desenho para a subpasta `DEVOLUCOES`.
+- As referencias de busca, upload, movimentacao e comprovantes passaram a usar
+  os IDs devolvidos pelos novos modulos.
+- O agendamento foi restaurado para `Immediately as data arrives` depois da
+  importacao e o blueprint foi salvo e reexportado para conferencia.
+
+### Testes realizados
+- Uma arvore sintetica totalmente nova foi enviada com `ROW_WRITE=false`; o
+  cliente interrompeu a espera HTTP apos 1.032 ms, mas o Make concluiu a criacao
+  da arvore e do arquivo com `Success` em 8 segundos e 14 creditos.
+- O mesmo lote foi reenviado e respondeu `200` em 5,5 segundos; o Make concluiu
+  com `Success` em 4 segundos e 14 creditos.
+- O ID do arquivo na primeira execucao e no reenvio foi exatamente o mesmo,
+  confirmando a busca idempotente dentro do PDV criado pelo lote.
+- O blueprint salvo contem os modulos 92 a 99 e nao contem mais os antigos
+  modulos de pasta 71, 72, 73 e 79 na rota de lote.
+
+### Limite operacional encontrado
+- A organizacao atingiu aproximadamente `10.030/10.000` creditos, saldo `-30`;
+  o Make informou que os cenarios foram pausados ate 03/09/2026 11:25.
+- O teste de devolucao nao foi executado: um unico evento sintetico ficou na fila
+  exclusiva da homologacao depois da recusa por `exceeded limits`.
+- O cenario de producao continua marcado como `Active`, mas novos processamentos
+  dependem da liberacao de creditos pela organizacao.
+
+### Seguranca
+- O cenario de producao nao foi editado, executado manualmente ou substituido.
+- A homologacao permaneceu `Inactive`; nenhum `VISIT_FINALIZE` ou escrita em
+  planilha foi realizado.
+- Nenhum novo disparo sera feito enquanto o limite de creditos nao for resolvido.
+
+### Pendente
+- Liberar creditos no Make e processar o unico evento de devolucao que esta na
+  fila da homologacao.
+- Reenviar a devolucao para validar a reutilizacao da subpasta e do arquivo.
+- Executar uma visita completa controlada antes de ativar o lote em producao.
+
+## [2026-08-18] - Timeout HTTP real validado no preview Netlify
+
+### Causa testada
+- O backend pode encerrar a espera pela resposta do webhook enquanto o Make
+  continua processando o lote; nesse caso, a retomada envia novamente o mesmo
+  `BATCH_ID` e precisa reutilizar os arquivos ja gravados.
+
+### Solucao aplicada
+- O timeout da chamada ao Make passou a aceitar configuracao protegida, mantendo
+  45 segundos como padrao e limites entre 500 e 60.000 ms.
+- Foi criada uma sonda interna, protegida por flag e token, para executar somente
+  no draft de homologacao os modos `timeout` de 1 segundo e `retry` de 45 segundos.
+- A carga sintetica usa `ROW_WRITE=false`, duas imagens minimas e a arvore de
+  homologacao ja existente `HOMOLOGACAO_LOTE/18-08-2026/PDV TESTE LOTE 20`.
+
+### Validacao
+- O draft `timeout-make-homolog` respondeu `200` no health check e rejeitou a
+  sonda sem token com `401`.
+- A primeira chamada autenticada retornou `504`, `reason=timeout` e
+  `errorType=AbortError` com limite interno de 1.000 ms; o Make continuou e
+  concluiu a execucao em 9 segundos, com status `Success` e 15 creditos.
+- O reenvio do mesmo lote retornou `200` em 9,2 segundos e o Make concluiu em
+  8 segundos, novamente com status `Success` e 15 creditos.
+- Os dois comprovantes do reenvio conservaram exatamente os IDs de arquivo da
+  primeira execucao e o mesmo ID da pasta do PDV, sem evidencia de duplicacao.
+- Uma tentativa diagnostica anterior, em uma arvore nova, falhou no modulo 84
+  com `File not found`, consumindo 6 creditos e revelando que o caminho de lote
+  ainda depende de industria, data e PDV previamente existentes.
+
+### Seguranca
+- Nenhum `VISIT_FINALIZE` foi enviado e nenhuma linha foi criada na planilha.
+- Foram usadas apenas duas imagens sinteticas de 68 bytes.
+- O cenario de homologacao permaneceu inativo e foi executado apenas com
+  `Run once`; o cenario de producao nao foi editado nem executado.
+- Nenhum deploy de producao foi realizado e a flag de lote continua desligada
+  em producao.
+- As variaveis temporarias da sonda foram removidas depois do ensaio.
+
+### Pendente
+- Fazer o caminho de lote criar ou localizar industria, data e PDV antes do
+  Iterator; sem isso, a primeira visita de uma arvore nova nao pode usar lote.
+- Executar uma visita completa controlada antes de avaliar a ativacao em
+  producao.
+
+## [2026-08-18] - Reenvio apos resposta perdida validado na homologacao do Make
+
+### Causa testada
+- Quando o chamador deixa de receber a resposta final do webhook, o mesmo lote
+  pode ser reenviado mesmo que o Make ja tenha gravado as fotos no Drive.
+- A fila exclusiva da homologacao continha cinco eventos sinteticos com
+  `ROW_WRITE=false`; os dois mais recentes eram copias identicas do mesmo lote.
+
+### Solucao aplicada
+- As duas copias finais foram processadas em sequencia como primeira tentativa
+  sem resposta util e reenvio do mesmo `BATCH_ID`.
+- A busca idempotente por nome reutilizou os arquivos existentes e atualizou o
+  conteudo sem criar uma segunda linha no Google Drive.
+
+### Validacao
+- As execucoes finais de 12:21:33 e 12:22:38 consumiram 15 creditos cada e
+  terminaram em 7 e 8 segundos, respectivamente.
+- O status `Warning` foi causado apenas pelo modulo de resposta: o Make nao
+  consegue devolver a resposta original ao processar manualmente dados antigos
+  da fila. Os modulos do Drive concluiram a gravacao normalmente.
+- A pesquisa exata no Drive retornou uma unica ocorrencia de
+  `HOMOLOG_LOTE_20_01.jpg`, ID `1u-p7dxQ16mkDTKETrnNdypQa8CCfeNlj`, e uma
+  unica ocorrencia de `HOMOLOG_IDEMP_V2_FINAL_20260818.jpg`, ID
+  `1oJPsmFp7iBHkHOJR8zzMVNZJs-ndzapK`.
+- Ambos os arquivos permaneceram em `PDV TESTE LOTE 20`; a fila de homologacao
+  foi reduzida de cinco para zero. As cinco execucoes consumiram 75 creditos.
+
+### Seguranca
+- Nenhum evento `VISIT_FINALIZE` foi processado e nenhuma linha de teste foi
+  criada na planilha operacional.
+- O cenario de producao nao foi aberto para edicao, ativado ou executado.
+- O cenario de homologacao permaneceu `Inactive` depois da validacao.
+- Nenhum deploy, push ou alteracao de variavel no Netlify foi realizado.
+
+### Pendente
+- Repetir o teste com timeout HTTP real no preview Netlify para validar tambem
+  a retomada do backend, sem promover a flag de lote para producao.
+
+## [2026-08-18] - Lote idempotente validado na homologacao do Make
+
+### Corrigido
+- O fluxo em lote passou a localizar cada arquivo por nome dentro da pasta
+  final antes de decidir entre obter o arquivo existente ou criar um novo.
+- Cada foto agora segue por uma unica saida linear antes do agregador: busca,
+  obtencao/criacao, atualizacao do conteudo e garantia explicita da pasta pai.
+- Arquivos novos criados na raiz da conta da conexao sao movidos para o PDV ou
+  para `DEVOLUCOES` com `addParents` e `removeParents` antes da resposta.
+
+### Validacao
+- Lote normal misto, com uma foto existente e uma nova, retornou dois recibos
+  e gravou ambos em `HOMOLOGACAO_LOTE/18-08-2026/PDV TESTE LOTE 20`.
+- O mesmo lote foi reenviado com os mesmos IDs e retornou os mesmos IDs de
+  arquivo; o Drive manteve uma unica linha para cada nome.
+- Uma devolucao nova foi gravada em `PDV TESTE LOTE 20/DEVOLUCOES` e o reenvio
+  manteve o mesmo arquivo e a mesma pasta, sem duplicacao.
+- As quatro execucoes finais terminaram com `Success`: duas de 15 creditos no
+  lote normal e duas de 12 creditos em devolucoes, total de 54 creditos.
+- Blueprint salvo e reexportado com os modulos de garantia de pasta presentes.
+- `npm.cmd test`: 92 testes aprovados; `npm.cmd run lint`: sem erros;
+  `npm.cmd run build`: concluido com o aviso conhecido de chunk acima de 500 kB.
+
+### Seguranca
+- Foram usadas apenas imagens sinteticas e nenhum evento `VISIT_FINALIZE` foi
+  enviado; nenhuma linha de teste foi criada na planilha operacional.
+- O cenario de producao nao foi editado, ativado ou executado nesta etapa.
+- A homologacao permaneceu inativa com `Immediately as data arrives` e a flag
+  `BACKEND_MAKE_PHOTO_BATCH_ENABLED` continua desligada por padrao.
+- Nenhum deploy, push ou alteracao de variavel no Netlify foi realizado.
+
+### Pendencias
+- Simular timeout real durante um lote e repetir o evento depois da falha.
+- Executar preview Netlify e uma visita completa controlada antes de avaliar a
+  promocao da funcionalidade para producao.
+
+## [2026-08-18] - Tentativa de idempotencia no lote mantida fora de homologacao
+
+### Verificado
+- Exportado backup do blueprint do cenario inativo `Criativa Field Ops - Upload
+  V2 - HOMOLOG PDV` antes de qualquer alteracao.
+- Gerada variante de blueprint com busca por nome de arquivo dentro do lote e
+  roteamento entre foto nova e foto ja enviada.
+- O Make rejeitou o desenho porque o agregador do lote nao consegue referenciar
+  modulos de upload colocados dentro de um roteador interno por item.
+
+### Seguranca
+- A variante idempotente nao foi executada e nao foi promovida para producao.
+- O blueprint original foi reimportado, o rascunho local de agendamento foi
+  descartado e o cenario permaneceu inativo com `Immediately as data arrives`.
+- O cenario de producao nao foi aberto para edicao nem alterado.
+
+### Pendencias
+- Redesenhar a idempotencia do lote sem depender de agregador comum apos
+  roteador interno, por exemplo com modulo/API que resolva `create` ou
+  `existing` em uma unica saida por foto.
+- Repetir o mesmo lote depois do novo desenho e validar que todos os recibos
+  retornam em uma unica resposta, sem duplicar arquivos.
+
+## [2026-08-18] - Lote de fotos com teto de 20 em homologacao
+
+### Adicionado
+- Contrato local `PHOTO_UPLOAD_BATCH` que agrupa no maximo 20 fotos somente
+  quando industria, data, PDV e destino final sao iguais.
+- Validacao estrita do retorno do Make: o lote so e aceito quando todos os IDs
+  de foto possuem comprovante unico com arquivo e URL no Google Drive.
+- Chaves `BACKEND_MAKE_PHOTO_BATCH_ENABLED` e
+  `BACKEND_MAKE_PHOTO_BATCH_SIZE`; o recurso permanece desligado por padrao.
+- Rota de lote no cenario inativo `Criativa Field Ops - Upload V2 - HOMOLOG
+  PDV`, com Iterator, upload e agregacao dos comprovantes.
+
+### Validacao
+- Lote normal de 20 fotos concluido em 40 segundos, com 20 recibos unicos e
+  todos os arquivos na mesma pasta do PDV.
+- Execucao de 20 fotos consumiu 27 creditos, contra estimativa de 120 creditos
+  no fluxo individual atual, reducao aproximada de 77,5%.
+- Lote de tres devolucoes retornou tres recibos unicos na mesma subpasta
+  `DEVOLUCOES`, diferente da raiz do PDV, consumindo 11 creditos.
+- Testes automatizados do contrato e `tsc --noEmit` aprovados.
+
+### Seguranca
+- O cenario de producao permaneceu ativo e nao foi editado; o cenario de
+  homologacao permaneceu inativo depois dos testes.
+- Nenhum evento `VISIT_FINALIZE` foi enviado e nenhuma linha sintetica foi
+  gravada na planilha operacional.
+- O sincronizador local preserva o envio individual e so seleciona o lote por
+  uma flag explicita, ainda nao configurada no Netlify.
+
+### Pendencias
+- Preservar a busca idempotente pelo nome de cada arquivo dentro do lote antes
+  de ativar o recurso em producao.
+- Simular timeout e repetir o mesmo lote, comprovando que nenhum arquivo e
+  duplicado.
+- Executar preview Netlify e visita controlada completa antes de qualquer troca
+  de webhook ou variavel de producao.
+
+## [2026-08-18] - Homologacao de pastas por PDV e devolucoes no Make
+
+### Alterado
+- Criada uma copia inativa do cenario Make de producao para homologar o layout
+  `INDUSTRIA/DATA/PDV` sem interromper os usuarios.
+- A rota de fotos da copia pesquisa ou cria a pasta do PDV dentro da data da
+  industria antes de localizar ou enviar o arquivo.
+- Fotos com `ETAPA = TROCAS` usam exclusivamente a subpasta `DEVOLUCOES` dentro
+  do PDV; as demais etapas permanecem na raiz do PDV.
+- Respostas `PHOTO_UPLOADED` passam a informar tanto a pasta final do arquivo
+  quanto a pasta raiz do PDV.
+
+### Seguranca
+- O cenario `Criativa Field Ops - Upload V2 - HOMOLOG PDV` permanece inativo e
+  usa webhook exclusivo; o cenario e o webhook de producao nao foram alterados.
+- A busca pelo nome do arquivo foi preservada nos caminhos de retry para evitar
+  uploads duplicados.
+- Nenhum evento `VISIT_FINALIZE` de teste foi enviado para nao gravar linha
+  sintetica na planilha operacional.
+- O webhook de homologacao nao foi registrado em documentacao nem em logs.
+
+### Validacao
+- Blueprint recarregado apos o salvamento com 53 modulos e sem referencias
+  ausentes ou cruzadas entre rotas.
+- Upload normal confirmado em `INDUSTRIA/DATA/PDV`, com `folderId` igual ao
+  `pdvFolderId`.
+- Upload de troca confirmado em `INDUSTRIA/DATA/PDV/DEVOLUCOES`, com pasta final
+  diferente da raiz do PDV.
+- Reenvios normal e de devolucao retornaram os mesmos IDs de arquivo, sem criar
+  duplicatas.
+
+### Pendencias
+- Reconciliar cinco visitas com erro e uma pendente antes de trocar o webhook de
+  producao; uma das falhas e de 17/08/2026 e possui 25 fotos.
+- Executar uma visita completa controlada, incluindo `VISIT_FINALIZE`, em uma
+  janela que permita conferir e remover a linha de teste da planilha.
+- Ativar a copia e trocar `BACKEND_MAKE_WEBHOOK_V2_URL` somente depois dessas
+  validacoes.
+
 ## [2026-08-17] - Observabilidade operacional protegida
 
 ### Alterado

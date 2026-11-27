@@ -1,6 +1,20 @@
 # Checklist do Projeto - Criativa Field Ops
 
-Data da ultima auditoria: 2026-08-17
+Data da ultima auditoria: 2026-08-19
+
+## Producao - Migracao Make para Google Sync
+
+- [x] Ingestao em lotes de ate 20 fotos implementada e autenticada.
+- [x] Cloud Tasks recebe somente referencias; fotos ficam no staging privado.
+- [x] Worker privado cria `INDUSTRIA/DATA/PDV[/DEVOLUCOES]`.
+- [x] Finalizacao usa upsert por `ID_VISITA` em `RELATORIO_VISITAS`.
+- [x] Retry idempotente e `dead_letter` cobertos por teste.
+- [x] Destinos produtivos validados sem escrita.
+- [x] Netlify publicada primeiro com flag `make` e frontend identico.
+- [x] Corte para `google-v1` publicado sem indisponibilidade observada.
+- [x] Make preservado como rollback imediato.
+- [x] Primeiras tres finalizacoes reais reconciliadas, com 96 fotos concluidas.
+- [ ] Logs e fila observados durante o primeiro dia de operacao.
 
 ## Producao - Observabilidade operacional
 
@@ -46,10 +60,12 @@ Data da ultima auditoria: 2026-08-17
 - [x] Testes e typecheck aprovados.
 - [x] Build e preview Netlify aprovados.
 - [ ] Confirmar que nao existem visitas parcialmente enviadas.
-- [ ] Atualizar os modulos de pasta no Make.
-- [ ] Testar uma visita com fotos normais e devolucao.
-- [ ] Confirmar idempotencia ao reenviar a mesma visita.
-- [ ] Publicar em producao somente depois da homologacao do Make.
+- [x] Atualizar os modulos de pasta na copia inativa do cenario Make.
+- [x] Testar uploads normais em `INDUSTRIA/DATA/PDV`.
+- [x] Testar devolucoes em `INDUSTRIA/DATA/PDV/DEVOLUCOES`.
+- [x] Confirmar idempotencia ao reenviar as mesmas fotos.
+- [ ] Testar uma visita completa com `VISIT_FINALIZE` controlado.
+- [x] Publicar em producao somente depois da homologacao do Make.
 
 ## Producao - Fuso horario das visitas
 
@@ -439,3 +455,52 @@ Data da ultima auditoria: 2026-08-17
 - [x] Testes, lint, build e preview Netlify aprovados.
 - [ ] Login `Philipe.almeida` validado no aparelho real.
 - [ ] Preview aprovado para promocao a producao.
+
+## Homologacao - Envio de fotos em lote
+
+- [x] Teto do contrato limitado a 20 fotos.
+- [x] Lotes separados por industria, data, PDV e `DEVOLUCOES`.
+- [x] Resposta exige um comprovante unico para cada foto enviada.
+- [x] Flag de ativacao criada e desligada por padrao.
+- [x] Lote normal de 20 fotos validado com 20 recibos no mesmo PDV.
+- [x] Lote de devolucoes validado dentro da subpasta correta.
+- [x] Prototipo sem idempotencia medido em 27 creditos para 20 fotos.
+- [x] Cenario de producao confirmado ativo e sem alteracoes.
+- [x] Cenario de homologacao confirmado inativo depois do teste.
+- [x] Tentativa de idempotencia com roteador interno rejeitada pelo Make e
+  revertida para o blueprint original.
+- [x] Busca idempotente por arquivo implementada dentro do lote.
+- [x] Estrategia com uma unica saida por foto implementada antes do agregador do
+  lote.
+- [x] Lote misto reenviado com os mesmos IDs e sem duplicar arquivos no PDV.
+- [x] Devolucao reenviada com o mesmo ID e sem duplicar arquivo na subpasta.
+- [x] Quatro execucoes finais confirmadas como `Success`, total de 54 creditos.
+- [x] Perda de resposta e reenvio do mesmo lote validados sem duplicacao.
+- [x] Timeout HTTP real no preview Netlify validado com retomada do backend.
+- [x] Fazer o lote criar industria, data e PDV quando a arvore ainda nao existe.
+- [x] Criar uma arvore normal inedita e reutilizar o mesmo arquivo no reenvio.
+- [x] Creditos adicionais liberados no Make; limite passou para 13.000.
+- [x] Fila de devolucao identificada como evento sintetico, nao bloqueante e
+  mantida fora da producao para evitar consumo adicional.
+- [x] Blueprint produtivo salvo com webhook original, modulos 92 a 99 e
+  agendamento `Immediately as data arrives`.
+- [x] Lote sintetico produtivo validado com `ROW_WRITE=false`, HTTP 200, recibo
+  completo, `Success` e 14 creditos.
+- [x] Flag de lote ativada em producao com tamanho 20 e timeout de 45 segundos.
+- [x] Deploy produtivo atomico e health checks aprovados sem indisponibilidade.
+- [x] Primeiro lote real confirmado com sete fotos, `Success`, 38 creditos e
+  fechamento posterior de quatro creditos.
+- [x] Repeticao do mesmo lote de 20 fotos identificada por `BATCH_ID` e visita;
+  cada tentativa consumia 90 creditos e ultrapassava o timeout de 45 segundos.
+- [x] Rollback temporario para envio individual publicado sem indisponibilidade.
+- [x] Arquivo normal criado diretamente dentro do PDV e devolucao diretamente
+  dentro de `PDV/DEVOLUCOES`.
+- [x] Modulos 90 e 91 removidos; idempotencia e confirmacao HTTP preservadas.
+- [x] Custo interno reduzido de quatro para tres operacoes por foto.
+- [x] Lote de 10 fotos validado com HTTP 200 em 38,7 segundos, 10 recibos e um
+  unico ID de pasta do PDV.
+- [x] Blueprint otimizado promovido preservando webhook, conexao, estado
+  `Active` e agendamento imediato.
+- [x] Lote reativado em producao com tamanho 10 e timeout de 60 segundos.
+- [ ] Confirmar o primeiro lote real de ate 10 fotos depois do deploy otimizado.
+- [ ] Confirmar uma devolucao real na nova subpasta depois da ativacao.

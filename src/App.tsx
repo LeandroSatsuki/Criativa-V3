@@ -9,13 +9,34 @@ import ContentArea from './components/ContentArea';
 import CriativaIcon from './components/CriativaIcon';
 import { SectionId, STORAGE_KEY } from './types';
 import { apiService } from './services/apiService';
-import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X } from 'lucide-react';
+import { LogOut, RefreshCw, AlertCircle, Loader2, CloudUpload, X, Settings } from 'lucide-react';
+import { liteMode, litePilot, setLitePreference, isPhotoCaptureBusy } from './services/liteMode';
+import { pruneConfirmedPhotos } from './services/litePhotos';
+import { confirmQueuedVisit } from './services/confirmQueuedVisit';
 import { appConfig } from './config/appConfig';
 import { clearSession, getLastLoginUser, getSession, SESSION_EXPIRED_EVENT, type SessionEndReason } from './services/session';
 import { HttpRequestError } from './services/httpClient';
-import { clearQueuedVisits, getQueuedVisitCount, listQueuedVisits, removeQueuedVisit, updateQueuedVisit } from './services/syncQueue';
-import { loadVisitDraft, readLegacyVisitState, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
+import {
+  getQueuedVisitCount,
+  listQueuedVisitSummaries,
+  updateQueuedVisit,
+} from './services/syncQueue';
+import { startCameraMonitor } from './services/cameraJournal';
+import { cameraChoice, setCameraChoice, supportsVisitCamera, type CameraChoice } from './services/visitCameraChoice';
+import { loadVisitDraft, requestPersistentVisitStorage, saveVisitDraft } from './services/visitStorage';
 import { resolveSessionSection } from './services/navigationPolicy';
+import { hasStartedVisit, recoverUnstartedVisit } from './services/visitLifecycle';
+import { isStaleSync } from './services/syncAge';
+import { deliverQueuedVisit, isQueuedVisitUploading } from './services/queuedVisitDelivery';
+import { createSingleFlight } from './services/singleFlight';
+import { auditLocalVisitPhotos, type LocalPhotoAudit } from './services/localPhotoAudit';
+import { getQueuedVisit } from './services/syncQueue';
+import { canDiscardAuthorizedVisit, wasVisitDiscarded } from './services/authorizedQueueDiscard';
+import { discardAuthorizedQueue } from './services/discardAuthorizedQueue';
+import { protectVisitPhotos, type PhotoProtection } from './services/photoSafety';
+import { photoRecoveryEnabled } from './services/photoRecoveryClient';
+import { localPhotoIds } from './services/litePhotos';
+import PhotoRecoveryGallery from './components/PhotoRecoveryGallery';
 
 const INITIAL_STATE = {
   user: null, draftOwnerId: null, visitId: null, syncStatus: null, syncError: null, currentStore: '', currentStoreId: '', step: SectionId.Dashboard,
@@ -25,21 +46,21 @@ const INITIAL_STATE = {
 };
 
 type PendingSyncView = {
+  localOnly?: boolean;
   visitId: string;
+  createdAt: string;
   store: string;
   status: string;
   error: string | null;
   sent: number;
   total: number;
+  retry?: {
+    retryable: boolean;
+    available: boolean;
+    remaining: number;
+    retryAfterSeconds: number;
+  };
 };
-
-const hasVisitInProgress = (state: {
-  visitId?: string | null;
-  checkInDone?: boolean;
-  currentStoreId?: string;
-}) => Boolean(
-  state.visitId || state.checkInDone || state.currentStoreId,
-);
 
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -51,18 +72,7 @@ const App: React.FC = () => {
   const loginRequestInFlight = useRef(false);
   const [visitState, setVisitState] = useState(() => {
     try {
-      const saved = readLegacyVisitState(STORAGE_KEY);
       const session = getSession();
-      if (saved) {
-        const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
-        const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
-        return {
-          ...INITIAL_STATE,
-          ...(sessionMatchesDraft ? saved : {}),
-          user: session?.user || null,
-          draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
-        };
-      }
       if (session?.user) return { ...INITIAL_STATE, user: session.user, draftOwnerId: session.user.id };
     } catch (e) {
       console.error("Erro ao carregar estado do localStorage:", e);
@@ -71,7 +81,7 @@ const App: React.FC = () => {
   });
 
   const [activeSection, setActiveSection] = useState<SectionId>(() =>
-    resolveSessionSection(visitState.user?.role, visitState.step, hasVisitInProgress(visitState)),
+    resolveSessionSection(visitState.user?.role, visitState.step, hasStartedVisit(visitState)),
   );
 
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
@@ -81,52 +91,215 @@ const App: React.FC = () => {
   const [promptSyncMessage, setPromptSyncMessage] = useState('');
   const [promptSyncError, setPromptSyncError] = useState<string | null>(null);
   const [promptQueueCount, setPromptQueueCount] = useState(0);
+  const [promptStaleCount, setPromptStaleCount] = useState(0);
   const [pendingSyncs, setPendingSyncs] = useState<PendingSyncView[]>([]);
   const [showSyncStatus, setShowSyncStatus] = useState(false);
   const [draftHydrated, setDraftHydrated] = useState(false);
+  const [draftRestoreFailed, setDraftRestoreFailed] = useState(false);
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+  const [deviceSettingBusy, setDeviceSettingBusy] = useState(false);
+  const [deviceSettingError, setDeviceSettingError] = useState<string | null>(null);
   const persistenceAlertShown = useRef(false);
   const lastSessionRefresh = useRef(0);
+  const automaticUploadBusy = useRef(false);
+  const automaticUploadAttempts = useRef(new Map<string, number>());
+  const statusChecks = useRef(createSingleFlight<void>());
+  const [photoAudit, setPhotoAudit] = useState<{ ownerId: string; visitId: string; report?: LocalPhotoAudit; error?: string } | null>(null);
+  const photoAuditBusy = useRef(false);
+  const [discardBusy, setDiscardBusy] = useState(false);
+  const [protection, setProtection] = useState<{ visitId: string; report?: PhotoProtection; error?: string } | null>(null);
+  const protectionBusy = useRef(false);
+  useEffect(() => {
+    if (visitState.user?.role === 'FIELD_OPS') return startCameraMonitor(String(visitState.user.id));
+  }, [visitState.user?.id, visitState.user?.role]);
+  const safetyDraft = useRef(visitState);
+  safetyDraft.current = visitState;
+  const [discardMessage, setDiscardMessage] = useState<string | null>(null);
+  const activeVisitIdentity = useRef({ ownerId: visitState.user?.id, visitId: visitState.visitId });
+  activeVisitIdentity.current = { ownerId: visitState.user?.id, visitId: visitState.visitId };
+
+  const discardOldAuthorizedVisit = async (visitId: string) => {
+    const user = getSession()?.user;
+    if (!canDiscardAuthorizedVisit(user, visitId) || !user || discardBusy) return;
+    if (!window.confirm(`Remover somente o envio antigo ${visitId}, de BH PRAIA DA COSTA 539?\nEssa visita não será enviada. As visitas novas serão mantidas.`)) return;
+    setDiscardBusy(true); setDiscardMessage(null);
+    try {
+      await discardAuthorizedQueue(user, visitId, () => getSession()?.user.id || null);
+      if (getSession()?.user.id !== user.id) return;
+      if (activeVisitIdentity.current.ownerId === user.id && activeVisitIdentity.current.visitId === visitId) {
+        setVisitState((prev: any) => prev.user?.id === user.id && prev.visitId === visitId
+          ? { ...INITIAL_STATE, user: prev.user, draftOwnerId: user.id, industries: prev.industries, availableStores: prev.availableStores } : prev);
+        setActiveSection(SectionId.CheckIn);
+      }
+      await refreshSyncStatus();
+      setPromptQueueCount(await getQueuedVisitCount(user.id));
+      setDiscardMessage('Somente o envio antigo foi removido. As outras visitas foram mantidas.');
+      window.dispatchEvent(new Event('criativa-sync-queue-updated'));
+    } catch (error: any) { setDiscardMessage(error.message || 'Nao foi possivel remover a pendencia antiga.'); }
+    finally { setDiscardBusy(false); }
+  };
+
+  const inspectSavedPhotos = async (visitId: string) => {
+    const ownerId = getSession()?.user.id;
+    if (!ownerId || photoAuditBusy.current) return;
+    photoAuditBusy.current = true;
+    setPhotoAudit(current => current?.ownerId === ownerId && current.visitId === visitId ? { ...current, error: undefined } : { ownerId, visitId });
+    try {
+      const queued = await getQueuedVisit(ownerId, visitId);
+      if (!queued) throw new Error('O registro nao esta mais na fila local. Atualize o status.');
+      const report = await auditLocalVisitPhotos(ownerId, queued.payload, () => getSession()?.user.id || null);
+      if (getSession()?.user.id === ownerId) setPhotoAudit({ ownerId, visitId, report });
+    } catch (error: any) {
+      if (getSession()?.user.id === ownerId) setPhotoAudit({ ownerId, visitId, error: error.message || 'Nao foi possivel conferir as fotos.' });
+    } finally { photoAuditBusy.current = false; }
+  };
+
+  const protectSavedPhotos = async (visitId: string) => {
+    const ownerId = getSession()?.user.id;
+    if (!ownerId || protectionBusy.current) return;
+    protectionBusy.current = true; setProtection({ visitId });
+    try {
+      const queued = await getQueuedVisit(ownerId, visitId);
+      if (!queued) throw new Error('Registro nao encontrado nesta fila.');
+      const report = await protectVisitPhotos(ownerId, visitId, queued.payload, true);
+      if (getSession()?.user.id === ownerId) setProtection({ visitId, report });
+    } catch (error: any) {
+      if (getSession()?.user.id === ownerId) setProtection({ visitId, error: error.message || 'Nao foi possivel proteger as fotos.' });
+    } finally { protectionBusy.current = false; }
+  };
+
+  useEffect(() => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || !photoRecoveryEnabled(ownerId) || !draftHydrated || loading) return;
+    let cancelled = false, busy = false;
+    const protect = async () => {
+      if (busy || cancelled || !navigator.onLine || document.visibilityState === 'hidden' || isPhotoCaptureBusy()) return;
+      busy = true;
+      try {
+        const draft = safetyDraft.current;
+        if (draft.visitId && localPhotoIds(draft).size) await protectVisitPhotos(ownerId, draft.visitId, draft);
+        const summaries = await listQueuedVisitSummaries(ownerId);
+        for (const summary of summaries.slice(0, 2)) {
+          if (cancelled || getSession()?.user.id !== ownerId || isPhotoCaptureBusy()) break;
+          const queued = await getQueuedVisit(ownerId, summary.visitId);
+          if (queued && localPhotoIds(queued.payload).size) await protectVisitPhotos(ownerId, summary.visitId, queued.payload);
+        }
+      } catch { /* Secondary protection must never block capture or delivery. */ }
+      finally { busy = false; }
+    };
+    const resume = () => { void protect(); };
+    let captureTimer: number | undefined;
+    const afterCapture = (event: Event) => {
+      if ((event as CustomEvent).detail?.ownerId !== ownerId) return;
+      window.clearTimeout(captureTimer);
+      captureTimer = window.setTimeout(resume, 800);
+    };
+    const timer = window.setInterval(resume, 15000);
+    window.addEventListener('online', resume); window.addEventListener('focus', resume);
+    window.addEventListener('criativa-photo-saved', afterCapture);
+    resume();
+    return () => { cancelled = true; window.clearInterval(timer); window.clearTimeout(captureTimer); window.removeEventListener('online', resume); window.removeEventListener('focus', resume); window.removeEventListener('criativa-photo-saved', afterCapture); };
+  }, [visitState.user?.id, draftHydrated, loading]);
+
+  useEffect(() => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || !draftHydrated || loading) return;
+    let cancelled = false;
+    const resumeAutomaticUploads = async () => {
+      if (cancelled || automaticUploadBusy.current || !navigator.onLine || document.visibilityState === 'hidden') return;
+      automaticUploadBusy.current = true;
+      try {
+        const summaries = await listQueuedVisitSummaries(ownerId);
+        const pending = summaries.filter((item) => (item.status === 'pending' || item.status === 'syncing')
+          && Date.now() - (automaticUploadAttempts.current.get(item.visitId) || 0) >= 60_000)
+          .sort((left, right) => (automaticUploadAttempts.current.get(left.visitId) || 0) - (automaticUploadAttempts.current.get(right.visitId) || 0))
+          .slice(0, 2);
+        for (const summary of pending) {
+          if (cancelled || !navigator.onLine) break;
+          automaticUploadAttempts.current.set(summary.visitId, Date.now());
+          try {
+            if (isPhotoCaptureBusy()) break;
+            await deliverQueuedVisit(ownerId, summary.visitId, {
+              status: apiService.getSyncStatus, create: apiService.createVisit, start: apiService.startBackgroundSync,
+            }, () => cancelled ? null : getSession()?.user.id || null);
+          } catch (error) {
+            if (cancelled || getSession()?.user.id !== ownerId) break;
+          }
+          window.dispatchEvent(new Event('criativa-sync-queue-updated'));
+        }
+      } catch (error) {
+        console.error('Falha ao consultar encerramentos pendentes:', error);
+      } finally {
+        automaticUploadBusy.current = false;
+      }
+    };
+    const resume = () => { void resumeAutomaticUploads(); };
+    const timer = window.setInterval(resume, 60_000);
+    window.addEventListener('online', resume);
+    window.addEventListener('pageshow', resume);
+    window.addEventListener('criativa-sync-queue-updated', resume);
+    document.addEventListener('visibilitychange', resume);
+    resume();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('online', resume);
+      window.removeEventListener('pageshow', resume);
+      window.removeEventListener('criativa-sync-queue-updated', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
+  }, [visitState.user?.id, draftHydrated, loading]);
 
   useEffect(() => {
     let cancelled = false;
 
     const restoreDraft = async () => {
-      const saved = await loadVisitDraft(STORAGE_KEY);
+      const session = getSession();
+      // A signed-out screen must neither hydrate photo evidence nor replace it.
+      if (!session?.user) {
+        if (!cancelled) setDraftHydrated(true);
+        return;
+      }
+      const saved = await loadVisitDraft(STORAGE_KEY, session.user.id);
       if (cancelled) return;
 
-      const session = getSession();
       if (saved) {
         const draftOwnerId = saved.draftOwnerId || saved.user?.id || null;
         const sessionMatchesDraft = !draftOwnerId || session?.user.id === draftOwnerId;
-        const restored = sessionMatchesDraft ? saved : {};
+        const restored = sessionMatchesDraft && !wasVisitDiscarded(session.user.id, saved.visitId) ? recoverUnstartedVisit(saved) : null;
         setVisitState({
           ...INITIAL_STATE,
-          ...restored,
+          ...(restored || {}),
           user: session?.user || null,
           draftOwnerId: sessionMatchesDraft ? draftOwnerId : session?.user.id || null,
         });
         setActiveSection(resolveSessionSection(
           session?.user.role,
-          sessionMatchesDraft ? saved.step : SectionId.Dashboard,
-          sessionMatchesDraft && hasVisitInProgress(saved),
+          restored?.step || SectionId.Dashboard,
+          Boolean(restored && hasStartedVisit(restored)),
         ));
       } else if (session?.user) {
         setActiveSection(resolveSessionSection(session.user.role));
       }
 
-      await requestPersistentVisitStorage();
       if (!cancelled) setDraftHydrated(true);
     };
 
     restoreDraft().catch((error) => {
       console.error('Erro ao restaurar rascunho da visita:', error);
-      if (!cancelled) setDraftHydrated(true);
+      if (!cancelled) { setDraftRestoreFailed(true); setDraftHydrated(true); }
     });
 
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    // Covers the first login as well as authenticated openings. A permission
+    // denial must not block login, draft restoration or offline work.
+    if (visitState.user?.id) void requestPersistentVisitStorage();
+  }, [visitState.user?.id]);
 
   useEffect(() => {
     document.title = appConfig.title;
@@ -192,11 +365,12 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!draftHydrated) return;
     loadConfig();
-  }, [visitState.user?.id]);
+  }, [visitState.user?.id, draftHydrated]);
 
   useEffect(() => {
-    if (!visitState.user?.id) return;
+    if (!visitState.user?.id || !draftHydrated || loading) return;
     let cancelled = false;
 
     const renewSession = async (force = false) => {
@@ -209,7 +383,7 @@ const App: React.FC = () => {
         const refreshedUser = await apiService.refreshSession();
         if (cancelled) return;
         setVisitState((prev: any) => ({ ...prev, user: refreshedUser }));
-        await loadConfig(false, true);
+        if (!force) await loadConfig(false, true);
       } catch (error) {
         if (!(error instanceof HttpRequestError && error.status === 401)) {
           console.warn('Sessão não pôde ser renovada agora; o acesso local foi preservado.');
@@ -235,10 +409,10 @@ const App: React.FC = () => {
       window.removeEventListener('focus', handleResume);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [visitState.user?.id]);
+  }, [visitState.user?.id, draftHydrated, loading]);
 
   useEffect(() => {
-    if (!draftHydrated) return;
+    if (!draftHydrated || draftRestoreFailed || !visitState.user) return;
 
     saveVisitDraft(STORAGE_KEY, { ...visitState, step: activeSection }).catch((error) => {
       console.error('Erro ao persistir rascunho da visita:', error);
@@ -247,7 +421,7 @@ const App: React.FC = () => {
         alert('Não foi possível salvar o progresso neste aparelho. Verifique o espaço disponível antes de fechar o aplicativo.');
       }
     });
-  }, [visitState, activeSection, draftHydrated]);
+  }, [visitState, activeSection, draftHydrated, draftRestoreFailed]);
 
   useEffect(() => {
     if (loading || !visitState.user) return;
@@ -256,12 +430,15 @@ const App: React.FC = () => {
 
     setShowPendingSyncPrompt(false);
     setPromptQueueCount(0);
+    setPromptStaleCount(0);
     setPromptSyncError(null);
 
-    getQueuedVisitCount(ownerId).then((queuedCount) => {
+    listQueuedVisitSummaries(ownerId).then((queuedVisits) => {
       if (cancelled) return;
+      const queuedCount = queuedVisits.length;
       if (queuedCount > 0) {
         setPromptQueueCount(queuedCount);
+        setPromptStaleCount(queuedVisits.filter((visit) => isStaleSync(visit.createdAt)).length);
         setPromptSyncMessage(`${queuedCount} envio${queuedCount > 1 ? 's' : ''} pendente${queuedCount > 1 ? 's' : ''} na fila local.`);
         setPromptSyncError(null);
         setShowPendingSyncPrompt(true);
@@ -285,22 +462,25 @@ const App: React.FC = () => {
     window.dispatchEvent(new Event('criativa-sync-queue-updated'));
   };
 
-  const refreshSyncStatus = async () => {
-    const ownerId = visitState.user?.id;
+  const refreshSyncStatus = () => {
+    const ownerId = getSession()?.user.id;
     if (!ownerId) {
       setPendingSyncs([]);
-      return;
+      return Promise.resolve();
     }
 
-    const queuedVisits = await listQueuedVisits(ownerId);
+    return statusChecks.current(ownerId, async () => {
+    const queuedVisits = await listQueuedVisitSummaries(ownerId);
     const next: PendingSyncView[] = [];
     let queueChanged = false;
 
     for (const queuedVisit of queuedVisits) {
+      if (getSession()?.user.id !== ownerId) return;
       try {
         const remote = await apiService.getSyncStatus(queuedVisit.visitId);
+        if (getSession()?.user.id !== ownerId) return;
         if (remote.syncStatus === 'enviado') {
-          await removeQueuedVisit(ownerId, queuedVisit.visitId);
+          await confirmQueuedVisit(ownerId, queuedVisit.visitId, remote.syncStatus);
           queueChanged = true;
           continue;
         }
@@ -315,32 +495,72 @@ const App: React.FC = () => {
 
         next.push({
           visitId: queuedVisit.visitId,
-          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          createdAt: queuedVisit.createdAt,
+          store: queuedVisit.store,
           status: remote.syncStatus,
           error: remote.syncError || null,
           sent: Number(remote.progress?.sent || 0),
           total: Number(remote.progress?.total || 0),
+          retry: remote.retry,
         });
-      } catch {
+      } catch (error: any) {
+        const localOnly = error instanceof HttpRequestError && error.status === 404;
         next.push({
           visitId: queuedVisit.visitId,
-          store: String(queuedVisit.payload?.currentStore || 'Loja não informada'),
+          createdAt: queuedVisit.createdAt,
+          store: queuedVisit.store,
           status: queuedVisit.status,
-          error: queuedVisit.error,
+          localOnly,
+          error: localOnly ? queuedVisit.error || 'Visita salva neste aparelho. O envio ao servidor ainda nao foi concluido.' : queuedVisit.error,
           sent: 0,
           total: 0,
         });
       }
     }
 
+    if (getSession()?.user.id !== ownerId) return;
     setPendingSyncs(next);
     if (queueChanged) notifyQueueChanged();
+    });
+  };
+
+  const retryPendingSync = async (sync: PendingSyncView) => {
+    const ownerId = visitState.user?.id;
+    if (!ownerId || (!sync.localOnly && !sync.retry?.available)) return;
+
+    setPromptSyncError(null);
+    setPendingSyncs((current) => current.map((item) => item.visitId === sync.visitId
+      ? { ...item, status: 'enviando', error: null, retry: { ...item.retry!, available: false } }
+      : item));
+
+    try {
+      if (sync.localOnly) {
+        automaticUploadAttempts.current.set(sync.visitId, Date.now());
+        await deliverQueuedVisit(ownerId, sync.visitId, {
+          status: apiService.getSyncStatus, create: apiService.createVisit, start: apiService.startBackgroundSync,
+        }, () => getSession()?.user.id || null);
+        await refreshSyncStatus();
+        notifyQueueChanged();
+        return;
+      }
+      const result = await apiService.retrySync(sync.visitId);
+      await updateQueuedVisit(ownerId, sync.visitId, { status: 'syncing', error: null });
+      if (result.syncStatus === 'enviando') await apiService.startBackgroundSync(sync.visitId);
+      await refreshSyncStatus();
+      notifyQueueChanged();
+    } catch (error: any) {
+      if (!sync.localOnly && getSession()?.user.id === ownerId) await updateQueuedVisit(ownerId, sync.visitId, {
+        status: 'error',
+        error: error.message || 'Nao foi possivel tentar novamente.',
+      });
+      await refreshSyncStatus();
+    }
   };
 
   const syncPendingQueueFromPrompt = async () => {
     const ownerId = visitState.user?.id;
     if (!ownerId) return;
-    const queuedVisits = await listQueuedVisits(ownerId);
+    const queuedVisits = await listQueuedVisitSummaries(ownerId);
     if (queuedVisits.length === 0) {
       setShowPendingSyncPrompt(false);
       return;
@@ -351,33 +571,12 @@ const App: React.FC = () => {
 
     try {
       for (let index = 0; index < queuedVisits.length; index += 1) {
-        const queuedVisit = queuedVisits[index];
+        const queuedSummary = queuedVisits[index];
         setPromptSyncMessage(`Sincronizando ${index + 1}/${queuedVisits.length}...`);
-        await updateQueuedVisit(ownerId, queuedVisit.visitId, {
-          status: 'syncing',
-          error: null,
-        });
-
-        const draft = await apiService.createVisit({ ...queuedVisit.payload, visitId: queuedVisit.visitId });
-        const serverVisitId = draft.visitId || queuedVisit.visitId;
-        const status = await apiService.getSyncStatus(serverVisitId);
-
-        if (status.syncStatus === 'enviado') {
-          await removeQueuedVisit(ownerId, serverVisitId);
-          if (serverVisitId !== queuedVisit.visitId) {
-            await removeQueuedVisit(ownerId, queuedVisit.visitId);
-          }
-          notifyQueueChanged();
-          continue;
-        }
-
-        if (status.syncStatus !== 'enviando') {
-          await apiService.startBackgroundSync(serverVisitId);
-        }
-        await updateQueuedVisit(ownerId, serverVisitId, {
-          status: 'syncing',
-          error: null,
-        });
+        automaticUploadAttempts.current.set(queuedSummary.visitId, Date.now());
+        await deliverQueuedVisit(ownerId, queuedSummary.visitId, {
+          status: apiService.getSyncStatus, create: apiService.createVisit, start: apiService.startBackgroundSync,
+        }, () => getSession()?.user.id || null);
       }
 
       notifyQueueChanged();
@@ -393,7 +592,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!visitState.user?.id) return;
+    if (!visitState.user?.id || !draftHydrated || loading) return;
 
     const handleResume = () => {
       if (document.visibilityState !== 'hidden') void refreshSyncStatus();
@@ -417,22 +616,41 @@ const App: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('criativa-sync-queue-updated', handleResume);
     };
-  }, [visitState.user?.id]);
+  }, [visitState.user?.id, draftHydrated, loading]);
 
-  const clearCurrentUserQueue = async () => {
+  useEffect(() => {
     const ownerId = visitState.user?.id;
-    if (!ownerId || promptSyncing) return;
-    const confirmed = window.confirm(
-      'Limpar os envios pendentes deste usuário neste aparelho? Visitas ainda não enviadas deixarão de aparecer para reenvio local.',
-    );
-    if (!confirmed) return;
+    if (!ownerId || !draftHydrated || loading || hasStartedVisit(visitState)) return;
+    let busy = false;
+    const clean = async () => {
+      if (busy || document.visibilityState === 'hidden') return;
+      busy = true;
+      try { await pruneConfirmedPhotos(ownerId); }
+      catch (error) { console.warn('Limpeza adiada; fotos locais preservadas.', error); }
+      finally { busy = false; }
+    };
+    void clean();
+    const timer = window.setInterval(clean, 60_000);
+    return () => window.clearInterval(timer);
+  }, [visitState.user?.id, draftHydrated, loading, visitState.visitId, visitState.checkInDone]);
 
-    await clearQueuedVisits(ownerId);
-    setPromptQueueCount(0);
-    setPromptSyncError(null);
-    setPromptSyncMessage('Fila local deste usuário limpa.');
-    setShowPendingSyncPrompt(false);
-    notifyQueueChanged();
+  const changeDeviceMode = async () => {
+    if (deviceSettingBusy || litePilot) return;
+    setDeviceSettingBusy(true);
+    setDeviceSettingError(null);
+    try {
+      const ownerId = visitState.user?.id;
+      if (!ownerId || hasStartedVisit(visitState) || isPhotoCaptureBusy() || promptSyncing || automaticUploadBusy.current
+        || await getQueuedVisitCount(ownerId) > 0) {
+        setDeviceSettingError('Finalize a visita e confirme os envios pendentes antes de trocar o modo.');
+        return;
+      }
+      await saveVisitDraft(STORAGE_KEY, { ...visitState, step: activeSection });
+      setLitePreference(!liteMode);
+      window.location.reload();
+    } catch {
+      setDeviceSettingError('Nao foi possivel trocar o modo. Os registros foram preservados.');
+    } finally { setDeviceSettingBusy(false); }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -445,12 +663,12 @@ const App: React.FC = () => {
     try {
       const userData = await apiService.login(loginForm);
       setLoginForm({ user: userData.user, pass: '' });
-      const sameDraftOwner = !visitState.draftOwnerId || visitState.draftOwnerId === userData.id;
-      const hasActiveVisit = sameDraftOwner && hasVisitInProgress(visitState);
-      setVisitState((prev: any) => sameDraftOwner
-        ? { ...prev, user: userData, draftOwnerId: userData.id }
-        : { ...INITIAL_STATE, user: userData, draftOwnerId: userData.id });
-      setActiveSection(resolveSessionSection(userData.role, visitState.step, hasActiveVisit));
+      const saved = visitState.draftOwnerId === userData.id ? visitState
+        : await loadVisitDraft(STORAGE_KEY, userData.id);
+      const restored = saved && !wasVisitDiscarded(userData.id, saved.visitId) && (!saved.draftOwnerId || saved.draftOwnerId === userData.id)
+        ? recoverUnstartedVisit(saved) : null;
+      setVisitState({ ...INITIAL_STATE, ...(restored || {}), user: userData, draftOwnerId: userData.id });
+      setActiveSection(resolveSessionSection(userData.role, restored?.step, Boolean(restored && hasStartedVisit(restored))));
     } catch (err: any) { 
       setLoginError(err.message);
     } finally {
@@ -469,7 +687,16 @@ const App: React.FC = () => {
     }));
   };
 
-  if (loading) {
+  if (draftRestoreFailed) {
+    return <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center gap-5">
+      <AlertCircle size={40} className="text-orange-600" />
+      <h1 className="text-xl font-black">Não foi possível abrir os registros salvos</h1>
+      <p className="max-w-sm text-slate-600">Seus dados foram preservados. Feche a câmera e outros aplicativos e tente novamente. Não limpe os dados do aplicativo.</p>
+      <button className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-bold" onClick={() => window.location.reload()}>Tentar novamente</button>
+    </div>;
+  }
+
+  if (loading || !draftHydrated) {
     return (
       <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center text-white p-6 text-center">
         <RefreshCw className="w-12 h-12 mb-6 animate-spin text-blue-400" />
@@ -542,6 +769,11 @@ const App: React.FC = () => {
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
                 Existem {promptQueueCount} registro{promptQueueCount !== 1 ? 's' : ''} aguardando sincronização.
               </p>
+              {promptStaleCount > 0 && (
+                <p className="text-xs font-semibold text-orange-700">
+                  {promptStaleCount} envio{promptStaleCount === 1 ? '' : 's'} há mais de 24 horas. Conecte-se e sincronize assim que possível.
+                </p>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -560,7 +792,7 @@ const App: React.FC = () => {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-3">
               {!promptSyncError && (
                 <button
                   disabled={promptSyncing}
@@ -570,24 +802,20 @@ const App: React.FC = () => {
                   {promptSyncing ? 'Sincronizando' : 'Sincronizar agora'}
                 </button>
               )}
-              {promptSyncError && (
+              {!promptSyncing && (
                 <button
-                  disabled={promptSyncing}
                   onClick={() => setShowPendingSyncPrompt(false)}
                   className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
                 >
-                  Depois
-                </button>
-              )}
-              {!promptSyncing && (
-                <button
-                  onClick={clearCurrentUserQueue}
-                  className="flex-1 bg-white border border-slate-200 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]"
-                >
-                  Limpar minha fila
+                  Continuar trabalhando
                 </button>
               )}
             </div>
+            {!promptSyncing && (
+              <p className="text-center text-[10px] font-bold text-slate-400">
+                Os registros permanecem salvos e podem continuar enviando em segundo plano.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -641,16 +869,78 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex items-center justify-between gap-3 text-[9px] font-black uppercase tracking-widest">
                         <span className={hasError ? 'text-orange-600' : 'text-slate-500'}>
-                          {hasError ? 'Erro no envio' : sync.total > 0 ? 'Enviando fotos' : 'Preparando envio'}
+                          {hasError ? 'Erro no envio' : sync.localOnly ? 'Salvo no aparelho' : sync.total > 0 ? 'Enviando fotos' : 'Preparando envio'}
                         </span>
                         <span className="text-slate-400">{sync.sent}/{sync.total || '--'}</span>
                       </div>
                       {sync.error && <p className="text-[10px] font-bold text-orange-700 leading-relaxed">{sync.error}</p>}
+                      {sync.localOnly && /foto local indisponivel|foto pertence/i.test(sync.error || '') && (
+                        <div className="space-y-3">
+                          <button type="button" onClick={() => void inspectSavedPhotos(sync.visitId)} disabled={photoAuditBusy.current}
+                            className="w-full border border-slate-300 text-slate-700 py-3 rounded-xl font-bold text-xs disabled:opacity-50">
+                            {photoAuditBusy.current && photoAudit?.visitId === sync.visitId ? 'Conferindo fotos...' : 'Verificar fotos salvas'}
+                          </button>
+                          {photoAudit?.ownerId === visitState.user?.id && photoAudit.visitId === sync.visitId && (
+                            <div role="status" className="text-xs text-slate-700 space-y-2">
+                              {photoAudit.report && <>
+                                <p>Fotos com dados acessíveis: <strong>{photoAudit.report.readable}</strong></p>
+                                <p>Imagens indisponíveis: <strong>{photoAudit.report.missing}</strong></p>
+                                <p>Imagens diferentes no registro: {photoAudit.report.total}</p>
+                                {photoAudit.report.differentOwner > 0 && <p>{photoAudit.report.differentOwner} referencias nao correspondem a esta conta.</p>}
+                                {photoAudit.report.unverified > 0 && <p>{photoAudit.report.unverified} fotos nao puderam ser verificadas por falha de leitura.</p>}
+                                <p>A conferência não altera fotos nem a fila. Informe estes números ao suporte.</p>
+                                {photoRecoveryEnabled(visitState.user!.id) && <>
+                                  <button type="button" disabled={protectionBusy.current} onClick={() => void protectSavedPhotos(sync.visitId)} className="w-full border border-blue-300 text-blue-800 py-3 rounded-xl font-bold disabled:opacity-50">{protectionBusy.current && protection?.visitId === sync.visitId ? 'Protegendo fotos...' : 'Proteger fotos disponiveis'}</button>
+                                  {protection?.visitId === sync.visitId && protection.report && <p>Copias protegidas no servidor: <strong>{protection.report.protected}</strong>. Fotos nao encontradas: <strong>{protection.report.missing}</strong>. Falhas de conferencia/envio: <strong>{protection.report.failed}</strong>. Ainda nao conferidas: <strong>{protection.report.remaining}</strong>. A visita continua preservada e nao sera confirmada com fotos faltantes.</p>}
+                                  {protection?.visitId === sync.visitId && protection.error && <p>{protection.error}</p>}
+                                  <p className="text-slate-500">Protecao de fotos: 25/11/2026. Copia de seguranca nao equivale a visita enviada ao Drive.</p>
+                                  <PhotoRecoveryGallery ownerId={visitState.user!.id} visitId={sync.visitId} onRecovered={() => { setProtection(null); void inspectSavedPhotos(sync.visitId); }} />
+                                </>}
+                              </>}
+                              {photoAudit.error && <p>{photoAudit.error}</p>}
+                              <p className="break-all text-slate-500">Endereço em uso: {window.location.hostname}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {isStaleSync(sync.createdAt) && (
+                        <p className="text-[10px] font-bold text-orange-700">Pendente há mais de 24 horas. Sincronize com conexão estável.</p>
+                      )}
+                      {sync.localOnly && (
+                        <button type="button" onClick={() => void retryPendingSync(sync)}
+                          disabled={isQueuedVisitUploading(visitState.user!.id, sync.visitId)}
+                          className="w-full bg-orange-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50">
+                          {isQueuedVisitUploading(visitState.user!.id, sync.visitId) ? 'Enviando ao servidor...' : 'Enviar visita salva'}
+                        </button>
+                      )}
+                      {!sync.localOnly && hasError && sync.retry?.retryable && (
+                        <button
+                          type="button"
+                          disabled={!sync.retry.available}
+                          onClick={() => void retryPendingSync(sync)}
+                          className="w-full bg-orange-600 text-white py-3 rounded-xl font-black uppercase tracking-widest text-[10px] disabled:bg-slate-200 disabled:text-slate-500"
+                        >
+                          {sync.retry.remaining === 0
+                            ? 'Necessita suporte'
+                            : sync.retry.retryAfterSeconds > 0
+                              ? `Aguarde ${sync.retry.retryAfterSeconds}s`
+                              : 'Tentar novamente'}
+                        </button>
+                      )}
+                      {canDiscardAuthorizedVisit(visitState.user, sync.visitId) && (
+                        <button type="button" disabled={discardBusy || isQueuedVisitUploading(visitState.user!.id, sync.visitId)}
+                          onClick={() => void discardOldAuthorizedVisit(sync.visitId)}
+                          className="w-full border border-red-200 bg-red-50 text-red-700 py-3 rounded-xl font-bold text-xs disabled:opacity-50">
+                          {discardBusy ? 'Removendo envio antigo...' : 'Remover envio antigo autorizado'}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
+
+            {discardMessage && <p role="status" className="text-sm font-semibold text-slate-700">{discardMessage}</p>}
 
             <button
               onClick={() => void refreshSyncStatus()}
@@ -681,6 +971,9 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {visitState.user?.role === 'FIELD_OPS' && <button type="button" onClick={() => setShowDeviceSettings(true)}
+              className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${liteMode ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-500'}`}
+              title="Preferencias do aparelho" aria-label="Preferencias do aparelho"><Settings size={18} /></button>}
             <div className="hidden md:block text-right mr-4">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Última Sincronização</p>
               <p className="text-[10px] font-bold text-slate-600">
@@ -742,6 +1035,25 @@ const App: React.FC = () => {
           />
         </div>
       </main>
+      {showDeviceSettings && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-5">
+        <div role="dialog" aria-modal="true" aria-labelledby="device-settings-title" className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 id="device-settings-title" className="text-lg font-semibold">Preferencias do aparelho</h2>
+            <button type="button" onClick={() => setShowDeviceSettings(false)} disabled={deviceSettingBusy} aria-label="Fechar preferencias" title="Fechar" className="p-2"><X size={18}/></button>
+          </div>
+          <label className="flex items-center justify-between gap-4 text-sm font-semibold">
+            Modo Lite
+            <input type="checkbox" checked={liteMode} disabled={deviceSettingBusy || litePilot} onChange={() => void changeDeviceMode()} className="h-5 w-5" />
+          </label>
+          {supportsVisitCamera() && <label className="mt-4 block text-sm font-semibold">Câmera para fotos
+            <select className="mt-1 block w-full rounded-lg border p-2" defaultValue={cameraChoice(String(visitState.user?.id || ''))}
+              onChange={event => setCameraChoice(String(visitState.user?.id || ''),event.target.value as CameraChoice)}>
+              <option value="auto">Automática</option><option value="lite">Câmera leve</option><option value="native">Câmera do aparelho</option>
+            </select>
+          </label>}
+          {deviceSettingError && <p role="alert" className="mt-4 text-sm text-orange-700">{deviceSettingError}</p>}
+        </div>
+      </div>}
     </div>
   );
 };

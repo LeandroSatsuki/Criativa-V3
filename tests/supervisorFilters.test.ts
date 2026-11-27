@@ -52,6 +52,16 @@ test('card de cadastrados exclui usuario somente historico', () => {
   );
 });
 
+test('lista inicial mostra apenas promotores cadastrados e ativos', () => {
+  const data = [
+    promoter(),
+    promoter({ id: 'INATIVO', registrationStatus: 'INATIVO' }),
+    promoter({ id: 'HISTORICO', registered: false }),
+  ];
+  assert.deepEqual(filterSupervisorPromoters(data, 'all').map((item) => item.id), ['PROMOTOR-1']);
+  assert.deepEqual(filterSupervisorPromoters(data, 'consult').map((item) => item.id), ['PROMOTOR-1', 'INATIVO', 'HISTORICO']);
+});
+
 test('inativo nao aparece como falta de atualizacao operacional', () => {
   const data = [
     promoter(),

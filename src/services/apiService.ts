@@ -12,10 +12,14 @@ import {
   writeOperationalCache,
 } from './operationalCache';
 import { isNetworkRequestFailure } from './networkStatus';
+import { hasLocalPhotos, readLocalPhoto } from './litePhotos';
+import { sendLiteVisit } from './liteUpload';
+import { getSession } from './session';
+import { liteTestCatalog } from './liteMode';
 import {
   DIRECT_VISIT_PAYLOAD_MAX_BYTES,
+  hasLargeVisitStrings,
   getUtf8ByteLength,
-  splitUtf8Text,
 } from './visitPayload';
 
 const APP_CONFIG_CACHE = 'CRIATIVA_APP_CONFIG_CACHE';
@@ -98,49 +102,9 @@ const buildVisitName = (prefix: string) => {
 
 const toJsonBody = (data: unknown) => JSON.stringify(data);
 
-const buildUploadId = async (serializedPayload: string) => {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(serializedPayload),
-  );
-  return Array.from(new Uint8Array(digest))
-    .slice(0, 16)
-    .map((value) => value.toString(16).padStart(2, '0'))
-    .join('');
-};
-
-const createChunkedVisit = async (payload: any, serializedPayload: string) => {
-  const visitId = String(payload.visitId || buildVisitName('VISIT'));
-  const chunks = splitUtf8Text(serializedPayload);
-  const uploadId = await buildUploadId(serializedPayload);
-
-  for (let index = 0; index < chunks.length; index += 1) {
-    await requestJson('/visits/upload', {
-      method: 'POST',
-      body: toJsonBody({
-        action: 'chunk',
-        uploadId,
-        visitId,
-        index,
-        total: chunks.length,
-        chunk: chunks[index],
-      }),
-    });
-  }
-
-  return requestJson<any>('/visits/upload', {
-    method: 'POST',
-    body: toJsonBody({
-      action: 'finalize',
-      uploadId,
-      visitId,
-      total: chunks.length,
-    }),
-  });
-};
-
 export const apiService = {
   getAppConfig: async (force = false) => {
+    if (liteTestCatalog) return { industries: ['HOMOLOGACAO LITE'], timestamp: null };
     if (!force) {
       const cached = readCachedConfig();
       if (cached) return cached;
@@ -203,6 +167,10 @@ export const apiService = {
   },
 
   getOperationalData: async (user: User, industries: string[]) => {
+    if (liteTestCatalog) return {
+      stores: [{ id: 'HOMOLOG-LITE', name: 'HOMOLOGACAO LITE - NAO OPERACIONAL' }],
+      industries: ['HOMOLOGACAO LITE'], source: 'cache' as const,
+    };
     try {
       const query = new URLSearchParams({ userId: user.id });
       const stores = await requestJson<any[]>(`/stores?${query.toString()}`);
@@ -245,12 +213,12 @@ export const apiService = {
     return Boolean(health.ok);
   },
 
-  getSupervisorDashboard: async () => {
-    return requestJson<SupervisorDashboardResponse>('/supervisor/dashboard');
+  getSupervisorDashboard: async (date?: string) => {
+    return requestJson<SupervisorDashboardResponse>(`/supervisor/dashboard${date ? `?date=${encodeURIComponent(date)}` : ''}`);
   },
 
-  getPromoterExecution: async (id: string) => {
-    return requestJson<SupervisorPromoterDetailResponse>(`/supervisor/promoters/${id}`);
+  getPromoterExecution: async (id: string, date?: string) => {
+    return requestJson<SupervisorPromoterDetailResponse>(`/supervisor/promoters/${encodeURIComponent(id)}${date ? `?date=${encodeURIComponent(date)}` : ''}`);
   },
 
   createVisit: async (payload: any) => {
@@ -258,14 +226,28 @@ export const apiService = {
       ...payload,
       visitId: payload.visitId || buildVisitName('VISIT'),
     };
+    const hasPhotoReferences = hasLocalPhotos(payloadWithVisitId);
+    const sendInChunks = () => {
+      const ownerId = String(getSession()?.user.id || '');
+      return sendLiteVisit(payloadWithVisitId, id => readLocalPhoto(ownerId, id), body => {
+        if (getSession()?.user.id !== ownerId) throw new Error('A sessao mudou. Dados preservados.');
+        return requestJson('/visits/upload', {
+          method: 'POST', retries: body.action === 'finalize' ? 0 : 1,
+          headers: body.action === 'finalize' ? { 'X-Criativa-Start-Sync': 'background' } : undefined,
+          body: toJsonBody(body),
+        });
+      }, !hasPhotoReferences);
+    };
+    if (hasPhotoReferences || hasLargeVisitStrings(payloadWithVisitId)) return sendInChunks();
     const serializedPayload = toJsonBody(payloadWithVisitId);
 
     if (getUtf8ByteLength(serializedPayload) > DIRECT_VISIT_PAYLOAD_MAX_BYTES) {
-      return createChunkedVisit(payloadWithVisitId, serializedPayload);
+      return sendInChunks();
     }
 
     return requestJson<any>('/visits', {
       method: 'POST',
+      headers: { 'X-Criativa-Start-Sync': 'background' },
       body: serializedPayload,
     });
   },

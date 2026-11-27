@@ -20,6 +20,7 @@ export type VisitSummary = {
     storeId?: string;
     checkInTime?: string;
     checkOutTime?: string;
+    automaticCheckout?: { reason: 'end_of_day'; scheduledAt: string; recordedAt: string };
   };
 };
 
@@ -69,6 +70,8 @@ export const buildVisitSummary = (visit: SummarizableVisit): VisitSummary => ({
     storeId: String(visit.payload?.storeId || visit.payload?.currentStoreId || ''),
     checkInTime: visit.payload?.checkInTime || undefined,
     checkOutTime: visit.payload?.checkOutTime || undefined,
+    ...(visit.payload?.automaticCheckout?.reason === 'end_of_day'
+      ? { automaticCheckout: visit.payload.automaticCheckout } : {}),
   },
 });
 

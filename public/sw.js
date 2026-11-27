@@ -13,6 +13,7 @@ const APP_SHELL = [
 ];
 
 const isSensitiveRequestPath = (pathname) =>
+  pathname === '/lite-api' || pathname.startsWith('/lite-api/') ||
   pathname === '/api' ||
   pathname.startsWith('/api/') ||
   pathname === '/.netlify/functions' ||

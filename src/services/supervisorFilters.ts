@@ -2,6 +2,7 @@ import type { SupervisorPromoterOverview } from '../types';
 
 export type SupervisorFilter =
   | 'all'
+  | 'consult'
   | 'active'
   | 'completed'
   | 'sync_pending'
@@ -26,7 +27,8 @@ export const filterSupervisorPromoters = (
 
   return promoters.filter((promoter) => {
     const matchesFilter = (() => {
-      if (filter === 'all') return true;
+      if (filter === 'all') return promoter.registered && promoter.registrationStatus === 'ATIVO';
+      if (filter === 'consult') return true;
       if (filter === 'active') return promoter.registered;
       if (filter === 'completed' || filter === 'duration') return promoter.todayVisits.completed > 0;
       if (filter === 'sync_pending') return promoter.pendingSyncVisits > 0;
